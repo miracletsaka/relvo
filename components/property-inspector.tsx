@@ -12,16 +12,58 @@ import { ExternalLink, RotateCw } from "lucide-react";
 
 // ✅ FIXED: Proper font options
 const FONT_OPTIONS = [
+  // Sans-serif / UI
   { label: "Arial", value: "Arial" },
   { label: "Arial Black", value: "Arial Black" },
   { label: "Verdana", value: "Verdana" },
   { label: "Tahoma", value: "Tahoma" },
   { label: "Trebuchet MS", value: "Trebuchet MS" },
-  { label: "Impact", value: "Impact" },
+  { label: "Helvetica", value: "Helvetica" },
+  { label: "Calibri", value: "Calibri" },
+  { label: "Gill Sans", value: "Gill Sans" },
+  { label: "Century Gothic", value: "Century Gothic" },
+  { label: "Futura", value: "Futura" },
+  // Serif / Editorial / Blog
   { label: "Times New Roman", value: "Times New Roman" },
   { label: "Georgia", value: "Georgia" },
-  { label: "Courier New", value: "Courier New" },
+  { label: "Palatino", value: "Palatino" },
+  { label: "Garamond", value: "Garamond" },
+  { label: "Book Antiqua", value: "Book Antiqua" },
+  { label: "Baskerville", value: "Baskerville" },
+  // Display / Marketing / Impact
+  { label: "Impact", value: "Impact" },
+  { label: "Oswald", value: "Oswald" },
+  { label: "Anton", value: "Anton" },
+  { label: "Bebas Neue", value: "Bebas Neue" },
+  { label: "Rajdhani", value: "Rajdhani" },
+  { label: "Barlow Condensed", value: "Barlow Condensed" },
+  { label: "Black Han Sans", value: "Black Han Sans" },
+  // E-commerce / Modern
+  { label: "Montserrat", value: "Montserrat" },
+  { label: "Poppins", value: "Poppins" },
+  { label: "Lato", value: "Lato" },
+  { label: "Nunito", value: "Nunito" },
+  { label: "Raleway", value: "Raleway" },
+  { label: "Open Sans", value: "Open Sans" },
+  { label: "Roboto", value: "Roboto" },
+  { label: "Inter", value: "Inter" },
+  { label: "DM Sans", value: "DM Sans" },
+  { label: "Outfit", value: "Outfit" },
+  // Elegant / Luxury
+  { label: "Playfair Display", value: "Playfair Display" },
+  { label: "Cormorant Garamond", value: "Cormorant Garamond" },
+  { label: "Libre Baskerville", value: "Libre Baskerville" },
+  { label: "EB Garamond", value: "EB Garamond" },
+  { label: "Cinzel", value: "Cinzel" },
+  // Friendly / Creative
+  { label: "Nunito Sans", value: "Nunito Sans" },
+  { label: "Quicksand", value: "Quicksand" },
   { label: "Comic Sans MS", value: "Comic Sans MS" },
+  { label: "Pacifico", value: "Pacifico" },
+  { label: "Lobster", value: "Lobster" },
+  // Monospace
+  { label: "Courier New", value: "Courier New" },
+  { label: "Inconsolata", value: "Inconsolata" },
 ];
 
 interface PropertyInspectorProps {
@@ -274,6 +316,24 @@ export default function PropertyInspector({
                 onChange={(e) => handleChange({ fontSize: parseInt(e.target.value) })}
                 className="h-7 text-xs"
               />
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs">Text Transform</Label>
+              <Select
+                value={(shape as any).textTransform || "none"}
+                onValueChange={(v) => handleChange({ textTransform: v } as any)}
+              >
+                <SelectTrigger className="h-7 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None (as typed)</SelectItem>
+                  <SelectItem value="uppercase">UPPERCASE</SelectItem>
+                  <SelectItem value="lowercase">lowercase</SelectItem>
+                  <SelectItem value="capitalize">Capitalize Each Word</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-1">

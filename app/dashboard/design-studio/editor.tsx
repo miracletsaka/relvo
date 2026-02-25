@@ -15,7 +15,7 @@ import AdvancedShapeTools from "@/components/advanced-shape-tools";
 import LogoEditor from "@/components/logo-editor";
 import ImageUploader from "@/components/image-uploader";
 import { synthesizeAndSaveTemplate } from "@/lib/api";
-import { getPremiumComponent } from "@/lib/template-components";
+import { getPremiumComponent, PremiumComponentKey } from "@/lib/template-components"
 import { TemplateShape, CampaignData, Template } from "@/lib/types";
 import { Download, Plus, RefreshCcw, Save, Grid3x3, Magnet, MousePointer2, Upload } from "lucide-react";
 import { alignShapes, distributeShapes, reorderShape } from "@/lib/alignment-utils";
@@ -32,6 +32,7 @@ import { Input } from "@/components/ui/input";
 
 import { createTemplate, updateTemplate } from "@/lib/template-storage";
 import { uploadFileToSpaces } from "@/lib/upload-client";
+import { resolveTemplateImages } from "@/lib/resolve-template-images";
 
 const CANVAS_WIDTH = 1080;
 const CANVAS_HEIGHT = 1350;
@@ -105,6 +106,8 @@ export default function EditorPage() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Delete" || e.key === "Backspace") {
+        const tag = (e.target as HTMLElement).tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement).isContentEditable) return;
         if (selectedShapeId || selectedShapeIds.length > 0) {
           e.preventDefault();
           handleDeleteSelected();
@@ -186,9 +189,9 @@ export default function EditorPage() {
         height: 260,
         zIndex: shapes.length + 1,
         opacity: 1,
-        backgroundColor: "#f0f0f0",
-        borderColor: "#cccccc",
-        borderWidth: 2,
+        backgroundColor: "transparent",
+        borderColor: "transparent",
+        borderWidth: 0,
         src: undefined, // ✅ No image yet
         fit: "cover",
         radius: 8,
@@ -313,6 +316,12 @@ export default function EditorPage() {
   };
 
   const handleSelectShape = (id: string, multiSelect: boolean = false) => {
+    if (!id) {
+      // ✅ Deselect all
+      setSelectedShapeId(null);
+      setSelectedShapeIds([]);
+      return;
+    }
     if (multiSelect) {
       setSelectedShapeIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
       setSelectedShapeId(null);
@@ -454,6 +463,7 @@ export default function EditorPage() {
     }
 
     setSaving(true);
+    fitCanvas();
     const file = await canvasToFile(canvasRef.current as HTMLCanvasElement, `${fileBaseName}.png`);
     const url = await uploadFileToSpaces(file);
     try {
@@ -533,14 +543,16 @@ export default function EditorPage() {
     }
   };
 
-  const insertPremiumComponent = (key: "offer" | "hero") => {
+  const insertPremiumComponent = async (key: PremiumComponentKey) => {
     const newShapes = getPremiumComponent(key, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+    const resolvedShapes = await resolveTemplateImages(newShapes, campaignData);
 
     setShapes((prev) => {
       const maxZ = prev.reduce((m, s) => Math.max(m, s.zIndex || 1), 1);
       return [
         ...prev,
-        ...newShapes.map((s, i) => ({ ...s, zIndex: maxZ + i + 1 })),
+        ...resolvedShapes.map((s, i) => ({ ...s, zIndex: maxZ + i + 1 })),
       ];
     });
 
@@ -645,11 +657,57 @@ export default function EditorPage() {
               <Card className="p-4 border-border">
                 <h3 className="text-sm font-semibold text-foreground mb-3">Premium Components</h3>
                 <div className="grid grid-cols-2 gap-2">
-                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("offer")}>
-                    Insert Offer
+                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("offer")}>Offer/Discount</Button>
+                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("hero")}>Hero Product</Button>
+                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("skincare")}>Skincare Split</Button>
+                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("boldBrand")}>Bold Brand</Button>
+                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("flashSale")}>Flash Sale</Button>
+                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("testimonial")}>Testimonial</Button>
+                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("editorial")}>Editorial Blog</Button>
+                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("luxuryDark")}>Luxury Dark</Button>
+                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("splitColor")}>Split Color</Button>
+                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("instagramStory")}>IG Story</Button>
+                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("communityEvent")}>Community Event</Button>
+                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("albumCover")}>Album Cover</Button>
+                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("boldStatement")}>Bold Statement</Button>
+                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("fullBleedHero")}>Full Bleed Hero</Button>
+                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("massiveTypography")}>Massive Type</Button>
+                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("comparison")}>Old vs New</Button>
+                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("collageGrid")}>Collage Grid</Button>
+                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("singleHeroPhoto")}>Hero Photo</Button>
+                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("splitPhotoContent")}>Split Photo</Button>
+                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("magazinePhotoGrid")}>Magazine Grid</Button>
+                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("thoughtLeader")}>Thought Leader</Button>
+                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("lifestyleShowcase")}>Lifestyle Showcase</Button>
+                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("darkEditorial")}>Dark Editorial</Button>
+                </div>
+              </Card>
+
+              <Card className="p-4 border-border space-y-3">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-foreground">✨ Clipdrop AI Templates</h3>
+                  <span className="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
+                    Uses AI Credits
+                  </span>
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  These templates use Clipdrop to remove or replace image backgrounds automatically.
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button variant="outline" size="sm" className="text-xs border-purple-300 text-purple-700" onClick={() => insertPremiumComponent("cdProductFloat")}>
+                    ✨ Product Float
                   </Button>
-                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("hero")}>
-                    Insert Hero
+                  <Button variant="outline" size="sm" className="text-xs border-purple-300 text-purple-700" onClick={() => insertPremiumComponent("cdStatsShowcase")}>
+                    ✨ Stats Showcase
+                  </Button>
+                  <Button variant="outline" size="sm" className="text-xs border-purple-300 text-purple-700" onClick={() => insertPremiumComponent("cdBrandVs")}>
+                    ✨ Brand vs
+                  </Button>
+                  <Button variant="outline" size="sm" className="text-xs border-purple-300 text-purple-700" onClick={() => insertPremiumComponent("cdPersonHero")}>
+                    ✨ Person Hero
+                  </Button>
+                  <Button variant="outline" size="sm" className="text-xs border-purple-300 text-purple-700 col-span-2" onClick={() => insertPremiumComponent("cdLifestyleScene")}>
+                    ✨ Lifestyle Scene
                   </Button>
                 </div>
               </Card>

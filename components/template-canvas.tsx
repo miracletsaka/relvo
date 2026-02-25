@@ -187,23 +187,26 @@ const TemplateCanvas = forwardRef<HTMLCanvasElement, TemplateCanvasProps>(functi
   const getShapeText = (shape: TemplateShape): string => {
     if (shape.type !== "text") return "";
 
-    if (!shape.dataField) return String(shape.customText || "");
-    
-    if (shape.customText) {
-      return shape.customText;
-    }
-    
-    if (shape.dataField) {
+    let text = "";
+    if (!shape.dataField) {
+      text = String(shape.customText || "");
+    } else if (shape.dataField) {
       const field = shape.dataField as string;
       if (field.startsWith("bullet-")) {
         const bulletIndex = parseInt(field.split("-")[1], 10);
-        return campaignData.bullets[bulletIndex] || "";
+        text = campaignData.bullets[bulletIndex] || "";
+      } else {
+        text = (campaignData[field as keyof CampaignData] as string) || "";
       }
-      return (campaignData[field as keyof CampaignData] as string) || "";
     }
-    
-    return "";
-  };
+
+  // ✅ Apply text transform
+  const transform = (shape as any).textTransform || "none";
+  if (transform === "uppercase") return text.toUpperCase();
+  if (transform === "lowercase") return text.toLowerCase();
+  if (transform === "capitalize") return text.replace(/\b\w/g, (c) => c.toUpperCase());
+  return text;
+};
 
   const loadShapeImage = async (url: string) => {
     const cache = shapeImageCacheRef.current;
@@ -693,6 +696,8 @@ const TemplateCanvas = forwardRef<HTMLCanvasElement, TemplateCanvasProps>(functi
         return;
       }
     }
+
+    onShapeSelect?.("", false);
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {

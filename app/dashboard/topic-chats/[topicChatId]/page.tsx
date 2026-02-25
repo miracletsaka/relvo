@@ -252,11 +252,6 @@ export default function TopicChatDetailPage() {
   const bulkApprove = async () => {
     if (!selectedIds.length) return;
 
-    // enforce pending tab only
-    if (tab !== "pending") {
-      alert("✅ Publishing is only available in Pending tab.");
-      return;
-    }
 
     setLoading(true);
     setErr(null);
@@ -474,7 +469,7 @@ export default function TopicChatDetailPage() {
               <div className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
                 Topic Chat Management
               </div>
-              <h1 className="text-4xl md:text-5xl font-bold mt-2 text-foreground">
+              <h1 className="text-4xl line-clamp-2 md:text-5xl font-bold mt-2 text-foreground">
                 {chat?.topic || "—"}
               </h1>
               <div className="text-sm text-muted-foreground mt-3 space-y-1">
@@ -516,6 +511,15 @@ export default function TopicChatDetailPage() {
                     Reject
                   </Button>
                 </>
+              )}
+              {tab === "published" && (
+                <Button
+                  className="text-xs bg-secondary hover:bg-secondary/90 text-secondary-foreground rounded-full disabled:opacity-50"
+                  disabled={!selectedIds.length}
+                  onClick={bulkApprove}
+                >
+                  Republish ({selectedIds.length})
+                </Button>
               )}
             </div>
           </div>
@@ -718,7 +722,7 @@ export default function TopicChatDetailPage() {
                         {/* top row badges */}
                         <div className="flex gap-2 flex-wrap items-center">
                           {/* selection only for pending */}
-                          {tab === "pending" && (
+                          {tab === "pending" || tab === "published" && (
                             <input
                               type="checkbox"
                               checked={!!selected[it.id]}
