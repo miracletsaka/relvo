@@ -677,24 +677,6 @@ export default function TopicChatDetailPage() {
                   </span>
                 )}
               </div>
-
-              <div className="flex gap-2">
-                <Button
-                  className="text-xs rounded-full"
-                  disabled={!selectedIds.length || loading}
-                  onClick={bulkApprove}
-                >
-                  Approve ({selectedIds.length})
-                </Button>
-                <Button
-                  variant="destructive"
-                  className="text-xs rounded-full"
-                  disabled={!selectedIds.length || loading}
-                  onClick={bulkRejectDrafts}
-                >
-                  Reject
-                </Button>
-              </div>
             </div>
           )}
 
@@ -722,7 +704,19 @@ export default function TopicChatDetailPage() {
                         {/* top row badges */}
                         <div className="flex gap-2 flex-wrap items-center">
                           {/* selection only for pending */}
-                          {tab === "pending" || tab === "published" && (
+                          {tab === "pending" && (
+                            <input
+                              type="checkbox"
+                              checked={!!selected[it.id]}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                toggleOne(it.id, e.target.checked);
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              className="rounded border-border"
+                            />
+                          )}
+                          {tab === "published" && (
                             <input
                               type="checkbox"
                               checked={!!selected[it.id]}
