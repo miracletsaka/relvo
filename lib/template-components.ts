@@ -984,11 +984,187 @@ function cdLifestyleSceneBase(): TemplateShape[] {
     withDefaults({ id: id("cta-text"), type: "text", x: 260, y: 1262, width: 560, height: 48, fontSize: 28, fontWeight: 800, textAlign: "center", textColor: "#111111", dataField: "cta", zIndex: 6 }),
   ];
 }
+
+// ─────────────────────────────────────────────
+// 27) SAMSUNG-STYLE LIFESTYLE HERO
+//     Full bleed person photo, bold headline
+//     top center, product name subtitle,
+//     disclaimer bottom left
+// ─────────────────────────────────────────────
+function lifestyleHeroBase(): TemplateShape[] {
+  return [
+    // Soft grey-blue gradient background — visible behind cutout person
+    withDefaults({ id: id("bg"), type: "rectangle", x: 0, y: 0, width: 1080, height: 1350, backgroundColor: "#c8cdd6", borderWidth: 0, zIndex: 0 }),
+
+    // Subtle radial glow center — gives Samsung's soft vignette feel
+    withDefaults({ id: id("bg-glow"), type: "circle", x: 90, y: 200, width: 900, height: 1000, backgroundColor: "rgba(255,255,255,0.35)", borderWidth: 0, zIndex: 1 }),
+
+    // Bottom darker gradient — grounds the person
+    withDefaults({ id: id("bg-bottom"), type: "rectangle", x: 0, y: 900, width: 1080, height: 450, backgroundColor: "rgba(100,110,130,0.4)", borderWidth: 0, zIndex: 2 }),
+
+    // PERSON CUTOUT — bg removed, floats over gradient
+    // Using __clipdrop__ prefix triggers removeBackground() automatically
+    withDefaults({ id: id("hero-cutout"), type: "image", x: 0, y: 0, width: 1080, height: 1350, src: clipdropPhoto("hero-cutout"), fit: "cover", radius: 0, borderWidth: 0, opacity: 1, zIndex: 3 } as any),
+
+    // Headline top center — on top of person
+    withDefaults({ id: id("headline"), type: "text", x: 60, y: 60, width: 960, height: 260, fontSize: 96, fontWeight: 800, textAlign: "center", textColor: "#ffffff", fontFamily: "Arial", dataField: "hook", shadowBlur: 12, shadowX: 0, shadowY: 4, shadowColor: "rgba(0,0,0,0.3)", zIndex: 5 }),
+
+    // Product name subtitle
+    withDefaults({ id: id("product-name"), type: "text", x: 60, y: 330, width: 960, height: 70, fontSize: 42, fontWeight: 600, textAlign: "center", textColor: "#ffffff", fontFamily: "Arial", dataField: "companyName", shadowBlur: 8, shadowX: 0, shadowY: 3, shadowColor: "rgba(0,0,0,0.25)", zIndex: 5 }),
+
+    // Subheading below headline
+    withDefaults({ id: id("sub"), type: "text", x: 60, y: 410, width: 960, height: 70, fontSize: 34, fontWeight: 400, textAlign: "center", textColor: "rgba(255,255,255,0.85)", dataField: "subheading", shadowBlur: 6, shadowX: 0, shadowY: 2, shadowColor: "rgba(0,0,0,0.2)", zIndex: 5 }),
+
+    // CTA pill — bottom center, above person's body
+    withDefaults({ id: id("cta-btn"), type: "rounded-rect", x: 240, y: 1180, width: 600, height: 96, backgroundColor: "rgba(255,255,255,0.95)", borderWidth: 0, borderRadius: 48, shadowBlur: 24, shadowX: 0, shadowY: 10, shadowColor: "rgba(0,0,0,0.3)", zIndex: 6 } as any),
+    withDefaults({ id: id("cta-text"), type: "text", x: 260, y: 1206, width: 560, height: 48, fontSize: 30, fontWeight: 800, textAlign: "center", textColor: "#111111", dataField: "cta", zIndex: 7 }),
+
+    // Disclaimer bottom left
+    withDefaults({ id: id("disclaimer"), type: "text", x: 40, y: 1300, width: 700, height: 44, fontSize: 18, fontWeight: 400, textAlign: "left", textColor: "rgba(255,255,255,0.5)", customText: "*Image simulated for illustrative purposes.", zIndex: 5 } as any),
+  ];
+}
+// ─────────────────────────────────────────────
+// 28) PRODUCT CUTOUT + ABSTRACT BG
+//     Soft gradient bg, product PNG cutout
+//     center-left, abstract wave/particle
+//     effects right, headline top
+// ─────────────────────────────────────────────
+function productAbstractBase(): TemplateShape[] {
+  return [
+    // Soft lavender/grey gradient bg
+    withDefaults({ id: id("bg"), type: "rectangle", x: 0, y: 0, width: 1080, height: 1350, backgroundColor: "#e8e4f0", borderWidth: 0, zIndex: 0 }),
+
+    // Gradient glow blob left
+    withDefaults({ id: id("glow-left"), type: "circle", x: -200, y: 400, width: 900, height: 900, backgroundColor: "rgba(168,85,247,0.15)", borderWidth: 0, zIndex: 1 }),
+
+    // Gradient glow blob right
+    withDefaults({ id: id("glow-right"), type: "circle", x: 500, y: 200, width: 800, height: 800, backgroundColor: "rgba(99,102,241,0.12)", borderWidth: 0, zIndex: 1 }),
+
+    // Abstract wave shape — faked with rotated rounded rect
+    withDefaults({ id: id("wave1"), type: "rounded-rect", x: 200, y: 500, width: 700, height: 400, backgroundColor: "transparent", borderColor: "rgba(168,85,247,0.4)", borderWidth: 3, borderRadius: 200, rotation: -20, zIndex: 2 } as any),
+    withDefaults({ id: id("wave2"), type: "rounded-rect", x: 280, y: 580, width: 600, height: 360, backgroundColor: "transparent", borderColor: "rgba(99,102,241,0.3)", borderWidth: 2, borderRadius: 180, rotation: -20, zIndex: 2 } as any),
+
+    // Particle dots right side
+    withDefaults({ id: id("dot1"), type: "circle", x: 820, y: 380, width: 28, height: 28, backgroundColor: "#a855f7", borderWidth: 0, opacity: 0.8, zIndex: 3 }),
+    withDefaults({ id: id("dot2"), type: "circle", x: 900, y: 440, width: 18, height: 18, backgroundColor: "#818cf8", borderWidth: 0, opacity: 0.7, zIndex: 3 }),
+    withDefaults({ id: id("dot3"), type: "circle", x: 960, y: 520, width: 22, height: 22, backgroundColor: "#60a5fa", borderWidth: 0, opacity: 0.6, zIndex: 3 }),
+    withDefaults({ id: id("dot4"), type: "circle", x: 870, y: 600, width: 14, height: 14, backgroundColor: "#a855f7", borderWidth: 0, opacity: 0.5, zIndex: 3 }),
+    withDefaults({ id: id("dot5"), type: "circle", x: 1000, y: 680, width: 30, height: 30, backgroundColor: "#818cf8", borderWidth: 0, opacity: 0.4, zIndex: 3 }),
+    withDefaults({ id: id("dot6"), type: "circle", x: 820, y: 760, width: 12, height: 12, backgroundColor: "#60a5fa", borderWidth: 0, opacity: 0.6, zIndex: 3 }),
+    withDefaults({ id: id("dot7"), type: "circle", x: 940, y: 820, width: 20, height: 20, backgroundColor: "#a855f7", borderWidth: 0, opacity: 0.5, zIndex: 3 }),
+
+    // PRODUCT CUTOUT — center, slightly left
+    withDefaults({ id: id("product-cutout"), type: "image", x: 140, y: 400, width: 680, height: 680, src: clipdropPhoto("product-cutout"), fit: "contain", radius: 0, borderWidth: 0, opacity: 1, zIndex: 4 } as any),
+
+    // Headline top center
+    withDefaults({ id: id("headline"), type: "text", x: 60, y: 60, width: 960, height: 220, fontSize: 80, fontWeight: 800, textAlign: "center", textColor: "#1e1b4b", fontFamily: "Arial", dataField: "hook", zIndex: 5 }),
+
+    // Product name subtitle
+    withDefaults({ id: id("product-name"), type: "text", x: 60, y: 290, width: 960, height: 70, fontSize: 38, fontWeight: 600, textAlign: "center", textColor: "#4c1d95", fontFamily: "Arial", dataField: "companyName", zIndex: 5 }),
+
+    // Subheading bottom
+    withDefaults({ id: id("sub"), type: "text", x: 60, y: 1110, width: 960, height: 100, fontSize: 36, fontWeight: 400, textAlign: "center", textColor: "#4c1d95", dataField: "subheading", zIndex: 5 }),
+
+    // CTA pill
+    withDefaults({ id: id("cta-btn"), type: "rounded-rect", x: 240, y: 1240, width: 600, height: 90, backgroundColor: "#7c3aed", borderWidth: 0, borderRadius: 45, shadowBlur: 24, shadowX: 0, shadowY: 10, shadowColor: "rgba(124,58,237,0.4)", zIndex: 5 } as any),
+    withDefaults({ id: id("cta-text"), type: "text", x: 260, y: 1262, width: 560, height: 48, fontSize: 30, fontWeight: 800, textAlign: "center", textColor: "#ffffff", dataField: "cta", zIndex: 6 }),
+
+    // Disclaimer
+    withDefaults({ id: id("disclaimer"), type: "text", x: 40, y: 1308, width: 700, height: 40, fontSize: 18, fontWeight: 400, textAlign: "left", textColor: "rgba(0,0,0,0.35)", customText: "*Image simulated for illustrative purposes.", zIndex: 4 } as any),
+  ];
+}
+
+// ─────────────────────────────────────────────
+// 29) CLOUDINARY-STYLE SaaS AD
+//     Dark navy bg, logo+brand top center,
+//     big headline, CTA button, screenshot
+//     mockup bottom with play button overlay
+// ─────────────────────────────────────────────
+function saasAdBase(): TemplateShape[] {
+  return [
+    // Dark navy background
+    withDefaults({ id: id("bg"), type: "rectangle", x: 0, y: 0, width: 1080, height: 1350, backgroundColor: "#0f172a", borderWidth: 0, zIndex: 0 }),
+
+    // Subtle radial glow center
+    withDefaults({ id: id("glow"), type: "circle", x: 140, y: 100, width: 800, height: 600, backgroundColor: "rgba(56,189,248,0.06)", borderWidth: 0, zIndex: 1 }),
+
+    // Brand logo area top
+    withDefaults({ id: id("logo-bg"), type: "rounded-rect", x: 460, y: 60, width: 160, height: 80, backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 0, borderRadius: 12, zIndex: 3 } as any),
+    withDefaults({ id: id("brand"), type: "text", x: 60, y: 70, width: 960, height: 70, fontSize: 38, fontWeight: 700, textAlign: "center", textColor: "#ffffff", dataField: "companyName", zIndex: 4 }),
+
+    // BIG headline
+    withDefaults({ id: id("headline"), type: "text", x: 60, y: 170, width: 960, height: 280, fontSize: 100, fontWeight: 900, textAlign: "center", textColor: "#ffffff", fontFamily: "Arial Black", dataField: "hook", zIndex: 4 }),
+
+    // Subheading
+    withDefaults({ id: id("sub"), type: "text", x: 60, y: 450, width: 960, height: 80, fontSize: 38, fontWeight: 400, textAlign: "center", textColor: "rgba(255,255,255,0.65)", dataField: "subheading", zIndex: 4 }),
+
+    // CTA button — bright blue pill
+    withDefaults({ id: id("cta-btn"), type: "rounded-rect", x: 240, y: 568, width: 600, height: 96, backgroundColor: "#38bdf8", borderWidth: 0, borderRadius: 48, shadowBlur: 28, shadowX: 0, shadowY: 10, shadowColor: "rgba(56,189,248,0.45)", zIndex: 4 } as any),
+    withDefaults({ id: id("cta-text"), type: "text", x: 260, y: 592, width: 560, height: 52, fontSize: 30, fontWeight: 900, textAlign: "center", textColor: "#0f172a", dataField: "cta", textTransform: "uppercase", zIndex: 5 } as any),
+
+    // Screenshot/mockup panel
+    withDefaults({ id: id("mockup-shadow"), type: "rounded-rect", x: 80, y: 710, width: 920, height: 520, backgroundColor: "rgba(0,0,0,0.4)", borderWidth: 0, borderRadius: 20, shadowBlur: 40, shadowX: 0, shadowY: 20, shadowColor: "rgba(0,0,0,0.6)", zIndex: 2 } as any),
+    withDefaults({ id: id("mockup-frame"), type: "rounded-rect", x: 80, y: 700, width: 920, height: 520, backgroundColor: "#1e293b", borderColor: "rgba(255,255,255,0.1)", borderWidth: 1, borderRadius: 20, zIndex: 3 } as any),
+
+    // Screenshot image inside frame
+    withDefaults({ id: id("screenshot"), type: "image", x: 90, y: 710, width: 900, height: 500, src: photoPlaceholder("photo-top"), fit: "cover", radius: 16, borderWidth: 0, opacity: 0.85, zIndex: 4 } as any),
+
+    // Play button circle overlay on screenshot
+    withDefaults({ id: id("play-circle"), type: "circle", x: 440, y: 890, width: 200, height: 200, backgroundColor: "rgba(0,0,0,0.75)", borderColor: "rgba(255,255,255,0.3)", borderWidth: 2, zIndex: 5 }),
+    withDefaults({ id: id("play-icon"), type: "text", x: 440, y: 910, width: 200, height: 160, fontSize: 80, fontWeight: 900, textAlign: "center", textColor: "#ffffff", customText: "▶", zIndex: 6 } as any),
+
+    // URL strip bottom
+    withDefaults({ id: id("url-strip"), type: "rounded-rect", x: 60, y: 1248, width: 960, height: 80, backgroundColor: "#38bdf8", borderWidth: 0, borderRadius: 12, zIndex: 4 } as any),
+    withDefaults({ id: id("url-text"), type: "text", x: 80, y: 1264, width: 920, height: 50, fontSize: 28, fontWeight: 600, textAlign: "center", textColor: "#0f172a", dataField: "proof", zIndex: 5 }),
+  ];
+}
+
+// ─────────────────────────────────────────────
+// 30) 3D CHARACTER + DASHBOARD (Clickly style)
+//     Dark gradient bg, big question headline,
+//     bold red CTA, 3D character cutout center,
+//     dashboard screenshot behind, price badge
+// ─────────────────────────────────────────────
+function characterDashboardBase(): TemplateShape[] {
+  return [
+    // Dark maroon/brown gradient bg
+    withDefaults({ id: id("bg"), type: "rectangle", x: 0, y: 0, width: 1080, height: 1350, backgroundColor: "#1a0a0a", borderWidth: 0, zIndex: 0 }),
+
+    // Radial glow center
+    withDefaults({ id: id("glow-center"), type: "circle", x: 90, y: 300, width: 900, height: 900, backgroundColor: "rgba(180,30,30,0.25)", borderWidth: 0, zIndex: 1 }),
+    withDefaults({ id: id("glow-top"), type: "circle", x: 290, y: -200, width: 500, height: 500, backgroundColor: "rgba(200,50,50,0.15)", borderWidth: 0, zIndex: 1 }),
+
+    // BIG question headline top
+    withDefaults({ id: id("headline"), type: "text", x: 60, y: 60, width: 960, height: 280, fontSize: 104, fontWeight: 900, textAlign: "center", textColor: "#ffffff", fontFamily: "Arial Black", dataField: "hook", zIndex: 4 }),
+
+    // Red CTA button — high contrast
+    withDefaults({ id: id("cta-btn"), type: "rounded-rect", x: 140, y: 360, width: 800, height: 110, backgroundColor: "#dc2626", borderWidth: 0, borderRadius: 55, shadowBlur: 30, shadowX: 0, shadowY: 12, shadowColor: "rgba(220,38,38,0.55)", zIndex: 4 } as any),
+    withDefaults({ id: id("cta-text"), type: "text", x: 160, y: 388, width: 760, height: 58, fontSize: 36, fontWeight: 900, textAlign: "center", textColor: "#ffffff", dataField: "cta", zIndex: 5 }),
+
+    // Dashboard screenshot behind character
+    withDefaults({ id: id("dashboard-frame"), type: "rounded-rect", x: 60, y: 520, width: 960, height: 580, backgroundColor: "#1e293b", borderColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderRadius: 16, shadowBlur: 30, shadowX: 0, shadowY: 15, shadowColor: "rgba(0,0,0,0.6)", zIndex: 2 } as any),
+    withDefaults({ id: id("dashboard-img"), type: "image", x: 70, y: 530, width: 940, height: 560, src: clipdropPhoto("photo-top"), fit: "cover", radius: 12, borderWidth: 0, opacity: 0.7, zIndex: 3 } as any),
+
+    // 3D CHARACTER CUTOUT — overlapping everything, center-bottom
+    withDefaults({ id: id("character-cutout"), type: "image", x: 240, y: 460, width: 600, height: 780, src: clipdropPhoto("person-cutout"), fit: "contain", radius: 0, borderWidth: 0, opacity: 1, zIndex: 6 } as any),
+
+    // Price badge — yellow circle bottom left
+    withDefaults({ id: id("price-circle"), type: "circle", x: 40, y: 880, width: 280, height: 280, backgroundColor: "#fbbf24", borderWidth: 0, shadowBlur: 20, shadowX: 0, shadowY: 8, shadowColor: "rgba(0,0,0,0.4)", zIndex: 7 }),
+    withDefaults({ id: id("price-label"), type: "text", x: 50, y: 900, width: 260, height: 50, fontSize: 26, fontWeight: 700, textAlign: "center", textColor: "#1a0a0a", customText: "LIMITED TIME", zIndex: 8 } as any),
+    withDefaults({ id: id("price-label2"), type: "text", x: 50, y: 950, width: 260, height: 50, fontSize: 24, fontWeight: 600, textAlign: "center", textColor: "#1a0a0a", customText: "OFFER", zIndex: 8 } as any),
+    withDefaults({ id: id("price-amount"), type: "text", x: 50, y: 1000, width: 260, height: 100, fontSize: 80, fontWeight: 900, textAlign: "center", textColor: "#1a0a0a", fontFamily: "Arial Black", dataField: "proof", zIndex: 8 }),
+    withDefaults({ id: id("price-term"), type: "text", x: 50, y: 1092, width: 260, height: 50, fontSize: 26, fontWeight: 700, textAlign: "center", textColor: "#1a0a0a", customText: "LIFETIME", zIndex: 8 } as any),
+
+    // Bottom brand strip
+    withDefaults({ id: id("brand-strip"), type: "rectangle", x: 0, y: 1278, width: 1080, height: 72, backgroundColor: "rgba(0,0,0,0.5)", borderWidth: 0, zIndex: 6 }),
+    withDefaults({ id: id("brand-text"), type: "text", x: 60, y: 1290, width: 960, height: 52, fontSize: 30, fontWeight: 700, textAlign: "center", textColor: "rgba(255,255,255,0.7)", dataField: "companyName", zIndex: 7 }),
+  ];
+}
 // ─────────────────────────────────────────────
 // EXPORTS
 // ─────────────────────────────────────────────
 export type PremiumComponentKey =
-  | "offer" | "hero" | "skincare" | "boldBrand" | "flashSale" | "albumCover" | "thoughtLeader" | "lifestyleShowcase" | "darkEditorial"
+  | "offer" | "hero" | "skincare" | "boldBrand" | "flashSale" | "albumCover" | "thoughtLeader" | "lifestyleShowcase" | "darkEditorial" | "lifestyleHero" | "productAbstract" | "saasAd" | "characterDashboard"
   | "testimonial" | "editorial" | "luxuryDark" | "splitColor"  | "boldStatement" | "collageGrid" | "singleHeroPhoto" | "splitPhotoContent" | "magazinePhotoGrid"
   | "instagramStory" | "communityEvent" | "fullBleedHero" | "massiveTypography" | "comparison"| "cdProductFloat" | "cdStatsShowcase" | "cdBrandVs" | "cdPersonHero" | "cdLifestyleScene"; // ← add this
 
@@ -1027,6 +1203,10 @@ export function getPremiumComponent(
     cdBrandVs: cdBrandVsBase,
     cdPersonHero: cdPersonHeroBase,
     cdLifestyleScene: cdLifestyleSceneBase,
+    lifestyleHero: lifestyleHeroBase,
+    productAbstract: productAbstractBase,
+    saasAd: saasAdBase,
+    characterDashboard: characterDashboardBase,
   };
   const fn = map[key];
   if (!fn) return [];

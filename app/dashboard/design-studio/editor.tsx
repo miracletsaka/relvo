@@ -680,6 +680,10 @@ export default function EditorPage() {
                   <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("thoughtLeader")}>Thought Leader</Button>
                   <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("lifestyleShowcase")}>Lifestyle Showcase</Button>
                   <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("darkEditorial")}>Dark Editorial</Button>
+                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("lifestyleHero")}>Lifestyle Hero</Button>
+                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("productAbstract")}>Product Abstract</Button>
+                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("saasAd")}>SaaS Ad</Button>
+                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("characterDashboard")}>3D Character</Button>
                 </div>
               </Card>
 
