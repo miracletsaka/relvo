@@ -20,6 +20,23 @@ export type Status =
   | "PUBLISHED"
   | "FAILED";
 
+
+export async function listTemplates(params?: { brand_id?: string; platform?: string }) {
+  const qs = new URLSearchParams();
+  if (params?.brand_id) qs.set("brand_id", params.brand_id);
+  if (params?.platform) qs.set("platform", params.platform);
+
+  const res = await fetch(`/api/templates?${qs.toString()}`, {
+    credentials: "include",
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to list templates");
+  }
+
+  return res.json();
+}
+
 export interface ContentItem {
   id: string;
   topic_id: string;

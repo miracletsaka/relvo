@@ -1,86 +1,131 @@
-const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY!;
+export type VoiceId = "rachel" | "adam" | "bella" | "josh" | "elli" | "antoni" | "domi" | "thomas";
 
-// ── Free voices available on all plans ──────────────────────────────────
-export const VOICES = {
-  rachel:  "21m00Tcm4TlvDq8ikWAM", // warm, professional female
-  adam:    "pNInz6obpgDQGcFmaJgB", // deep, confident male
-  bella:   "EXAVITQu4vr4xnSDxMaL", // soft, friendly female
-  antoni:  "ErXwobaYiN019PkySvjV", // well-rounded male
-  josh:    "TxGEqnHWrfWFTfGW9XjX", // deep, narrative male
-  arnold:  "VR6AewLTigWG4xSOukaG", // strong, commanding
-} as const;
+const VOICE_MAP: Record<VoiceId, string> = {
+  rachel:  "21m00Tcm4TlvDq8ikWAM",
+  adam:    "pNInz6obpgDQGcFmaJgB",
+  bella:   "EXAVITQu4vr4xnSDxMaL",
+  josh:    "TxGEqnHWrfWFTfGW9XjX",
+  elli:    "MF3mGyEYCl7XYWbV9V6O",
+  antoni:  "ErXwobaYiN019PkySvjV",
+  domi:    "AZnzlk1XvdvUeBnXmlld",
+  thomas:  "GBv7mTt0atIp3Br8iCZE",
+};
 
-export type VoiceId = keyof typeof VOICES;
+const API_KEY = process.env.ELEVENLABS_API_KEY!;
+const BASE    = "https://api.elevenlabs.io/v1";
 
-export interface ElevenLabsResult {
-  audioBuffer: Buffer | null;
-  error?: string;
+export interface WordTiming {
+  word:       string;
+  start_time: number;
+  end_time:   number;
+}
+
+export interface GenerateVoiceoverResult {
+  audioBuffer:  ArrayBuffer | null;
+  wordTimings:  WordTiming[] | null;
+  durationSecs: number | null;
 }
 
 export async function generateVoiceover(
-  text: string,
+  text:    string,
   voiceId: VoiceId = "rachel",
-  stability     = 0.5,
-  similarityBoost = 0.75
-): Promise<ElevenLabsResult> {
+): Promise<GenerateVoiceoverResult> {
 
-  if (!ELEVENLABS_API_KEY) {
-    console.warn("[elevenlabs] No API key — skipping voiceover");
-    return { audioBuffer: null, error: "No API key" };
-  }
+  const id = VOICE_MAP[voiceId] ?? VOICE_MAP.rachel;
+  const body = {
+    text,
+    model_id:       "eleven_turbo_v2",
+    voice_settings: { stability: 0.45, similarity_boost: 0.82, style: 0.35, use_speaker_boost: true },
+  };
 
-  if (!text?.trim()) {
-    return { audioBuffer: null, error: "No text provided" };
-  }
-
+  // ── Try /with-timestamps first — gives word-level sync ───────────────
   try {
-    const voice = VOICES[voiceId];
+    const res = await fetch(`${BASE}/text-to-speech/${id}/with-timestamps`, {
+      method:  "POST",
+      headers: { "xi-api-key": API_KEY, "Content-Type": "application/json", "Accept": "application/json" },
+      body:    JSON.stringify(body),
+    });
 
-    console.log(`[elevenlabs] Generating voiceover: "${text.slice(0, 60)}..."`);
+    if (res.ok) {
+      const json: {
+        audio_base64: string;
+        alignment: {
+          characters:                     string[];
+          character_start_times_seconds:  number[];
+          character_end_times_seconds:    number[];
+        };
+      } = await res.json();
 
-    const res = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${voice}`,
-      {
-        method: "POST",
-        headers: {
-          "xi-api-key":   ELEVENLABS_API_KEY,
-          "Content-Type": "application/json",
-          "Accept":       "audio/mpeg",
-        },
-        body: JSON.stringify({
-          text,
-          model_id: "eleven_turbo_v2", // fastest + cheapest
-          voice_settings: {
-            stability,
-            similarity_boost: similarityBoost,
-            style:            0.3,
-            use_speaker_boost: true,
-          },
-        }),
-      }
-    );
+      // base64 → ArrayBuffer
+      const bin   = atob(json.audio_base64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      const msg = JSON.stringify(err);
+      const wordTimings  = charAlignmentToWords(json.alignment, text);
+      const endTimes     = json.alignment?.character_end_times_seconds ?? [];
+      const durationSecs = endTimes.length > 0 ? endTimes[endTimes.length - 1] : null;
 
-      // Out of quota — skip gracefully
-      if (res.status === 401 || res.status === 422) {
-        console.warn("[elevenlabs] Auth/quota error:", msg);
-        return { audioBuffer: null, error: `Auth: ${msg}` };
-      }
-
-      throw new Error(`ElevenLabs ${res.status}: ${msg}`);
+      console.log(`[elevenlabs] ✅ with-timestamps: ${wordTimings.length} words, ${durationSecs?.toFixed(1)}s`);
+      return { audioBuffer: bytes.buffer, wordTimings, durationSecs };
     }
-
-    const arrayBuffer = await res.arrayBuffer();
-    const buffer      = Buffer.from(arrayBuffer);
-
-    console.log(`[elevenlabs] ✅ Generated ${buffer.length} bytes`);
-    return { audioBuffer: buffer };
-
-  } catch (err: any) {
-    console.warn("[elevenlabs] Error — skipping:", err.message);
-    return { audioBuffer: null, error: err.message };
+  } catch (e) {
+    console.warn("[elevenlabs] with-timestamps failed, falling back to plain TTS:", e);
   }
+
+  // ── Fallback: plain audio ─────────────────────────────────────────────
+  try {
+    const res = await fetch(`${BASE}/text-to-speech/${id}`, {
+      method:  "POST",
+      headers: { "xi-api-key": API_KEY, "Content-Type": "application/json", "Accept": "audio/mpeg" },
+      body:    JSON.stringify(body),
+    });
+    if (!res.ok) {
+      console.error("[elevenlabs] plain TTS error:", res.status);
+      return { audioBuffer: null, wordTimings: null, durationSecs: null };
+    }
+    const audioBuffer = await res.arrayBuffer();
+    console.log(`[elevenlabs] ✅ plain audio: ${(audioBuffer.byteLength/1024).toFixed(0)}KB`);
+    return { audioBuffer, wordTimings: null, durationSecs: null };
+  } catch (e) {
+    console.error("[elevenlabs] fatal:", e);
+    return { audioBuffer: null, wordTimings: null, durationSecs: null };
+  }
+}
+
+// ── Parse character alignment → word timings ────────────────────────────────
+function charAlignmentToWords(
+  alignment: { characters: string[]; character_start_times_seconds: number[]; character_end_times_seconds: number[] },
+  _originalText: string,
+): WordTiming[] {
+  if (!alignment?.characters) return [];
+
+  const { characters: chars, character_start_times_seconds: starts, character_end_times_seconds: ends } = alignment;
+  const words: WordTiming[] = [];
+
+  let wordChars = "";
+  let wordStart = 0;
+  let wordEnd   = 0;
+  let inWord    = false;
+
+  const flush = () => {
+    const w = wordChars.trim();
+    if (w.length > 0) words.push({ word: w, start_time: wordStart, end_time: wordEnd });
+    wordChars = "";
+    inWord    = false;
+  };
+
+  for (let i = 0; i < chars.length; i++) {
+    const ch        = chars[i];
+    const isWordCh  = /[\w'$%\-]/.test(ch);
+
+    if (isWordCh) {
+      if (!inWord) { wordStart = starts[i] ?? 0; inWord = true; }
+      wordChars += ch;
+      wordEnd    = ends[i] ?? wordStart;
+    } else {
+      flush();
+    }
+  }
+  flush();
+  return words;
 }

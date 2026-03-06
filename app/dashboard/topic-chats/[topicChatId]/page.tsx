@@ -10,7 +10,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import StructuredPost from "@/components/StructuredPost";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-
+import AutoGenerateImagesDialog from "@/components/AutoGenerateImagesDialog";
 import {
   getTopicChat,
   listTopicChatDrafts,
@@ -148,7 +148,7 @@ export default function TopicChatDetailPage() {
   const [bgPromptSelectorOpen, setBgPromptSelectorOpen] = useState(false)
   const [randomPrompt, setRandomPrompt] = useState<string>("")
   const [selectedUserPrompts, setSelectedUserPrompts] = useState<string[]>([])
-
+  const [autoGenOpen, setAutoGenOpen] = useState(false);
   const [chat, setChat] = useState<any | null>(null);
   const [drafts, setDrafts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -549,6 +549,13 @@ export default function TopicChatDetailPage() {
                 </span>
               </button>
             ))}
+            <Button
+              size="sm"
+              onClick={() => setAutoGenOpen(true)}
+              disabled={drafts.length === 0}
+            >
+              Auto Generate Images
+            </Button>
             <Button
               size="sm"
               variant="outline"
@@ -964,6 +971,13 @@ export default function TopicChatDetailPage() {
           </div>
         </SheetContent>
       </Sheet>
+      <AutoGenerateImagesDialog
+        open={autoGenOpen}
+        onOpenChange={setAutoGenOpen}
+        drafts={drafts}
+        chat={chat}
+        onFinished={refresh}
+      />
     </div>
   );
 }
