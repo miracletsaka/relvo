@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 import { FileText, Image as ImageIcon, Video as VideoIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -831,7 +832,12 @@ export default function TopicChatDetailPage() {
             <div className="p-1">
               <div className="bg-white shadow-sm  p-5 space-y-4">
                 <div className="text-xs font-bold text-gray-500 uppercase tracking-wide">Media</div>
-
+                <div className="text-sm text-gray-400">
+                  Attach an image or video to this draft. Supported formats: JPG, PNG, MP4. Max size: 100MB.
+                  <Link href={`/studio/${topicChatId}?draftId=${active?.id}`} className="bg-gray-900 text-white hover:bg-gray-800 py-2 px-4 rounded">
+                    Generate Video
+                  </Link>
+                </div>
                 <div className="space-y-1">
                   <input
                     type="file"
