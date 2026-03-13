@@ -153,6 +153,7 @@ export default function ChatStudioPage() {
       draftId={String(draft.id)}
       initialConcept={initialConcept}
       autoGenerateOnMount
+      brandId={chat.brand_id}
       storageKey={storageKey}
       companyName={draft?.structured?.companyName || chat?.brand_id || "NeuroFlow"}
       accentColor="#7c3aed"

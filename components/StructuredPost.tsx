@@ -43,7 +43,7 @@ function StructuredPost({ item }: { item: any }) {
 
       {/* Hashtags */}
       {item.hashtags && (
-        <p className="text-xs md:text-sm text-neutral-400">
+        <p className="text-xs md:text-sm line-clamp-2 text-neutral-400">
           {item.hashtags}
         </p>
       )}

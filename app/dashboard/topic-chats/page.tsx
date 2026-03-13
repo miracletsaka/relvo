@@ -1,359 +1,650 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { RefreshCcw } from "lucide-react";
-
-import { listTopicChats, listTopicChatDrafts } from "@/lib/api";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import Link from "next/link";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
+import {
+  RefreshCcw, Search, X, ChevronRight, Image as ImageIcon,
+  Clock, CheckCircle2, XCircle, Calendar, Layers, ArrowUpRight,
+  MessageCircle, SlidersHorizontal, Play, Eye, AlertTriangle,
+  CheckCheck, Filter,
+} from "lucide-react";
+import { listTopicChats, listTopicChatDrafts } from "@/lib/api";
 
+/* ─── Types ─────────────────────────────────────────────────── */
+type Chat = {
+  id: string; topic?: string | null; brand_id?: string | null;
+  target_month?: string | null; posts_per_week?: number | null;
+  created_at?: string | null; updated_at?: string | null;
+};
+type Draft = {
+  id: string; topic_chat_id: string; platform?: string | null;
+  status?: string | null; body_text?: string | null;
+  scheduled_at?: string | null; last_error?: string | null;
+  created_at?: string | null; updated_at?: string | null;
+  media_type?: string | null; media_url?: string | null;
+  media_urls?: any; thumbnail_url?: string | null;
+  structured?: Record<string, any> | null;
+};
+
+/* ─── Helpers ────────────────────────────────────────────────── */
 function fmtDate(iso?: string | null) {
-  if (!iso) return "-";
+  if (!iso) return "—";
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString();
+  if (isNaN(d.getTime())) return iso;
+  const diff = Date.now() - d.getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const days = Math.floor(h / 24);
+  if (days < 7) return `${days}d ago`;
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-function safeJsonParseArray(v: any): string[] {
+function safeArr(v: any): string[] {
   if (!v) return [];
   if (Array.isArray(v)) return v.filter(Boolean);
   if (typeof v === "string") {
-    try {
-      const parsed = JSON.parse(v);
-      if (Array.isArray(parsed)) return parsed.filter(Boolean);
-    } catch {
-      if (v.includes(",")) return v.split(",").map((x) => x.trim()).filter(Boolean);
-    }
+    try { const p = JSON.parse(v); if (Array.isArray(p)) return p.filter(Boolean); } catch {}
+    if (v.includes(",")) return v.split(",").map(x => x.trim()).filter(Boolean);
   }
   return [];
 }
 
-function getMediaPrimary(it: any): { kind: "image" | "video" | null; url: string | null; thumb: string | null } {
-  const mediaType = (it?.media_type || "").toLowerCase();
-  const mediaUrl = it?.media_url || null;
-  const thumb = it?.thumbnail_url || null;
-
-  const mediaUrls = safeJsonParseArray(it?.media_urls);
-  const primary = mediaUrl || mediaUrls[0] || null;
-
+function getMedia(d: Draft): { kind: "image" | "video" | null; url: string | null; thumb: string | null } {
+  const urls = safeArr(d.media_urls);
+  const primary = d.media_url || urls[0] || null;
   if (!primary) return { kind: null, url: null, thumb: null };
-
-  if (mediaType === "video") return { kind: "video", url: primary, thumb: thumb || null };
-  if (mediaType === "image") return { kind: "image", url: primary, thumb: null };
-
-  const lower = String(primary).toLowerCase();
-  if (lower.endsWith(".mp4") || lower.endsWith(".mov") || lower.includes("video")) {
-    return { kind: "video", url: primary, thumb: thumb || null };
-  }
-  return { kind: "image", url: primary, thumb: null };
+  const mt = (d.media_type || "").toLowerCase();
+  const lower = primary.toLowerCase();
+  const isVideo = mt === "video" || lower.endsWith(".mp4") || lower.endsWith(".mov") || lower.includes("video");
+  return { kind: isVideo ? "video" : "image", url: primary, thumb: d.thumbnail_url || null };
 }
 
+function countByStatus(drafts: Draft[]) {
+  const m: Record<string, number> = {};
+  for (const d of drafts) { const s = String(d.status || "UNKNOWN").toUpperCase(); m[s] = (m[s] || 0) + 1; }
+  return m;
+}
+
+const PLATFORM_COLORS: Record<string, string> = {
+  instagram: "#E1306C", facebook: "#1877F2", linkedin: "#0A66C2",
+  twitter: "#1DA1F2", tiktok: "#69C9D0",
+};
+
+const STATUS_CFG: Record<string, { color: string; label: string; icon: React.ReactNode }> = {
+  PENDING_APPROVAL: { color: "#a78bfa", label: "Pending",   icon: <Clock style={{ width: 10, height: 10 }} /> },
+  PUBLISHED:        { color: "#34d399", label: "Published", icon: <CheckCircle2 style={{ width: 10, height: 10 }} /> },
+  FAILED:           { color: "#f87171", label: "Failed",    icon: <XCircle style={{ width: 10, height: 10 }} /> },
+  APPROVED:         { color: "#60a5fa", label: "Approved",  icon: <CheckCheck style={{ width: 10, height: 10 }} /> },
+  SCHEDULED:        { color: "#fbbf24", label: "Scheduled", icon: <Calendar style={{ width: 10, height: 10 }} /> },
+};
+function scfg(s: string) { return STATUS_CFG[s.toUpperCase()] ?? { color: "#6b7280", label: s, icon: null }; }
+
+/* ─── ChatCard ───────────────────────────────────────────────── */
+function ChatCard({
+  chat, drafts, counts, onQuickView,
+}: {
+  chat: Chat;
+  drafts: Draft[];
+  counts: Record<string, number>;
+  onQuickView: () => void;
+}) {
+  const previews = drafts.filter(d => !!getMedia(d).url).slice(0, 5);
+  const withImages = drafts.filter(d => !!getMedia(d).url).length;
+  const total = drafts.length;
+
+  return (
+    <div
+      style={{
+        background: "rgba(255,255,255,0.025)",
+        border: "1px solid rgba(255,255,255,0.07)",
+        borderRadius: 18, overflow: "hidden",
+        transition: "border-color 0.18s, transform 0.18s, box-shadow 0.18s",
+        display: "flex", flexDirection: "column",
+      }}
+      onMouseEnter={e => {
+        const el = e.currentTarget as HTMLElement;
+        el.style.borderColor = "rgba(124,58,237,0.35)";
+        el.style.transform = "translateY(-2px)";
+        el.style.boxShadow = "0 12px 40px rgba(0,0,0,0.35)";
+      }}
+      onMouseLeave={e => {
+        const el = e.currentTarget as HTMLElement;
+        el.style.borderColor = "rgba(255,255,255,0.07)";
+        el.style.transform = "translateY(0)";
+        el.style.boxShadow = "none";
+      }}
+    >
+      {/* Image strip */}
+      <div style={{ height: 92, display: "flex", gap: 1.5, background: "#090910", overflow: "hidden", position: "relative" }}>
+        {previews.length > 0 ? (
+          previews.map((d, i) => {
+            const m = getMedia(d);
+            return (
+              <div key={d.id} style={{ flex: i === 0 ? 2.5 : 1, overflow: "hidden", position: "relative" }}>
+                <img
+                  src={m.thumb || m.url!} alt=""
+                  style={{ width: "100%", height: "100%", objectFit: "cover", opacity: 0.85, transition: "opacity 0.2s" }}
+                  onError={e => { (e.target as HTMLImageElement).style.opacity = "0"; }}
+                  onMouseEnter={e => { (e.target as HTMLImageElement).style.opacity = "1"; }}
+                  onMouseLeave={e => { (e.target as HTMLImageElement).style.opacity = "0.85"; }}
+                />
+                {i === 0 && previews.length > 1 && (
+                  <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to right, transparent 55%, rgba(9,9,16,0.7))", pointerEvents: "none" }} />
+                )}
+              </div>
+            );
+          })
+        ) : (
+          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 6, color: "rgba(255,255,255,0.07)" }}>
+            <ImageIcon style={{ width: 26, height: 26 }} />
+            <span style={{ fontSize: 9, fontFamily: "DM Mono, monospace", letterSpacing: "0.08em" }}>NO IMAGES</span>
+          </div>
+        )}
+        {/* Gradient bottom fade */}
+        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 32, background: "linear-gradient(to top, rgba(9,9,16,0.8), transparent)", pointerEvents: "none" }} />
+      </div>
+
+      {/* Body */}
+      <div style={{ padding: "12px 14px", flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+        {/* Chips row */}
+        <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+          {chat.brand_id && (
+            <span style={{ background: "rgba(124,58,237,0.14)", border: "1px solid rgba(124,58,237,0.28)", color: "#c4b5fd", fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 8, fontFamily: "DM Mono, monospace", letterSpacing: "0.04em" }}>
+              {chat.brand_id}
+            </span>
+          )}
+          {chat.target_month && (
+            <span style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.38)", fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 8, fontFamily: "DM Mono, monospace" }}>
+              {chat.target_month}
+            </span>
+          )}
+          {typeof chat.posts_per_week === "number" && (
+            <span style={{ background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.27)", fontSize: 9, fontFamily: "DM Mono, monospace", padding: "2px 8px", borderRadius: 8 }}>
+              {chat.posts_per_week}/wk
+            </span>
+          )}
+        </div>
+
+        {/* Topic */}
+        <p style={{ fontSize: 12, fontWeight: 700, color: "#e4e4e7", lineHeight: 1.42, margin: 0, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+          {chat.topic || "Untitled topic"}
+        </p>
+
+        {/* Status pills */}
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+          {(["PENDING_APPROVAL", "PUBLISHED", "FAILED"] as const).map(s =>
+            counts[s] > 0 && (
+              <span key={s} style={{ background: scfg(s).color + "18", border: `1px solid ${scfg(s).color}35`, color: scfg(s).color, fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 7, display: "flex", alignItems: "center", gap: 3, fontFamily: "DM Mono, monospace" }}>
+                {scfg(s).icon}{counts[s]}
+              </span>
+            )
+          )}
+          {withImages > 0 && (
+            <span style={{ background: "#34d39914", border: "1px solid #34d39930", color: "#34d399", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 7, display: "flex", alignItems: "center", gap: 3, fontFamily: "DM Mono, monospace" }}>
+              <ImageIcon style={{ width: 8, height: 8 }} />{withImages}
+            </span>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ marginTop: "auto", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, paddingTop: 4 }}>
+          <span style={{ fontSize: 9, color: "rgba(255,255,255,0.18)", fontFamily: "DM Mono, monospace" }}>
+            {fmtDate(chat.updated_at || chat.created_at)}{total > 0 ? ` · ${total} drafts` : ""}
+          </span>
+          <div style={{ display: "flex", gap: 5 }}>
+            <button
+              onClick={e => { e.preventDefault(); e.stopPropagation(); onQuickView(); }}
+              style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "rgba(255,255,255,0.45)", fontSize: 10, fontWeight: 700, cursor: "pointer", fontFamily: "Syne, sans-serif", transition: "all 0.15s" }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "#e4e4e7"; (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.1)"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.45)"; (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.06)"; }}
+            >
+              <Eye style={{ width: 10, height: 10 }} />Quick
+            </button>
+            <Link
+              href={`/dashboard/topic-chats/${chat.id}`}
+              style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", background: "rgba(124,58,237,0.18)", border: "1px solid rgba(124,58,237,0.38)", borderRadius: 8, color: "#c4b5fd", fontSize: 10, fontWeight: 700, textDecoration: "none", fontFamily: "Syne, sans-serif", transition: "background 0.15s" }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(124,58,237,0.28)"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "rgba(124,58,237,0.18)"; }}
+            >
+              Open <ArrowUpRight style={{ width: 10, height: 10 }} />
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── DraftDrawerCard ────────────────────────────────────────── */
+function DraftDrawerCard({ d }: { d: Draft }) {
+  const [expanded, setExpanded] = useState(false);
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const m = getMedia(d);
+  const s = String(d.status || "").toUpperCase();
+  const cfg = scfg(s);
+  const pColor = PLATFORM_COLORS[String(d.platform || "").toLowerCase()] ?? "#6b7280";
+  const hook = d.structured?.hook || d.body_text?.slice(0, 100) || "—";
+
+  return (
+    <div
+      style={{ borderRadius: 14, border: "1px solid rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.025)", overflow: "hidden", transition: "border-color 0.15s", cursor: "pointer" }}
+      onClick={() => setExpanded(v => !v)}
+      onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.13)"}
+      onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.07)"}
+    >
+      <div style={{ display: "flex", gap: 10, padding: "11px 12px", alignItems: "flex-start" }}>
+        {/* Thumbnail */}
+        <div style={{ width: 52, height: 52, borderRadius: 10, overflow: "hidden", background: "#111115", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          {m.url && m.kind === "image" ? (
+            <>
+              <img
+                src={m.thumb || m.url} alt=""
+                style={{ width: "100%", height: "100%", objectFit: "cover", opacity: imgLoaded ? 1 : 0, transition: "opacity 0.25s" }}
+                onLoad={() => setImgLoaded(true)}
+                onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+              />
+              {!imgLoaded && <div style={{ position: "absolute", width: 16, height: 16, border: "2px solid rgba(255,255,255,0.08)", borderTopColor: "#a78bfa", borderRadius: "50%", animation: "tcspin 0.8s linear infinite" }} />}
+            </>
+          ) : m.url && m.kind === "video" ? (
+            <Play style={{ width: 18, height: 18, color: "#a78bfa" }} />
+          ) : (
+            <ImageIcon style={{ width: 18, height: 18, color: "rgba(255,255,255,0.1)" }} />
+          )}
+        </div>
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", gap: 5, alignItems: "center", marginBottom: 5, flexWrap: "wrap" }}>
+            <span style={{ background: pColor + "22", color: pColor, fontSize: 9, fontWeight: 800, padding: "2px 8px", borderRadius: 7, letterSpacing: "0.07em", textTransform: "uppercase" }}>
+              {d.platform || "—"}
+            </span>
+            <span style={{ background: cfg.color + "18", border: `1px solid ${cfg.color}35`, color: cfg.color, fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 7, display: "flex", alignItems: "center", gap: 3 }}>
+              {cfg.icon}{cfg.label}
+            </span>
+            {d.scheduled_at && (
+              <span style={{ fontSize: 9, color: "rgba(255,255,255,0.22)", fontFamily: "DM Mono, monospace", marginLeft: "auto", flexShrink: 0 }}>
+                {fmtDate(d.scheduled_at)}
+              </span>
+            )}
+          </div>
+          <p style={{ fontSize: 11, color: "rgba(255,255,255,0.52)", margin: 0, lineHeight: 1.45, display: "-webkit-box", WebkitLineClamp: expanded ? 99 : 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+            {hook}
+          </p>
+          {d.last_error && s === "FAILED" && (
+            <p style={{ fontSize: 10, color: "#f87171", margin: "4px 0 0", fontFamily: "DM Mono, monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              ↳ {d.last_error.slice(0, 80)}
+            </p>
+          )}
+        </div>
+
+        <ChevronRight style={{ width: 13, height: 13, color: "rgba(255,255,255,0.2)", flexShrink: 0, transform: expanded ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.2s" }} />
+      </div>
+
+      {expanded && (
+        <div style={{ padding: "0 12px 12px", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 10, display: "flex", flexDirection: "column", gap: 10 }}>
+          {m.url && m.kind === "image" && (
+            <img src={m.url} alt="" style={{ width: "100%", maxHeight: 220, objectFit: "cover", borderRadius: 10 }}
+              onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+          )}
+          {m.url && m.kind === "video" && (
+            <div style={{ background: "#111115", borderRadius: 10, padding: "12px 14px", display: "flex", alignItems: "center", gap: 8, border: "1px solid rgba(255,255,255,0.06)" }}>
+              <Play style={{ width: 14, height: 14, color: "#a78bfa", flexShrink: 0 }} />
+              <a href={m.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 10, color: "#a78bfa", fontFamily: "DM Mono, monospace", textDecoration: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {m.url}
+              </a>
+            </div>
+          )}
+          {d.body_text && (
+            <div>
+              <div style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.25)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5, fontFamily: "DM Mono, monospace" }}>Caption</div>
+              <p style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", lineHeight: 1.55, margin: 0, whiteSpace: "pre-wrap" }}>{d.body_text}</p>
+            </div>
+          )}
+          <div style={{ fontSize: 9, color: "rgba(255,255,255,0.12)", fontFamily: "DM Mono, monospace", paddingTop: 2 }}>{d.id}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── Main Page ──────────────────────────────────────────────── */
 export default function TopicChatsPage() {
-  const [chats, setChats] = useState<any[]>([]);
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [chatDrafts, setChatDrafts] = useState<Record<string, Draft[]>>({});
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // filters
   const [q, setQ] = useState("");
-  const [brand, setBrand] = useState<string>("all");
-  const [month, setMonth] = useState<string>("all");
+  const [brand, setBrand] = useState("all");
+  const [month, setMonth] = useState("all");
+  const [showFilters, setShowFilters] = useState(false);
 
-  // drawer
-  const [activeChat, setActiveChat] = useState<any | null>(null);
-  const [drafts, setDrafts] = useState<any[]>([]);
+  const [activeChat, setActiveChat] = useState<Chat | null>(null);
+  const [drawerDrafts, setDrawerDrafts] = useState<Draft[]>([]);
   const [drawerLoading, setDrawerLoading] = useState(false);
+  const [drawerFilter, setDrawerFilter] = useState("all");
 
-  const refresh = async () => {
-    setLoading(true);
+  const load = useCallback(async (soft = false) => {
+    if (soft) setRefreshing(true); else setLoading(true);
     setErr(null);
     try {
-      const data = await listTopicChats(50);
+      const data: Chat[] = await listTopicChats(60);
       setChats(data || []);
-      setActiveChat(null);
-      setDrafts([]);
+      const slice = (data || []).slice(0, 24);
+      const pairs = await Promise.allSettled(
+        slice.map(c => listTopicChatDrafts(c.id).then(ds => ({ id: c.id, drafts: ds || [] })))
+      );
+      const map: Record<string, Draft[]> = {};
+      for (const p of pairs) if (p.status === "fulfilled") map[p.value.id] = p.value.drafts;
+      setChatDrafts(map);
     } catch (e: any) {
-      setErr(e?.message || "Failed to load topic chats");
+      setErr(e?.message || "Failed to load");
     } finally {
-      setLoading(false);
+      setLoading(false); setRefreshing(false);
     }
-  };
-
-  useEffect(() => {
-    refresh();
   }, []);
 
-  const brands = useMemo(() => {
-    const set = new Set<string>();
-    for (const c of chats) if (c.brand_id) set.add(String(c.brand_id));
-    return Array.from(set).sort();
-  }, [chats]);
+  useEffect(() => { load(); }, [load]);
 
-  const months = useMemo(() => {
-    const set = new Set<string>();
-    for (const c of chats) if (c.target_month) set.add(String(c.target_month));
-    // newest first
-    return Array.from(set).sort((a, b) => (a < b ? 1 : -1));
-  }, [chats]);
+  const brands = useMemo(() => Array.from(new Set(chats.map(c => c.brand_id).filter(Boolean) as string[])).sort(), [chats]);
+  const months = useMemo(() => Array.from(new Set(chats.map(c => c.target_month).filter(Boolean) as string[])).sort((a, b) => b.localeCompare(a)), [chats]);
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
-
-    return chats.filter((c: any) => {
-      if (brand !== "all" && String(c.brand_id) !== brand) return false;
-      if (month !== "all" && String(c.target_month) !== month) return false;
-
+    return chats.filter(c => {
+      if (brand !== "all" && c.brand_id !== brand) return false;
+      if (month !== "all" && c.target_month !== month) return false;
       if (!needle) return true;
-      const hay = `${c.id} ${c.brand_id} ${c.topic} ${c.target_month} ${c.posts_per_week}`.toLowerCase();
-      return hay.includes(needle);
+      return `${c.id} ${c.brand_id} ${c.topic} ${c.target_month}`.toLowerCase().includes(needle);
     });
   }, [chats, q, brand, month]);
 
-  const openChat = async (chat: any) => {
+  const openDrawer = async (chat: Chat) => {
     setActiveChat(chat);
+    setDrawerFilter("all");
     setDrawerLoading(true);
-    setErr(null);
     try {
       const ds = await listTopicChatDrafts(chat.id);
-      setDrafts(ds || []);
-    } catch (e: any) {
-      setErr(e?.message || "Failed to load chat drafts");
-      setDrafts([]);
+      setDrawerDrafts(ds || []);
+      setChatDrafts(prev => ({ ...prev, [chat.id]: ds || [] }));
+    } catch {
+      setDrawerDrafts([]);
     } finally {
       setDrawerLoading(false);
     }
   };
 
-  const draftCounts = useMemo(() => {
-    const map: Record<string, number> = {};
-    for (const d of drafts) map[d.status] = (map[d.status] || 0) + 1;
-    return map;
-  }, [drafts]);
+  const drawerCounts = useMemo(() => countByStatus(drawerDrafts), [drawerDrafts]);
+
+  const visibleDrafts = useMemo(() => {
+    if (drawerFilter === "all") return drawerDrafts;
+    if (drawerFilter === "images") return drawerDrafts.filter(d => !!getMedia(d).url);
+    return drawerDrafts.filter(d => String(d.status || "").toUpperCase() === drawerFilter);
+  }, [drawerDrafts, drawerFilter]);
+
+  const totalDrafts = useMemo(() => Object.values(chatDrafts).reduce((s, ds) => s + ds.length, 0), [chatDrafts]);
+  const totalImages = useMemo(() => Object.values(chatDrafts).reduce((s, ds) => s + ds.filter(d => !!getMedia(d).url).length, 0), [chatDrafts]);
 
   return (
-    <div className="space-y-3 p-4 bg-gray-100 min-h-screen">
-      <Card className="p-4">
-        <div className="flex items-start justify-between gap-3">
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Mono:wght@400;500&display=swap');
+        .tc-root * { box-sizing: border-box; }
+        .tc-root { font-family: 'Syne', sans-serif; background: #0c0c0f; min-height: 100vh; color: #e4e4e7; }
+        .tc-input { background: rgba(255,255,255,0.05) !important; border: 1px solid rgba(255,255,255,0.09) !important; color: #e4e4e7 !important; font-family: 'DM Mono', monospace !important; font-size: 12px !important; border-radius: 11px !important; padding: 9px 36px 9px 36px !important; width: 100% !important; outline: none !important; transition: border-color 0.15s, box-shadow 0.15s !important; }
+        .tc-input:focus { border-color: rgba(124,58,237,0.5) !important; box-shadow: 0 0 0 3px rgba(124,58,237,0.1) !important; }
+        .tc-input::placeholder { color: rgba(255,255,255,0.2) !important; }
+        .tc-select { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.09); color: rgba(255,255,255,0.65); font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 700; border-radius: 11px; padding: 8px 32px 8px 12px; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; outline: none; }
+        .tc-select:focus { border-color: rgba(124,58,237,0.5); }
+        .tc-select option { background: #1a1a2e; }
+        .tc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 14px; }
+        @media (max-width: 600px) { .tc-grid { grid-template-columns: 1fr; } }
+        @keyframes tcspin { to { transform: rotate(360deg); } }
+        @keyframes tcfade { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: translateY(0); } }
+        .tc-fade { animation: tcfade 0.28s ease both; }
+        .tc-skel { background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.07) 50%, rgba(255,255,255,0.04) 75%); background-size: 200% 100%; animation: tcshim 1.5s infinite; border-radius: 18px; }
+        @keyframes tcshim { 0%{background-position:200% 0;} 100%{background-position:-200% 0;} }
+        .tc-drawer-root { background: #111115 !important; border-left: 1px solid rgba(255,255,255,0.08) !important; }
+        .tc-scroll::-webkit-scrollbar { width: 3px; }
+        .tc-scroll::-webkit-scrollbar-track { background: transparent; }
+        .tc-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+        .tc-filter-panel { animation: tcfade 0.2s ease both; }
+      `}</style>
+
+      <div className="tc-root" style={{ padding: "24px 20px" }}>
+
+        {/* ── Header ── */}
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 24, gap: 12, flexWrap: "wrap" }}>
           <div>
-            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Topic Chats</div>
-            <div className="text-xs text-slate-500 mt-1">
-              Vision 2: chats → drafts. Click a chat to see all drafts (and their media).
+            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(124,58,237,0.7)", marginBottom: 4, fontFamily: "DM Mono, monospace" }}>
+              NeuroFlow · Campaigns
             </div>
+            <h1 style={{ fontSize: 24, fontWeight: 800, color: "#e4e4e7", margin: 0, lineHeight: 1.1 }}>
+              Topic Chats
+            </h1>
+            <p style={{ fontSize: 11, color: "rgba(255,255,255,0.28)", marginTop: 5 }}>
+              {loading ? "Loading…" : `${chats.length} campaigns · ${totalDrafts} drafts · ${totalImages} images`}
+            </p>
           </div>
-
-          <Button className="bg-white shadow rounded-full" onClick={refresh} disabled={loading}>
-            {loading ? "Loading..." : <RefreshCcw />}
-          </Button>
+          <button
+            onClick={() => load(true)}
+            disabled={refreshing}
+            style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 11, color: refreshing ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 700, cursor: refreshing ? "default" : "pointer", fontFamily: "Syne, sans-serif", transition: "all 0.15s" }}
+            onMouseEnter={e => { if (!refreshing) { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.09)"; (e.currentTarget as HTMLElement).style.color = "#e4e4e7"; } }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.05)"; (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.5)"; }}
+          >
+            <RefreshCcw style={{ width: 12, height: 12, animation: refreshing ? "tcspin 0.8s linear infinite" : "none" }} />
+            {refreshing ? "Refreshing…" : "Refresh"}
+          </button>
         </div>
 
-        {err && <div className="mt-3 text-sm text-red-600">{err}</div>}
-      </Card>
-
-      {/* Filters */}
-      <Card className="p-4 space-y-3">
-        <div className="grid md:grid-cols-4 gap-3">
-          <div className="space-y-1">
-            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Brand</div>
-            <select
-              className="w-full bg-white shadow rounded text-gray-500 text-xs font-bold px-3 py-2"
-              value={brand}
-              onChange={(e) => setBrand(e.target.value)}
-            >
-              <option value="all">All</option>
-              {brands.map((b) => (
-                <option key={b} value={b}>{b}</option>
-              ))}
-            </select>
+        {err && (
+          <div style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 12, padding: "10px 14px", fontSize: 12, color: "#f87171", marginBottom: 20, display: "flex", alignItems: "center", gap: 8 }}>
+            <AlertTriangle style={{ width: 13, height: 13, flexShrink: 0 }} />{err}
           </div>
+        )}
 
-          <div className="space-y-1">
-            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Month</div>
-            <select
-              className="w-full bg-white shadow rounded text-gray-500 text-xs font-bold px-3 py-2"
-              value={month}
-              onChange={(e) => setMonth(e.target.value)}
-            >
-              <option value="all">All</option>
-              {months.map((m) => (
-                <option key={m} value={m}>{m}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-1 md:col-span-2">
-            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Search</div>
-            <Input
-              style={{ backgroundColor: "white" }}
-              className="text-xs font-bold text-gray-500"
+        {/* ── Search + filter bar ── */}
+        <div style={{ display: "flex", gap: 8, marginBottom: showFilters ? 12 : 20, alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ position: "relative", flex: 1, minWidth: 200 }}>
+            <Search style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", width: 13, height: 13, color: "rgba(255,255,255,0.28)", pointerEvents: "none" }} />
+            <input
+              className="tc-input"
+              placeholder="Search topics, brand, month…"
               value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Search by topic / brand / month / id..."
+              onChange={e => setQ(e.target.value)}
             />
-          </div>
-        </div>
-
-        <div className="text-xs text-slate-500 flex justify-end">
-          {loading ? "Loading..." : `${filtered.length} chat(s)`}
-        </div>
-
-        {/* List */}
-        <div className="rounded overflow-hidden space-y-1 bg-gray-100">
-          <div className="grid grid-cols-[140px_120px_1fr_140px_180px_90px] gap-2 p-3 bg-gray-200 text-gray-600 text-sm font-medium">
-            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Brand</div>
-            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Month</div>
-            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Topic</div>
-            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Posts/Week</div>
-            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Created</div>
-            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Action</div>
+            {q && (
+              <button onClick={() => setQ("")} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.3)", display: "flex", alignItems: "center", justifyContent: "center", padding: 2 }}>
+                <X style={{ width: 11, height: 11 }} />
+              </button>
+            )}
           </div>
 
-          {loading ? (
-            <div className="p-6 text-sm text-gray-600">Loading chats...</div>
-          ) : filtered.length === 0 ? (
-            <div className="p-6 text-sm text-gray-600">No chats found.</div>
-          ) : (
-            filtered.map((c: any) => (
-              <div
-                key={c.id}
-                className="grid grid-cols-[140px_120px_1fr_140px_180px_90px] gap-2 p-3 text-xs shadow bg-white items-center"
-              >
-                <div className="text-gray-600 font-bold truncate">{c.brand_id || "—"}</div>
+          <button
+            onClick={() => setShowFilters(v => !v)}
+            style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 14px", background: showFilters ? "rgba(124,58,237,0.18)" : "rgba(255,255,255,0.05)", border: `1px solid ${showFilters ? "rgba(124,58,237,0.38)" : "rgba(255,255,255,0.1)"}`, borderRadius: 11, color: showFilters ? "#c4b5fd" : "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "Syne, sans-serif", transition: "all 0.15s", position: "relative" }}
+          >
+            <SlidersHorizontal style={{ width: 12, height: 12 }} />Filters
+            {(brand !== "all" || month !== "all") && (
+              <span style={{ position: "absolute", top: 7, right: 7, width: 5, height: 5, borderRadius: "50%", background: "#a78bfa" }} />
+            )}
+          </button>
 
-                <div>
-                  <Badge variant="secondary" className="capitalize">{c.target_month || "—"}</Badge>
-                </div>
-
-                <div className="text-gray-500 truncate">{(c.topic || "").slice(0, 120) || "—"}</div>
-
-                <div className="text-gray-500">{c.posts_per_week ?? "—"}</div>
-
-                <div className="text-gray-500">{fmtDate(c.created_at)}</div>
-
-                <div className="flex flex-col gap-1 items-center">
-                    <Link href={`/dashboard/topic-chats/${c.id}`}>
-                    <Button className="text-white text-xs" size="sm">
-                      Open
-                    </Button>
-                    </Link>
-                  <Button className="text-white text-xs" size="sm" onClick={() => openChat(c)}>
-                    View
-                  </Button>
-                </div>
-              </div>
-            ))
-          )}
+          <span style={{ fontSize: 10, color: "rgba(255,255,255,0.22)", fontFamily: "DM Mono, monospace", whiteSpace: "nowrap" }}>
+            {loading ? "…" : `${filtered.length} result${filtered.length !== 1 ? "s" : ""}`}
+          </span>
         </div>
-      </Card>
 
-      {/* Drawer: chat details + drafts */}
-      <Sheet open={!!activeChat} onOpenChange={(open) => !open && setActiveChat(null)}>
-        <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto p-4 bg-gray-100">
-          <SheetHeader>
-            <SheetTitle className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
-              Chat Details
-            </SheetTitle>
-          </SheetHeader>
-
-          {activeChat && (
-            <div className="space-y-4 mt-4">
-              <Card className="p-3 bg-white shadow">
-                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Topic</div>
-                <div className="text-sm font-bold text-slate-800">{activeChat.topic || "—"}</div>
-                <div className="text-xs text-slate-500 mt-1">
-                  Brand: <b>{activeChat.brand_id}</b> • Month: <b>{activeChat.target_month}</b> • Posts/week: <b>{activeChat.posts_per_week}</b>
-                </div>
-                <div className="text-[11px] text-slate-400 mt-2 break-all">
-                  Chat ID: {activeChat.id}
-                </div>
-              </Card>
-
-              <div className="grid grid-cols-2 gap-2">
-                {["PENDING_APPROVAL", "APPROVED", "SCHEDULED", "PUBLISHED", "FAILED"].map((s) => (
-                  <Card key={s} className="p-3 bg-white shadow">
-                    <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">{s.replaceAll("_", " ")}</div>
-                    <div className="text-sm font-semibold text-gray-500">{draftCounts[s] ?? 0}</div>
-                  </Card>
-                ))}
-              </div>
-
-              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Drafts</div>
-
-              {drawerLoading ? (
-                <div className="p-4 text-sm text-gray-600">Loading drafts...</div>
-              ) : drafts.length === 0 ? (
-                <div className="p-4 text-sm text-gray-600">No drafts in this chat.</div>
-              ) : (
-                <div className="space-y-2">
-                  {drafts.map((d: any) => {
-                    const m = getMediaPrimary(d);
-                    return (
-                      <Card key={d.id} className="p-3 bg-white shadow space-y-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex gap-2 flex-wrap">
-                            <Badge variant="secondary" className="capitalize">{d.platform}</Badge>
-                            <Badge className="capitalize text-white">
-                              {String(d.status).toLowerCase().replaceAll("_", " ")}
-                            </Badge>
-                          </div>
-                          <div className="text-xs text-gray-400">{fmtDate(d.scheduled_at)}</div>
-                        </div>
-
-                        {m.kind && (
-                          <div className="flex items-center gap-2">
-                            {m.kind === "image" ? (
-                              <img
-                                src={m.url!}
-                                alt="media"
-                                className="w-20 h-14 object-cover rounded border"
-                                onError={(e) => ((e.currentTarget.style.display = "none"))}
-                              />
-                            ) : (
-                              <div className="flex items-center gap-2">
-                                {m.thumb ? (
-                                  <img
-                                    src={m.thumb}
-                                    alt="thumb"
-                                    className="w-20 h-14 object-cover rounded border"
-                                    onError={(e) => ((e.currentTarget.style.display = "none"))}
-                                  />
-                                ) : (
-                                  <div className="w-20 h-14 rounded border bg-gray-100 flex items-center justify-center text-[10px] text-gray-500">
-                                    VIDEO
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                            <div className="text-[11px] text-gray-500 break-all line-clamp-2">
-                              {m.url}
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="text-xs text-gray-500 line-clamp-3">
-                          {(d.body_text || d.last_error || "").slice(0, 220) || "—"}
-                        </div>
-
-                        <div className="text-[11px] text-gray-400 break-all">
-                          Draft ID: {d.id}
-                        </div>
-                      </Card>
-                    );
-                  })}
-                </div>
-              )}
-
-              <div className="flex gap-2">
-                <Button className="text-white text-xs" onClick={() => setActiveChat(null)}>
-                  Close
-                </Button>
-              </div>
+        {/* Filter dropdowns */}
+        {showFilters && (
+          <div className="tc-filter-panel" style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap", padding: "14px 16px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.25)", fontFamily: "DM Mono, monospace" }}>Brand</span>
+              <select className="tc-select" value={brand} onChange={e => setBrand(e.target.value)}>
+                <option value="all">All brands</option>
+                {brands.map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
             </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.25)", fontFamily: "DM Mono, monospace" }}>Month</span>
+              <select className="tc-select" value={month} onChange={e => setMonth(e.target.value)}>
+                <option value="all">All months</option>
+                {months.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+            {(brand !== "all" || month !== "all") && (
+              <div style={{ display: "flex", alignItems: "flex-end" }}>
+                <button
+                  onClick={() => { setBrand("all"); setMonth("all"); }}
+                  style={{ display: "flex", alignItems: "center", gap: 5, padding: "8px 12px", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.22)", borderRadius: 11, color: "#f87171", fontSize: 10, fontWeight: 700, cursor: "pointer", fontFamily: "Syne, sans-serif" }}
+                >
+                  <X style={{ width: 11, height: 11 }} />Clear filters
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Cards grid ── */}
+        {loading ? (
+          <div className="tc-grid">
+            {Array.from({ length: 9 }).map((_, i) => (
+              <div key={i} className="tc-skel" style={{ height: 265, animationDelay: `${i * 0.05}s` }} />
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "60px 20px", color: "rgba(255,255,255,0.12)" }}>
+            <MessageCircle style={{ width: 48, height: 48, margin: "0 auto 14px", opacity: 0.4 }} />
+            <p style={{ fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.22)" }}>No campaigns found</p>
+            {q && <p style={{ fontSize: 12, marginTop: 6, color: "rgba(255,255,255,0.15)" }}>Try clearing your search</p>}
+          </div>
+        ) : (
+          <div className="tc-grid">
+            {filtered.map((chat, i) => (
+              <div key={chat.id} className="tc-fade" style={{ animationDelay: `${i * 0.03}s` }}>
+                <ChatCard
+                  chat={chat}
+                  drafts={chatDrafts[chat.id] ?? []}
+                  counts={countByStatus(chatDrafts[chat.id] ?? [])}
+                  onQuickView={() => openDrawer(chat)}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Quick-view Drawer ── */}
+      <Sheet open={!!activeChat} onOpenChange={open => { if (!open) { setActiveChat(null); setDrawerDrafts([]); } }}>
+        <SheetContent
+          side="right"
+          className="tc-drawer-root tc-scroll"
+          style={{ width: "min(500px, 100vw)", maxWidth: "100vw", padding: 0, overflowY: "auto", display: "flex", flexDirection: "column" }}
+        >
+          {activeChat && (
+            <>
+              {/* Drawer header */}
+              <div style={{ padding: "22px 20px 0", flexShrink: 0 }}>
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 16 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+                      {activeChat.brand_id && (
+                        <span style={{ background: "rgba(124,58,237,0.14)", border: "1px solid rgba(124,58,237,0.28)", color: "#c4b5fd", fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 8, fontFamily: "DM Mono, monospace" }}>
+                          {activeChat.brand_id}
+                        </span>
+                      )}
+                      {activeChat.target_month && (
+                        <span style={{ background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.4)", fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 8, fontFamily: "DM Mono, monospace" }}>
+                          {activeChat.target_month}
+                        </span>
+                      )}
+                      {typeof activeChat.posts_per_week === "number" && (
+                        <span style={{ background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.28)", fontSize: 9, fontFamily: "DM Mono, monospace", padding: "2px 8px", borderRadius: 8 }}>
+                          {activeChat.posts_per_week}/wk
+                        </span>
+                      )}
+                    </div>
+                    <h2 style={{ fontSize: 14, fontWeight: 800, color: "#e4e4e7", margin: 0, lineHeight: 1.35 }}>
+                      {activeChat.topic || "Untitled topic"}
+                    </h2>
+                    <div style={{ fontSize: 9, color: "rgba(255,255,255,0.18)", fontFamily: "DM Mono, monospace", marginTop: 5 }}>
+                      {activeChat.id}
+                    </div>
+                  </div>
+                  <Link
+                    href={`/dashboard/topic-chats/${activeChat.id}`}
+                    style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 13px", background: "rgba(124,58,237,0.18)", border: "1px solid rgba(124,58,237,0.38)", borderRadius: 10, color: "#c4b5fd", fontSize: 11, fontWeight: 700, textDecoration: "none", flexShrink: 0, fontFamily: "Syne, sans-serif", whiteSpace: "nowrap" }}
+                  >
+                    Open <ArrowUpRight style={{ width: 11, height: 11 }} />
+                  </Link>
+                </div>
+
+                {/* Filter tabs */}
+                {!drawerLoading && drawerDrafts.length > 0 && (
+                  <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 16, padding: "10px 12px", background: "rgba(255,255,255,0.03)", borderRadius: 12, border: "1px solid rgba(255,255,255,0.06)" }}>
+                    <button
+                      onClick={() => setDrawerFilter("all")}
+                      style={{ padding: "4px 10px", borderRadius: 8, fontSize: 10, fontWeight: 700, fontFamily: "Syne, sans-serif", border: `1px solid ${drawerFilter === "all" ? "rgba(255,255,255,0.2)" : "transparent"}`, background: drawerFilter === "all" ? "rgba(255,255,255,0.08)" : "transparent", color: drawerFilter === "all" ? "#e4e4e7" : "rgba(255,255,255,0.35)", cursor: "pointer" }}
+                    >
+                      All {drawerDrafts.length}
+                    </button>
+                    {(["PENDING_APPROVAL", "PUBLISHED", "FAILED", "APPROVED"] as const).map(s =>
+                      drawerCounts[s] > 0 && (
+                        <button key={s}
+                          onClick={() => setDrawerFilter(prev => prev === s ? "all" : s)}
+                          style={{ padding: "4px 10px", borderRadius: 8, fontSize: 10, fontWeight: 700, fontFamily: "Syne, sans-serif", background: drawerFilter === s ? scfg(s).color + "22" : "transparent", border: `1px solid ${drawerFilter === s ? scfg(s).color + "50" : "transparent"}`, color: scfg(s).color, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
+                        >
+                          {scfg(s).icon}{drawerCounts[s]}
+                        </button>
+                      )
+                    )}
+                    {drawerDrafts.filter(d => !!getMedia(d).url).length > 0 && (
+                      <button
+                        onClick={() => setDrawerFilter(prev => prev === "images" ? "all" : "images")}
+                        style={{ padding: "4px 10px", borderRadius: 8, fontSize: 10, fontWeight: 700, fontFamily: "Syne, sans-serif", background: drawerFilter === "images" ? "#34d39922" : "transparent", border: `1px solid ${drawerFilter === "images" ? "#34d39950" : "transparent"}`, color: "#34d399", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
+                      >
+                        <ImageIcon style={{ width: 10, height: 10 }} />
+                        {drawerDrafts.filter(d => !!getMedia(d).url).length}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Draft list */}
+              <div className="tc-scroll" style={{ flex: 1, overflowY: "auto", padding: "0 20px 28px" }}>
+                {drawerLoading ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <div key={i} className="tc-skel" style={{ height: 78, animationDelay: `${i * 0.07}s` }} />
+                    ))}
+                  </div>
+                ) : visibleDrafts.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: "40px 20px", color: "rgba(255,255,255,0.15)" }}>
+                    <Layers style={{ width: 30, height: 30, margin: "0 auto 10px", opacity: 0.5 }} />
+                    <p style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.2)" }}>
+                      {drawerFilter !== "all" ? "No drafts match this filter" : "No drafts yet"}
+                    </p>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <div style={{ fontSize: 9, color: "rgba(255,255,255,0.18)", fontFamily: "DM Mono, monospace", padding: "2px 0 8px" }}>
+                      {visibleDrafts.length} draft{visibleDrafts.length !== 1 ? "s" : ""}
+                      {drawerFilter !== "all" && drawerFilter !== "images" ? ` · ${scfg(drawerFilter).label.toLowerCase()}` : drawerFilter === "images" ? " · with images" : ""}
+                    </div>
+                    {visibleDrafts.map(d => <DraftDrawerCard key={d.id} d={d} />)}
+                  </div>
+                )}
+              </div>
+            </>
           )}
         </SheetContent>
       </Sheet>
-    </div>
+    </>
   );
 }

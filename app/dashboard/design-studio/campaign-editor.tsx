@@ -39,7 +39,7 @@ export default function CampaignEditorPage() {
       borderWidth: 1,
       textColor: '#000000',
       fontSize: 16,
-      fontFamily: 'Arial',
+      fontFamily: 'Century Gothic',
       fontWeight: 400,
       textAlign: 'left',
       padding: 8,

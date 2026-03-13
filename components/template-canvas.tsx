@@ -436,7 +436,7 @@ const TemplateCanvas = forwardRef<HTMLCanvasElement, TemplateCanvasProps>(functi
         }
         ctx.save();
         ctx.fillStyle = shape.textColor || "#ffffff";
-        ctx.font = `${shape.fontWeight || 600} ${shape.fontSize || 16}px ${shape.fontFamily || "Arial"}`;
+        ctx.font = `${shape.fontWeight || 600} ${shape.fontSize || 16}px ${shape.fontFamily || "Century Gothic"}`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         const textX = shape.x + shape.width / 2;
@@ -488,7 +488,7 @@ const TemplateCanvas = forwardRef<HTMLCanvasElement, TemplateCanvasProps>(functi
             text,
             maxWidth,
             maxHeight,
-            fontFamily: shape.fontFamily || "Arial",
+            fontFamily: shape.fontFamily || "Century Gothic",
             fontWeight: shape.fontWeight || 400,
             maxFontSize: maxFont,
             minFontSize: minFont,
@@ -497,7 +497,7 @@ const TemplateCanvas = forwardRef<HTMLCanvasElement, TemplateCanvasProps>(functi
           const textX = shape.x + (shape.textAlign === "center" ? shape.width / 2 : padding);
           let textY = shape.y + padding;
           const chosenTextColor = shape.textColor || "#000000";
-          ctx.font = `${shape.fontWeight || 400} ${fitted.fontSize}px ${shape.fontFamily || "Arial"}`;
+          ctx.font = `${shape.fontWeight || 400} ${fitted.fontSize}px ${shape.fontFamily || "Century Gothic"}`;
           ctx.fillStyle = chosenTextColor;
           for (const line of fitted.lines) {
             const out = line.trimEnd();
@@ -519,7 +519,7 @@ const TemplateCanvas = forwardRef<HTMLCanvasElement, TemplateCanvasProps>(functi
         const boxH = shape.height;
         const maxFont = shape.fontSize || 16;
         const minFont = (shape as any).minFontSize || 12;
-        const family = shape.fontFamily || "Arial";
+        const family = shape.fontFamily || "Century Gothic";
         const weight = shape.fontWeight || 400;
         const chosenTextColor = shape.textColor || "#000000";
         const wrapBulletLines = (fontSize: number, t: string, maxW: number) => {

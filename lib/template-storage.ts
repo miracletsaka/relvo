@@ -12,7 +12,7 @@ import { uploadFileToSpaces } from "./upload-client";
 
 async function listTemplatesFromDb(brandId?: string): Promise<Template[]> {
   const q = brandId ? `?brand_id=${encodeURIComponent(brandId)}` : "";
-  return api<Template[]>(`/templates${q}`);
+  return api<Template[]>(`/templates`);
 }
 
 async function createTemplateInDb(t: Omit<Template, "id" | "createdAt" | "updatedAt"> & { brand_id?: string }) {

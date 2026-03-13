@@ -99,6 +99,8 @@ export interface ShapeEditState {
 
 export type TemplateShape = {
   id: string;
+  lineHeight?: number;      // ✅ NEW
+  letterSpacing?: number;   // ✅ NEW
   type: TemplateShapeType;
   rotation?: number;
   customText?:string;

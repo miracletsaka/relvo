@@ -38,6 +38,8 @@ function withDefaults(s: Partial<TemplateShape>): TemplateShape {
     fit: (s as any).fit,
     lineWidth: (s as any).lineWidth,
     lineDash: (s as any).lineDash,
+    lineHeight: s.lineHeight ?? 1.1,
+    letterSpacing: s.letterSpacing ?? 0,
     lineCap: (s as any).lineCap,
     direction: (s as any).direction,
     rotation: s.rotation,
@@ -70,33 +72,211 @@ function scaleShapes(
 // ─────────────────────────────────────────────
 function offerLayoutBase(): TemplateShape[] {
   return [
-    withDefaults({ id: id("label"), type: "text", x: 90, y: 90, width: 700, height: 60, fontSize: 34, fontWeight: 600, textColor: "#7a7a7a", dataField: "subheading", zIndex: 2 }),
-    withDefaults({ id: id("headline"), type: "text", x: 90, y: 170, width: 880, height: 220, fontSize: 76, fontWeight: 900, textColor: "#111111", dataField: "hook", zIndex: 3 }),
-    withDefaults({ id: id("badge-circle"), type: "circle", x: 760, y: 70, width: 260, height: 260, backgroundColor: "#f5e7ff", borderWidth: 0, shadowBlur: 12, shadowX: 0, shadowY: 6, shadowColor: "rgba(0,0,0,0.18)", zIndex: 2 }),
-    withDefaults({ id: id("badge-text"), type: "text", x: 790, y: 135, width: 220, height: 160, fontSize: 42, fontWeight: 900, textAlign: "center", textColor: "#111111", dataField: "proof", zIndex: 3 }),
-    withDefaults({ id: id("burst1"), type: "circle", x: 980, y: 360, width: 70, height: 70, backgroundColor: "#c7d2ff", borderWidth: 0, opacity: 0.55, zIndex: 1 }),
-    withDefaults({ id: id("burst2"), type: "circle", x: 950, y: 420, width: 42, height: 42, backgroundColor: "#ffd1f8", borderWidth: 0, opacity: 0.65, zIndex: 1 }),
-    withDefaults({ id: id("burst3"), type: "circle", x: 1000, y: 470, width: 28, height: 28, backgroundColor: "#d3fff5", borderWidth: 0, opacity: 0.65, zIndex: 1 }),
-    withDefaults({ id: id("bullets"), type: "bullet-group", x: 90, y: 450, width: 900, height: 420, fontSize: 40, fontWeight: 700, textColor: "#333333", zIndex: 3 }),
-    withDefaults({ id: id("cta-btn"), type: "rounded-rect", x: 170, y: 980, width: 740, height: 140, backgroundColor: "#0b6bff", borderWidth: 0, shadowBlur: 18, shadowX: 0, shadowY: 10, shadowColor: "rgba(0,0,0,0.25)", zIndex: 2, borderRadius: 70 }),
-    withDefaults({ id: id("cta-text"), type: "text", x: 200, y: 1015, width: 680, height: 80, fontSize: 32, fontWeight: 800, textAlign: "center", textColor: "#ffffff", dataField: "cta", zIndex: 3 }),
-    withDefaults({ id: id("footer-line"), type: "rectangle", x: 90, y: 1200, width: 900, height: 6, backgroundColor: "#d9d9d9", borderWidth: 0, opacity: 0.8, zIndex: 1 }),
-    withDefaults({ id: id("footer-brand"), type: "text", x: 90, y: 1230, width: 900, height: 60, fontSize: 28, fontWeight: 700, textAlign: "center", textColor: "#9a9a9a", dataField: "companyName", zIndex: 2 }),
+    // SUBHEADING
+    withDefaults({
+      id: id("label"),
+      type: "text",
+      x: 72,
+      y: 86,
+      width: 760,
+      height: 52,
+      fontSize: 28,
+      fontWeight: 800,
+      letterSpacing: 1.8,
+      lineHeight: 1.1,
+      textColor: "#ffffff",
+      opacity: 0.9,
+      shadowBlur: 6,
+      shadowX: 0,
+      shadowY: 2,
+      shadowColor: "rgba(0,0,0,0.25)",
+      dataField: "subheading",
+      zIndex: 3,
+    }),
+
+    // HEADLINE
+    withDefaults({
+      id: id("headline"),
+      type: "text",
+      x: 72,
+      y: 150,
+      width: 860,
+      height: 470,
+      fontSize: 112, // max size, should still be auto-fitted by renderer
+      fontWeight: 900,
+      letterSpacing: -1.8,
+      lineHeight: 0.88,
+      textColor: "#ffffff",
+      shadowBlur: 24,
+      shadowX: 0,
+      shadowY: 10,
+      shadowColor: "rgba(0,0,0,0.35)",
+      dataField: "hook",
+      zIndex: 4,
+    }),
+
+    // CTA BUTTON
+    withDefaults({
+      id: id("cta-btn"),
+      type: "rounded-rect",
+      x: 72,
+      y: 1042,
+      width: 380,
+      height: 108,
+      backgroundColor: "#081f44",
+      borderWidth: 0,
+      borderRadius: 54,
+      shadowBlur: 20,
+      shadowX: 0,
+      shadowY: 10,
+      shadowColor: "rgba(0,0,0,0.25)",
+      zIndex: 2,
+    }),
+
+    // CTA TEXT
+    withDefaults({
+      id: id("cta-text"),
+      type: "text",
+      x: 106,
+      y: 1076,
+      width: 312,
+      height: 36,
+      fontSize: 30,
+      fontWeight: 800,
+      letterSpacing: 0.6,
+      lineHeight: 1,
+      textAlign: "center",
+      textColor: "#ffffff",
+      shadowBlur: 4,
+      shadowX: 0,
+      shadowY: 1,
+      shadowColor: "rgba(0,0,0,0.18)",
+      dataField: "cta",
+      zIndex: 3,
+    }),
+
+    // BRAND / LOGO TEXT
+    withDefaults({
+      id: id("footer-brand"),
+      type: "text",
+      x: 72,
+      y: 1288,
+      width: 260,
+      height: 28,
+      fontSize: 20,
+      fontWeight: 800,
+      letterSpacing: 3,
+      lineHeight: 1,
+      textColor: "#ffffff",
+      opacity: 0.72,
+      shadowBlur: 4,
+      shadowX: 0,
+      shadowY: 1,
+      shadowColor: "rgba(0,0,0,0.2)",
+      dataField: "companyName",
+      zIndex: 3,
+    }),
   ];
 }
-
 // ─────────────────────────────────────────────
 // 2) HERO PRODUCT (original)
 // ─────────────────────────────────────────────
 function heroProductBase(): TemplateShape[] {
   return [
-    withDefaults({ id: id("big-number"), type: "text", x: 60, y: 40, width: 360, height: 260, fontSize: 220, fontWeight: 900, textColor: "rgba(0,0,0,0.08)", dataField: "proof", zIndex: 1 }),
-    withDefaults({ id: id("hero-headline"), type: "text", x: 300, y: 120, width: 720, height: 260, fontSize: 72, fontWeight: 900, textColor: "#111111", dataField: "hook", zIndex: 3 }),
-    withDefaults({ id: id("hero-sub"), type: "text", x: 300, y: 340, width: 720, height: 110, fontSize: 34, fontWeight: 600, textColor: "#6b6b6b", dataField: "subheading", zIndex: 3 }),
-    withDefaults({ id: id("image-panel"), type: "rounded-rect", x: 130, y: 520, width: 820, height: 520, backgroundColor: "#ededed", borderWidth: 0, shadowBlur: 22, shadowX: 0, shadowY: 12, shadowColor: "rgba(0,0,0,0.22)", zIndex: 2, borderRadius: 24 }),
-    withDefaults({ id: id("image-note"), type: "text", x: 170, y: 750, width: 740, height: 120, fontSize: 28, fontWeight: 700, textAlign: "center", textColor: "#777777", dataField: "location", zIndex: 3 }),
-    withDefaults({ id: id("hero-cta"), type: "rounded-rect", x: 610, y: 1120, width: 380, height: 120, backgroundColor: "#111111", borderWidth: 0, shadowBlur: 18, shadowX: 0, shadowY: 10, shadowColor: "rgba(0,0,0,0.22)", zIndex: 2, borderRadius: 60 }),
-    withDefaults({ id: id("hero-cta-text"), type: "text", x: 630, y: 1148, width: 340, height: 80, fontSize: 30, fontWeight: 800, textAlign: "center", textColor: "#ffffff", dataField: "cta", zIndex: 3 }),
+
+    // BRAND (top center)
+    withDefaults({
+      id: id("brand"),
+      type: "text",
+      x: 340,
+      y: 80,
+      width: 400,
+      height: 40,
+      fontSize: 22,
+      fontWeight: 900,
+      letterSpacing: 3,
+      textAlign: "center",
+      textColor: "#1e5f3b",
+      opacity: 0.8,
+      dataField: "companyName",
+      zIndex: 3
+    }),
+
+    // CATEGORY LABEL
+    withDefaults({
+      id: id("label"),
+      type: "text",
+      x: 240,
+      y: 140,
+      width: 600,
+      height: 60,
+      fontSize: 30,
+      fontWeight: 800,
+      letterSpacing: 2,
+      textAlign: "center",
+      textColor: "#1e5f3b",
+      opacity: 0.85,
+      dataField: "subheading",
+      zIndex: 3
+    }),
+
+    // MAIN HERO HEADLINE (CENTERED)
+    withDefaults({
+      id: id("headline"),
+      type: "text",
+      x: 120,
+      y: 210,
+      width: 840,
+      height: 320,
+      fontSize: 120,
+      fontWeight: 900,
+      letterSpacing: -2,
+      lineHeight: 0.9,
+      textAlign: "center",
+      textColor: "#1e5f3b",
+      shadowBlur: 10,
+      shadowX: 0,
+      shadowY: 6,
+      shadowColor: "rgba(0,0,0,0.15)",
+      dataField: "hook",
+      zIndex: 4
+    }),
+
+    // CTA BUTTON (CENTER)
+    withDefaults({
+      id: id("cta-btn"),
+      type: "rounded-rect",
+      x: 310,
+      y: 1050,
+      width: 460,
+      height: 110,
+      backgroundColor: "#1e5f3b",
+      borderRadius: 60,
+      shadowBlur: 16,
+      shadowX: 0,
+      shadowY: 10,
+      shadowColor: "rgba(0,0,0,0.22)",
+      zIndex: 2
+    }),
+
+    // CTA TEXT
+    withDefaults({
+      id: id("cta-text"),
+      type: "text",
+      x: 350,
+      y: 1086,
+      width: 380,
+      height: 36,
+      fontSize: 32,
+      fontWeight: 800,
+      letterSpacing: 0.6,
+      lineHeight: 1,
+      textAlign: "center",
+      textColor: "#ffffff",
+      dataField: "cta",
+      zIndex: 3
+    }),
+
   ];
 }
 
@@ -106,29 +286,120 @@ function heroProductBase(): TemplateShape[] {
 // ─────────────────────────────────────────────
 function skincareProductBase(): TemplateShape[] {
   return [
-    // Full background tint panel
-    withDefaults({ id: id("bg-panel"), type: "rectangle", x: 0, y: 0, width: 1080, height: 1350, backgroundColor: "#2d6a4f", borderWidth: 0, zIndex: 0 }),
-    // Soft bubble top-left decoration
-    withDefaults({ id: id("bubble1"), type: "circle", x: -80, y: -80, width: 360, height: 360, backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 0, zIndex: 1 }),
-    withDefaults({ id: id("bubble2"), type: "circle", x: 800, y: 1100, width: 300, height: 300, backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 0, zIndex: 1 }),
-    // Product image placeholder (left half)
-    withDefaults({ id: id("product-img"), type: "rounded-rect", x: 40, y: 220, width: 460, height: 780, backgroundColor: "rgba(255,255,255,0.12)", borderWidth: 0, borderRadius: 32, zIndex: 2 } as any),
-    withDefaults({ id: id("product-img-label"), type: "text", x: 60, y: 580, width: 420, height: 60, fontSize: 22, fontWeight: 500, textAlign: "center", textColor: "rgba(255,255,255,0.4)", customText: "Drop your product image here", zIndex: 3 } as any),
-    // Brand name top right
-    withDefaults({ id: id("brand"), type: "text", x: 540, y: 200, width: 480, height: 80, fontSize: 52, fontWeight: 700, textAlign: "left", textColor: "#ffffff", fontFamily: "Georgia", dataField: "companyName", zIndex: 3 }),
-    // Star rating row (decorative text)
-    withDefaults({ id: id("stars"), type: "text", x: 540, y: 300, width: 300, height: 60, fontSize: 36, fontWeight: 400, textAlign: "left", textColor: "#f4d03f", customText: "★★★★★", zIndex: 3 } as any),
-    // Main headline
-    withDefaults({ id: id("headline"), type: "text", x: 540, y: 370, width: 500, height: 280, fontSize: 68, fontWeight: 900, textAlign: "left", textColor: "#ffffff", fontFamily: "Arial Black", dataField: "hook", textTransform: "uppercase", zIndex: 4 } as any),
-    // Testimonial quote
-    withDefaults({ id: id("quote"), type: "text", x: 540, y: 680, width: 490, height: 280, fontSize: 26, fontWeight: 400, textAlign: "left", textColor: "rgba(255,255,255,0.85)", fontFamily: "Georgia", dataField: "proof", zIndex: 3 }),
-    // Divider line
-    withDefaults({ id: id("divider"), type: "line", x: 40, y: 1060, width: 1000, height: 0, borderColor: "rgba(255,255,255,0.2)", lineWidth: 2, lineDash: [], zIndex: 2 } as any),
-    // CTA pill button
-    withDefaults({ id: id("cta-pill"), type: "rounded-rect", x: 200, y: 1110, width: 680, height: 130, backgroundColor: "#ffffff", borderWidth: 0, borderRadius: 65, shadowBlur: 20, shadowX: 0, shadowY: 8, shadowColor: "rgba(0,0,0,0.3)", zIndex: 3 } as any),
-    withDefaults({ id: id("cta-text"), type: "text", x: 220, y: 1148, width: 640, height: 60, fontSize: 34, fontWeight: 800, textAlign: "center", textColor: "#2d6a4f", dataField: "cta", textTransform: "uppercase", zIndex: 4 } as any),
-    // Hashtags bottom
-    withDefaults({ id: id("hashtags"), type: "text", x: 40, y: 1275, width: 1000, height: 50, fontSize: 22, fontWeight: 400, textAlign: "center", textColor: "rgba(255,255,255,0.45)", dataField: "hashtags", zIndex: 2 }),
+    withDefaults({
+      id: id("top-copy"),
+      type: "text",
+      x: 34,
+      y: 70,
+      width: 520,
+      height: 220,
+      fontSize: 64,
+      fontWeight: 900,
+      letterSpacing: -1.2,
+      lineHeight: 0.96,
+      textColor: "#1e5f3b",
+      shadowBlur: 6,
+      shadowX: 0,
+      shadowY: 3,
+      shadowColor: "rgba(0,0,0,0.12)",
+      dataField: "subheading",
+      zIndex: 4,
+    }),
+
+    withDefaults({
+      id: id("bottom-copy"),
+      type: "text",
+      x: 555,
+      y: 960,
+      width: 470,
+      height: 280,
+      fontSize: 66,
+      fontWeight: 900,
+      letterSpacing: -1.3,
+      lineHeight: 0.95,
+      textAlign: "left",
+      textColor: "#1e5f3b",
+      shadowBlur: 6,
+      shadowX: 0,
+      shadowY: 3,
+      shadowColor: "rgba(0,0,0,0.12)",
+      dataField: "hook",
+      zIndex: 4,
+    }),
+
+    withDefaults({
+      id: id("mini-cta"),
+      type: "text",
+      x: 38,
+      y: 1208,
+      width: 280,
+      height: 42,
+      fontSize: 20,
+      fontWeight: 800,
+      letterSpacing: 0.4,
+      lineHeight: 1,
+      textColor: "#1e5f3b",
+      dataField: "cta",
+      zIndex: 4,
+    }),
+
+    withDefaults({
+      id: id("brand"),
+      type: "text",
+      x: 38,
+      y: 1270,
+      width: 300,
+      height: 34,
+      fontSize: 24,
+      fontWeight: 900,
+      letterSpacing: 1.5,
+      lineHeight: 1,
+      textColor: "#ffffff",
+      dataField: "companyName",
+      zIndex: 4,
+    }),
+
+    withDefaults({
+      id: id("dots-left"),
+      type: "line",
+      x: 64,
+      y: 1012,
+      width: 190,
+      height: 0,
+      borderColor: "rgba(255,255,255,0.7)",
+      lineWidth: 3,
+      lineDash: [10, 10],
+      lineCap: "round",
+      zIndex: 2,
+    }),
+
+    withDefaults({
+      id: id("dots-left-2"),
+      type: "line",
+      x: 64,
+      y: 1038,
+      width: 190,
+      height: 0,
+      borderColor: "rgba(255,255,255,0.58)",
+      lineWidth: 3,
+      lineDash: [10, 10],
+      lineCap: "round",
+      zIndex: 2,
+    }),
+
+    withDefaults({
+      id: id("dots-left-3"),
+      type: "line",
+      x: 64,
+      y: 1064,
+      width: 190,
+      height: 0,
+      borderColor: "rgba(255,255,255,0.46)",
+      lineWidth: 3,
+      lineDash: [10, 10],
+      lineCap: "round",
+      zIndex: 2,
+    }),
   ];
 }
 
@@ -138,24 +409,103 @@ function skincareProductBase(): TemplateShape[] {
 // ─────────────────────────────────────────────
 function boldBrandBase(): TemplateShape[] {
   return [
-    // Background
-    withDefaults({ id: id("bg"), type: "rectangle", x: 0, y: 0, width: 1080, height: 1350, backgroundColor: "#faf7f2", borderWidth: 0, zIndex: 0 }),
-    // Thin top rule
-    withDefaults({ id: id("rule-top"), type: "rectangle", x: 90, y: 100, width: 900, height: 4, backgroundColor: "#111111", borderWidth: 0, zIndex: 2 }),
-    // Location / category label
-    withDefaults({ id: id("category"), type: "text", x: 90, y: 120, width: 900, height: 60, fontSize: 26, fontWeight: 400, textAlign: "center", textColor: "#888888", fontFamily: "Arial", dataField: "location", textTransform: "uppercase", zIndex: 2 } as any),
-    // GIANT wordmark / brand name
-    withDefaults({ id: id("wordmark"), type: "text", x: 40, y: 200, width: 1000, height: 300, fontSize: 160, fontWeight: 900, textAlign: "center", textColor: "#111111", fontFamily: "Arial Black", dataField: "companyName", textTransform: "uppercase", zIndex: 3 } as any),
-    // Image placeholder center
-    withDefaults({ id: id("product-img"), type: "rounded-rect", x: 140, y: 520, width: 800, height: 480, backgroundColor: "#e8e4de", borderWidth: 0, borderRadius: 20, zIndex: 2 } as any),
-    withDefaults({ id: id("img-hint"), type: "text", x: 160, y: 730, width: 760, height: 60, fontSize: 24, fontWeight: 400, textAlign: "center", textColor: "#aaaaaa", customText: "Drop your image here", zIndex: 3 } as any),
-    // Sub tagline
-    withDefaults({ id: id("tagline"), type: "text", x: 90, y: 1040, width: 900, height: 100, fontSize: 44, fontWeight: 800, textAlign: "center", textColor: "#111111", dataField: "hook", zIndex: 3 }),
-    withDefaults({ id: id("sub"), type: "text", x: 90, y: 1150, width: 900, height: 80, fontSize: 28, fontWeight: 400, textAlign: "center", textColor: "#666666", dataField: "subheading", zIndex: 3 }),
-    // Bottom rule
-    withDefaults({ id: id("rule-bot"), type: "rectangle", x: 90, y: 1260, width: 900, height: 4, backgroundColor: "#111111", borderWidth: 0, zIndex: 2 }),
-    // CTA text link style
-    withDefaults({ id: id("cta"), type: "text", x: 90, y: 1278, width: 900, height: 50, fontSize: 24, fontWeight: 600, textAlign: "center", textColor: "#111111", dataField: "cta", textTransform: "uppercase", zIndex: 2 } as any),
+    withDefaults({
+      id: id("top-copy"),
+      type: "text",
+      x: 42,
+      y: 84,
+      width: 560,
+      height: 190,
+      fontSize: 58,
+      fontWeight: 900,
+      letterSpacing: -1,
+      lineHeight: 0.97,
+      textColor: "#1e5f3b",
+      shadowBlur: 5,
+      shadowX: 0,
+      shadowY: 2,
+      shadowColor: "rgba(0,0,0,0.1)",
+      dataField: "subheading",
+      zIndex: 4,
+    }),
+
+    withDefaults({
+      id: id("mid-accent-line"),
+      type: "line",
+      x: 58,
+      y: 320,
+      width: 300,
+      height: 0,
+      borderColor: "rgba(30,95,59,0.25)",
+      lineWidth: 4,
+      lineDash: [14, 12],
+      lineCap: "round",
+      zIndex: 2,
+    }),
+
+    withDefaults({
+      id: id("bottom-copy"),
+      type: "text",
+      x: 500,
+      y: 930,
+      width: 510,
+      height: 320,
+      fontSize: 70,
+      fontWeight: 900,
+      letterSpacing: -1.5,
+      lineHeight: 0.94,
+      textAlign: "left",
+      textColor: "#1e5f3b",
+      shadowBlur: 6,
+      shadowX: 0,
+      shadowY: 3,
+      shadowColor: "rgba(0,0,0,0.12)",
+      dataField: "hook",
+      zIndex: 4,
+    }),
+
+    withDefaults({
+      id: id("mini-cta"),
+      type: "text",
+      x: 42,
+      y: 1214,
+      width: 340,
+      height: 34,
+      fontSize: 22,
+      fontWeight: 800,
+      letterSpacing: 0.3,
+      lineHeight: 1,
+      textColor: "#1e5f3b",
+      dataField: "cta",
+      zIndex: 4,
+    }),
+
+    withDefaults({
+      id: id("brand"),
+      type: "text",
+      x: 42,
+      y: 1272,
+      width: 280,
+      height: 30,
+      fontSize: 23,
+      fontWeight: 900,
+      letterSpacing: 1.8,
+      textColor: "#ffffff",
+      dataField: "companyName",
+      zIndex: 4,
+    }),
+
+    withDefaults({
+      id: id("accent-dot"),
+      type: "circle",
+      x: 360,
+      y: 116,
+      width: 24,
+      height: 24,
+      backgroundColor: "rgba(30,95,59,0.7)",
+      borderWidth: 0,
+      zIndex: 2,
+    }),
   ];
 }
 
@@ -165,24 +515,116 @@ function boldBrandBase(): TemplateShape[] {
 // ─────────────────────────────────────────────
 function flashSaleBase(): TemplateShape[] {
   return [
-    withDefaults({ id: id("bg"), type: "rectangle", x: 0, y: 0, width: 1080, height: 1350, backgroundColor: "#ff2d2d", borderWidth: 0, zIndex: 0 }),
-    // Diagonal accent stripe
-    withDefaults({ id: id("stripe"), type: "rectangle", x: -200, y: 300, width: 1600, height: 180, backgroundColor: "#ff0000", borderWidth: 0, opacity: 0.4, rotation: -8, zIndex: 1 }),
-    // SALE label
-    withDefaults({ id: id("sale-tag"), type: "rounded-rect", x: 90, y: 100, width: 260, height: 80, backgroundColor: "#ffffff", borderWidth: 0, borderRadius: 8, zIndex: 3 } as any),
-    withDefaults({ id: id("sale-tag-text"), type: "text", x: 100, y: 118, width: 240, height: 50, fontSize: 34, fontWeight: 900, textAlign: "center", textColor: "#ff2d2d", customText: "SALE", textTransform: "uppercase", zIndex: 4 } as any),
-    // Big % number
-    withDefaults({ id: id("percent"), type: "text", x: 60, y: 200, width: 960, height: 420, fontSize: 380, fontWeight: 900, textAlign: "center", textColor: "#ffffff", fontFamily: "Arial Black", dataField: "proof", zIndex: 2 }),
-    withDefaults({ id: id("off-label"), type: "text", x: 60, y: 580, width: 960, height: 120, fontSize: 100, fontWeight: 900, textAlign: "center", textColor: "rgba(255,255,255,0.85)", fontFamily: "Arial Black", customText: "OFF", zIndex: 2 } as any),
-    // Headline
-    withDefaults({ id: id("headline"), type: "text", x: 90, y: 730, width: 900, height: 160, fontSize: 64, fontWeight: 800, textAlign: "center", textColor: "#ffffff", dataField: "hook", zIndex: 3 }),
-    // Subheading
-    withDefaults({ id: id("sub"), type: "text", x: 90, y: 900, width: 900, height: 100, fontSize: 34, fontWeight: 500, textAlign: "center", textColor: "rgba(255,255,255,0.8)", dataField: "subheading", zIndex: 3 }),
-    // Bullets
-    withDefaults({ id: id("bullets"), type: "bullet-group", x: 130, y: 1020, width: 820, height: 200, fontSize: 30, fontWeight: 600, textColor: "#ffffff", zIndex: 3 }),
-    // CTA button
-    withDefaults({ id: id("cta-btn"), type: "rounded-rect", x: 140, y: 1240, width: 800, height: 90, backgroundColor: "#ffffff", borderWidth: 0, borderRadius: 45, shadowBlur: 20, shadowX: 0, shadowY: 8, shadowColor: "rgba(0,0,0,0.3)", zIndex: 3 } as any),
-    withDefaults({ id: id("cta-text"), type: "text", x: 160, y: 1260, width: 760, height: 55, fontSize: 32, fontWeight: 900, textAlign: "center", textColor: "#ff2d2d", dataField: "cta", textTransform: "uppercase", zIndex: 4 } as any),
+    withDefaults({
+      id: id("top-copy"),
+      type: "text",
+      x: 36,
+      y: 76,
+      width: 540,
+      height: 240,
+      fontSize: 60,
+      fontWeight: 900,
+      letterSpacing: -1.4,
+      lineHeight: 0.94,
+      textColor: "#1e5f3b",
+      shadowBlur: 5,
+      shadowX: 0,
+      shadowY: 2,
+      shadowColor: "rgba(0,0,0,0.1)",
+      dataField: "subheading",
+      zIndex: 4,
+    }),
+
+    withDefaults({
+      id: id("bottom-copy"),
+      type: "text",
+      x: 528,
+      y: 946,
+      width: 480,
+      height: 330,
+      fontSize: 74,
+      fontWeight: 900,
+      letterSpacing: -1.8,
+      lineHeight: 0.92,
+      textColor: "#1e5f3b",
+      shadowBlur: 6,
+      shadowX: 0,
+      shadowY: 3,
+      shadowColor: "rgba(0,0,0,0.12)",
+      dataField: "hook",
+      zIndex: 4,
+    }),
+
+    withDefaults({
+      id: id("support-dot"),
+      type: "circle",
+      x: 382,
+      y: 104,
+      width: 22,
+      height: 22,
+      backgroundColor: "rgba(30,95,59,0.72)",
+      borderWidth: 0,
+      zIndex: 2,
+    }),
+
+    withDefaults({
+      id: id("mini-cta"),
+      type: "text",
+      x: 42,
+      y: 1208,
+      width: 320,
+      height: 36,
+      fontSize: 20,
+      fontWeight: 900,
+      letterSpacing: 0.5,
+      lineHeight: 1,
+      textColor: "#1e5f3b",
+      dataField: "cta",
+      zIndex: 4,
+    }),
+
+    withDefaults({
+      id: id("brand"),
+      type: "text",
+      x: 42,
+      y: 1268,
+      width: 320,
+      height: 34,
+      fontSize: 25,
+      fontWeight: 900,
+      letterSpacing: 1.6,
+      textColor: "#ffffff",
+      dataField: "companyName",
+      zIndex: 4,
+    }),
+
+    withDefaults({
+      id: id("short-line-1"),
+      type: "line",
+      x: 70,
+      y: 1008,
+      width: 155,
+      height: 0,
+      borderColor: "rgba(255,255,255,0.68)",
+      lineWidth: 3,
+      lineDash: [8, 10],
+      lineCap: "round",
+      zIndex: 2,
+    }),
+
+    withDefaults({
+      id: id("short-line-2"),
+      type: "line",
+      x: 70,
+      y: 1034,
+      width: 155,
+      height: 0,
+      borderColor: "rgba(255,255,255,0.54)",
+      lineWidth: 3,
+      lineDash: [8, 10],
+      lineCap: "round",
+      zIndex: 2,
+    }),
   ];
 }
 
@@ -192,25 +634,110 @@ function flashSaleBase(): TemplateShape[] {
 // ─────────────────────────────────────────────
 function testimonialBase(): TemplateShape[] {
   return [
-    withDefaults({ id: id("bg"), type: "rectangle", x: 0, y: 0, width: 1080, height: 1350, backgroundColor: "#fafafa", borderWidth: 0, zIndex: 0 }),
-    // Top accent bar
-    withDefaults({ id: id("accent-bar"), type: "rectangle", x: 0, y: 0, width: 1080, height: 16, backgroundColor: "#111111", borderWidth: 0, zIndex: 2 }),
-    // Giant quote mark
-    withDefaults({ id: id("quote-mark"), type: "text", x: 60, y: 80, width: 260, height: 260, fontSize: 320, fontWeight: 900, textAlign: "left", textColor: "rgba(0,0,0,0.06)", fontFamily: "Georgia", customText: "\u201C", zIndex: 1 } as any),
-    // Stars
-    withDefaults({ id: id("stars"), type: "text", x: 90, y: 160, width: 400, height: 70, fontSize: 48, fontWeight: 400, textAlign: "left", textColor: "#f4a61d", customText: "★★★★★", zIndex: 3 } as any),
-    // Company name small
-    withDefaults({ id: id("brand"), type: "text", x: 90, y: 250, width: 600, height: 60, fontSize: 28, fontWeight: 600, textAlign: "left", textColor: "#888888", dataField: "companyName", textTransform: "uppercase", zIndex: 3 } as any),
-    // The quote / proof text
-    withDefaults({ id: id("quote-text"), type: "text", x: 90, y: 340, width: 900, height: 540, fontSize: 54, fontWeight: 700, textAlign: "left", textColor: "#111111", fontFamily: "Georgia", dataField: "proof", zIndex: 3 }),
-    // Attribution line
-    withDefaults({ id: id("attr-line"), type: "line", x: 90, y: 910, width: 200, height: 0, borderColor: "#111111", lineWidth: 3, lineDash: [], zIndex: 2 } as any),
-    withDefaults({ id: id("attr-name"), type: "text", x: 90, y: 930, width: 900, height: 60, fontSize: 30, fontWeight: 600, textAlign: "left", textColor: "#444444", dataField: "location", zIndex: 3 }),
-    // Hook headline below
-    withDefaults({ id: id("headline"), type: "text", x: 90, y: 1040, width: 900, height: 160, fontSize: 56, fontWeight: 900, textAlign: "left", textColor: "#111111", dataField: "hook", zIndex: 3 }),
-    // CTA
-    withDefaults({ id: id("cta-pill"), type: "rounded-rect", x: 90, y: 1240, width: 500, height: 90, backgroundColor: "#111111", borderWidth: 0, borderRadius: 45, zIndex: 3 } as any),
-    withDefaults({ id: id("cta-text"), type: "text", x: 110, y: 1262, width: 460, height: 50, fontSize: 28, fontWeight: 800, textAlign: "center", textColor: "#ffffff", dataField: "cta", zIndex: 4 }),
+    withDefaults({
+      id: id("top-copy"),
+      type: "text",
+      x: 28,
+      y: 88,
+      width: 560,
+      height: 220,
+      fontSize: 56,
+      fontWeight: 900,
+      letterSpacing: -1,
+      lineHeight: 0.98,
+      textColor: "#1e5f3b",
+      shadowBlur: 4,
+      shadowX: 0,
+      shadowY: 2,
+      shadowColor: "rgba(0,0,0,0.08)",
+      dataField: "subheading",
+      zIndex: 4,
+    }),
+
+    withDefaults({
+      id: id("bottom-copy"),
+      type: "text",
+      x: 560,
+      y: 916,
+      width: 445,
+      height: 350,
+      fontSize: 68,
+      fontWeight: 900,
+      letterSpacing: -1.5,
+      lineHeight: 0.93,
+      textColor: "#1e5f3b",
+      dataField: "hook",
+      zIndex: 4,
+    }),
+
+    withDefaults({
+      id: id("accent-bar"),
+      type: "rectangle",
+      x: 30,
+      y: 1176,
+      width: 10,
+      height: 84,
+      backgroundColor: "#1e5f3b",
+      borderWidth: 0,
+      zIndex: 3,
+    }),
+
+    withDefaults({
+      id: id("mini-cta"),
+      type: "text",
+      x: 56,
+      y: 1192,
+      width: 300,
+      height: 60,
+      fontSize: 22,
+      fontWeight: 800,
+      letterSpacing: 0.4,
+      lineHeight: 1.05,
+      textColor: "#1e5f3b",
+      dataField: "cta",
+      zIndex: 4,
+    }),
+
+    withDefaults({
+      id: id("brand"),
+      type: "text",
+      x: 56,
+      y: 1270,
+      width: 280,
+      height: 32,
+      fontSize: 24,
+      fontWeight: 900,
+      letterSpacing: 1.8,
+      textColor: "#ffffff",
+      dataField: "companyName",
+      zIndex: 4,
+    }),
+
+    withDefaults({
+      id: id("accent-dot"),
+      type: "circle",
+      x: 366,
+      y: 118,
+      width: 20,
+      height: 20,
+      backgroundColor: "rgba(30,95,59,0.7)",
+      borderWidth: 0,
+      zIndex: 2,
+    }),
+
+    withDefaults({
+      id: id("accent-line"),
+      type: "line",
+      x: 62,
+      y: 334,
+      width: 240,
+      height: 0,
+      borderColor: "rgba(30,95,59,0.28)",
+      lineWidth: 4,
+      lineDash: [12, 12],
+      lineCap: "round",
+      zIndex: 2,
+    }),
   ];
 }
 

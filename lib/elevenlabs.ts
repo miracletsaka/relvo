@@ -1,131 +1,230 @@
-export type VoiceId = "rachel" | "adam" | "bella" | "josh" | "elli" | "antoni" | "domi" | "thomas";
+/**
+ * lib/elevenlabs.ts
+ * ─────────────────
+ * Full ElevenLabs TTS integration.
+ *
+ * Uses the v1 Text-to-Speech API:
+ *   POST https://api.elevenlabs.io/v1/text-to-speech/{voice_id}
+ *
+ * Env required:
+ *   ELEVENLABS_API_KEY=your_key_here
+ */
 
-const VOICE_MAP: Record<VoiceId, string> = {
-  rachel:  "21m00Tcm4TlvDq8ikWAM",
-  adam:    "pNInz6obpgDQGcFmaJgB",
-  bella:   "EXAVITQu4vr4xnSDxMaL",
-  josh:    "TxGEqnHWrfWFTfGW9XjX",
-  elli:    "MF3mGyEYCl7XYWbV9V6O",
-  antoni:  "ErXwobaYiN019PkySvjV",
-  domi:    "AZnzlk1XvdvUeBnXmlld",
-  thomas:  "GBv7mTt0atIp3Br8iCZE",
+const ELEVEN_BASE = "https://api.elevenlabs.io/v1";
+
+// ── Voice catalogue ───────────────────────────────────────────────────────────
+// Real ElevenLabs pre-made voice IDs (stable, no cloning needed).
+// https://elevenlabs.io/docs/voices/pre-made-voices
+export const ELEVENLABS_VOICES = [
+  // Female
+  { id: "EXAVITQu4vr4xnSDxMaL", name: "Sarah",    gender: "female", accent: "American",  style: "Calm, conversational"  },
+  { id: "FGY2WhTYpPnrIDTdsKH5", name: "Laura",    gender: "female", accent: "American",  style: "Upbeat, positive"       },
+  { id: "XB0fDUnXU5powFXDhCwa", name: "Charlotte", gender: "female", accent: "English",   style: "Seductive, confident"  },
+  { id: "Xb7hH8MSUJpSbSDYk0k2", name: "Alice",    gender: "female", accent: "British",   style: "Confident, professional"},
+  { id: "cgSgspJ2msm6clMCkdW9", name: "Jessica",  gender: "female", accent: "American",  style: "Expressive, forward"   },
+  { id: "pFZP5JQG7iQjIQuC4Bku", name: "Lily",     gender: "female", accent: "British",   style: "Warm, narrative"        },
+  // Male
+  { id: "CwhRBWXzGAHq8TQ4Fs17", name: "Roger",    gender: "male",   accent: "American",  style: "Confident, assertive"  },
+  { id: "IKne3meq5aSn9XLyUdCD", name: "Charlie",  gender: "male",   accent: "Australian",style: "Natural, casual"        },
+  { id: "JBFqnCBsd6RMkjVDRZzb", name: "George",   gender: "male",   accent: "British",   style: "Warm, narrative"        },
+  { id: "N2lVS1w4EtoT3dr4eOWO", name: "Callum",   gender: "male",   accent: "Transatlantic", style: "Intense, character"  },
+  { id: "TX3LPaxmHKxFdv7VOQHJ", name: "Liam",     gender: "male",   accent: "American",  style: "Clear, articulate"     },
+  { id: "bIHbv24MWmeRgasZH58o", name: "Will",     gender: "male",   accent: "American",  style: "Friendly, relatable"   },
+  { id: "nPczCjzI2devNBz1zQrb", name: "Brian",    gender: "male",   accent: "American",  style: "Deep, authoritative"   },
+  { id: "onwK4e9ZLuTAKqWW03F9", name: "Daniel",   gender: "male",   accent: "British",   style: "Deep, professional"    },
+  { id: "pqHfZKP75CvOlQylNhV4", name: "Bill",     gender: "male",   accent: "American",  style: "Trustworthy, ground"   },
+] as const;
+
+export type VoiceId = typeof ELEVENLABS_VOICES[number]["id"] | string;
+
+// Default — Sarah (calm American female, great for marketing)
+export const DEFAULT_VOICE_ID: VoiceId = "EXAVITQu4vr4xnSDxMaL";
+
+// ── Model options ─────────────────────────────────────────────────────────────
+export type ElevenLabsModel =
+  | "eleven_multilingual_v2"   // best quality, supports 29 languages
+  | "eleven_turbo_v2_5"        // fast, low latency, English + major langs
+  | "eleven_flash_v2_5"        // ultra-fast, lowest cost
+
+export const DEFAULT_MODEL: ElevenLabsModel = "eleven_multilingual_v2";
+
+// ── Voice settings interface ──────────────────────────────────────────────────
+export interface VoiceSettings {
+  stability:        number   // 0–1  (0 = expressive, 1 = very stable)
+  similarity_boost: number   // 0–1  (higher = closer to original voice)
+  style?:           number   // 0–1  (amplify style, default 0)
+  use_speaker_boost?: boolean
+}
+
+const DEFAULT_SETTINGS: VoiceSettings = {
+  stability:        0.5,
+  similarity_boost: 0.75,
+  style:            0.0,
+  use_speaker_boost: true,
 };
 
-const API_KEY = process.env.ELEVENLABS_API_KEY!;
-const BASE    = "https://api.elevenlabs.io/v1";
-
-export interface WordTiming {
-  word:       string;
-  start_time: number;
-  end_time:   number;
+// ── Core generate function ────────────────────────────────────────────────────
+export interface GenerateVoiceoverOptions {
+  voiceId?:   VoiceId
+  model?:     ElevenLabsModel
+  settings?:  Partial<VoiceSettings>
+  outputFormat?: "mp3_44100_128" | "mp3_22050_32" | "pcm_16000" | "pcm_22050"
 }
 
 export interface GenerateVoiceoverResult {
-  audioBuffer:  ArrayBuffer | null;
-  wordTimings:  WordTiming[] | null;
-  durationSecs: number | null;
+  audioBuffer:   ArrayBuffer
+  durationSec:   number          // estimated from byte size (128kbps MP3)
+  voiceId:       VoiceId
+  characterCount: number
 }
 
 export async function generateVoiceover(
   text:    string,
-  voiceId: VoiceId = "rachel",
+  voiceId: VoiceId = DEFAULT_VOICE_ID,
+  options: GenerateVoiceoverOptions = {},
 ): Promise<GenerateVoiceoverResult> {
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) throw new Error("ELEVENLABS_API_KEY not set");
 
-  const id = VOICE_MAP[voiceId] ?? VOICE_MAP.rachel;
-  const body = {
-    text,
-    model_id:       "eleven_turbo_v2",
-    voice_settings: { stability: 0.45, similarity_boost: 0.82, style: 0.35, use_speaker_boost: true },
+  const {
+    model        = DEFAULT_MODEL,
+    settings     = {},
+    outputFormat = "mp3_44100_128",
+  } = options;
+
+  const mergedSettings: VoiceSettings = { ...DEFAULT_SETTINGS, ...settings };
+
+  // Trim and sanitise text
+  const cleanText = text
+    .trim()
+    .replace(/\s+/g, " ")
+    .slice(0, 5000); // ElevenLabs max ~5000 chars per request
+
+  if (!cleanText) throw new Error("Empty text — cannot generate voiceover");
+
+  const url = `${ELEVEN_BASE}/text-to-speech/${voiceId}`;
+
+  const res = await fetch(url, {
+    method:  "POST",
+    headers: {
+      "xi-api-key":    apiKey,
+      "Content-Type":  "application/json",
+      "Accept":        "audio/mpeg",
+    },
+    body: JSON.stringify({
+      text:           cleanText,
+      model_id:       model,
+      voice_settings: mergedSettings,
+      output_format:  outputFormat,
+    }),
+  });
+
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => "");
+    throw new Error(`ElevenLabs API error ${res.status}: ${errBody.slice(0, 200)}`);
+  }
+
+  const audioBuffer  = await res.arrayBuffer();
+  const bytes        = new Uint8Array(audioBuffer);
+  // 128kbps MP3 = 16,000 bytes/sec
+  const durationSec  = bytes.byteLength / 16_000;
+
+  return {
+    audioBuffer,
+    durationSec,
+    voiceId,
+    characterCount: cleanText.length,
   };
-
-  // ── Try /with-timestamps first — gives word-level sync ───────────────
-  try {
-    const res = await fetch(`${BASE}/text-to-speech/${id}/with-timestamps`, {
-      method:  "POST",
-      headers: { "xi-api-key": API_KEY, "Content-Type": "application/json", "Accept": "application/json" },
-      body:    JSON.stringify(body),
-    });
-
-    if (res.ok) {
-      const json: {
-        audio_base64: string;
-        alignment: {
-          characters:                     string[];
-          character_start_times_seconds:  number[];
-          character_end_times_seconds:    number[];
-        };
-      } = await res.json();
-
-      // base64 → ArrayBuffer
-      const bin   = atob(json.audio_base64);
-      const bytes = new Uint8Array(bin.length);
-      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-
-      const wordTimings  = charAlignmentToWords(json.alignment, text);
-      const endTimes     = json.alignment?.character_end_times_seconds ?? [];
-      const durationSecs = endTimes.length > 0 ? endTimes[endTimes.length - 1] : null;
-
-      console.log(`[elevenlabs] ✅ with-timestamps: ${wordTimings.length} words, ${durationSecs?.toFixed(1)}s`);
-      return { audioBuffer: bytes.buffer, wordTimings, durationSecs };
-    }
-  } catch (e) {
-    console.warn("[elevenlabs] with-timestamps failed, falling back to plain TTS:", e);
-  }
-
-  // ── Fallback: plain audio ─────────────────────────────────────────────
-  try {
-    const res = await fetch(`${BASE}/text-to-speech/${id}`, {
-      method:  "POST",
-      headers: { "xi-api-key": API_KEY, "Content-Type": "application/json", "Accept": "audio/mpeg" },
-      body:    JSON.stringify(body),
-    });
-    if (!res.ok) {
-      console.error("[elevenlabs] plain TTS error:", res.status);
-      return { audioBuffer: null, wordTimings: null, durationSecs: null };
-    }
-    const audioBuffer = await res.arrayBuffer();
-    console.log(`[elevenlabs] ✅ plain audio: ${(audioBuffer.byteLength/1024).toFixed(0)}KB`);
-    return { audioBuffer, wordTimings: null, durationSecs: null };
-  } catch (e) {
-    console.error("[elevenlabs] fatal:", e);
-    return { audioBuffer: null, wordTimings: null, durationSecs: null };
-  }
 }
 
-// ── Parse character alignment → word timings ────────────────────────────────
-function charAlignmentToWords(
-  alignment: { characters: string[]; character_start_times_seconds: number[]; character_end_times_seconds: number[] },
-  _originalText: string,
-): WordTiming[] {
-  if (!alignment?.characters) return [];
+// ── Batch generate for multiple scenes ───────────────────────────────────────
+// Generates per-scene clips concurrently (up to 3 at a time to avoid rate limits).
+export interface SceneVoiceResult {
+  index:      number
+  url:        string | null
+  durationSec: number
+  error?:     string
+}
 
-  const { characters: chars, character_start_times_seconds: starts, character_end_times_seconds: ends } = alignment;
-  const words: WordTiming[] = [];
+export async function generateSceneVoiceovers(
+  scenes: Array<{ index: number; narration: string }>,
+  voiceId: VoiceId,
+  uploadFn: (file: File) => Promise<string>,
+  concurrency = 3,
+): Promise<SceneVoiceResult[]> {
+  const results: SceneVoiceResult[] = scenes.map(s => ({
+    index: s.index, url: null, durationSec: 0,
+  }));
 
-  let wordChars = "";
-  let wordStart = 0;
-  let wordEnd   = 0;
-  let inWord    = false;
+  // Process in batches
+  for (let i = 0; i < scenes.length; i += concurrency) {
+    const batch = scenes.slice(i, i + concurrency);
+    const settled = await Promise.allSettled(
+      batch.map(async (scene) => {
+        if (!scene.narration?.trim()) return { index: scene.index, url: null, durationSec: 0 };
 
-  const flush = () => {
-    const w = wordChars.trim();
-    if (w.length > 0) words.push({ word: w, start_time: wordStart, end_time: wordEnd });
-    wordChars = "";
-    inWord    = false;
-  };
+        const { audioBuffer, durationSec } = await generateVoiceover(
+          scene.narration, voiceId,
+        );
+        const bytes = new Uint8Array(audioBuffer);
+        const url   = await uploadFn(
+          new File([bytes], `voice-scene${scene.index}-${Date.now()}.mp3`, { type: "audio/mpeg" })
+        );
+        return { index: scene.index, url, durationSec };
+      })
+    );
 
-  for (let i = 0; i < chars.length; i++) {
-    const ch        = chars[i];
-    const isWordCh  = /[\w'$%\-]/.test(ch);
-
-    if (isWordCh) {
-      if (!inWord) { wordStart = starts[i] ?? 0; inWord = true; }
-      wordChars += ch;
-      wordEnd    = ends[i] ?? wordStart;
-    } else {
-      flush();
-    }
+    settled.forEach((result, j) => {
+      const sceneIndex = batch[j].index;
+      const ri = results.findIndex(r => r.index === sceneIndex);
+      if (result.status === "fulfilled") {
+        results[ri] = result.value;
+      } else {
+        results[ri].error = String(result.reason);
+        console.error(`[elevenlabs] Scene ${sceneIndex + 1} failed:`, result.reason);
+      }
+    });
   }
-  flush();
-  return words;
+
+  return results;
+}
+
+// ── List available voices (from your ElevenLabs account) ─────────────────────
+export interface ElevenLabsVoice {
+  voice_id:     string
+  name:         string
+  category:     string
+  preview_url?: string
+  labels?:      Record<string, string>
+}
+
+export async function listVoices(): Promise<ElevenLabsVoice[]> {
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) throw new Error("ELEVENLABS_API_KEY not set");
+
+  const res = await fetch(`${ELEVEN_BASE}/voices`, {
+    headers: { "xi-api-key": apiKey },
+  });
+  if (!res.ok) throw new Error(`ElevenLabs list voices failed: ${res.status}`);
+  const data = await res.json();
+  return data.voices ?? [];
+}
+
+// ── Get remaining character quota ─────────────────────────────────────────────
+export async function getCharacterQuota(): Promise<{
+  used: number; total: number; remaining: number
+}> {
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) throw new Error("ELEVENLABS_API_KEY not set");
+
+  const res = await fetch(`${ELEVEN_BASE}/user/subscription`, {
+    headers: { "xi-api-key": apiKey },
+  });
+  if (!res.ok) throw new Error(`ElevenLabs quota check failed: ${res.status}`);
+  const data = await res.json();
+  return {
+    used:      data.character_count       ?? 0,
+    total:     data.character_limit       ?? 0,
+    remaining: (data.character_limit ?? 0) - (data.character_count ?? 0),
+  };
 }

@@ -1,12 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-
 import TemplateCanvas from "@/components/template-canvas";
 import PropertyInspector from "@/components/property-inspector";
 import CampaignDataForm from "@/components/campaign-data-form";
@@ -15,822 +9,832 @@ import AdvancedShapeTools from "@/components/advanced-shape-tools";
 import LogoEditor from "@/components/logo-editor";
 import ImageUploader from "@/components/image-uploader";
 import { synthesizeAndSaveTemplate } from "@/lib/api";
-import { getPremiumComponent, PremiumComponentKey } from "@/lib/template-components"
+import { getPremiumComponent, PremiumComponentKey } from "@/lib/template-components";
 import { TemplateShape, CampaignData, Template } from "@/lib/types";
-import { Download, Plus, RefreshCcw, Save, Grid3x3, Magnet, MousePointer2, Upload } from "lucide-react";
-import { alignShapes, distributeShapes, reorderShape } from "@/lib/alignment-utils";
-
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
+  Download, Plus, RefreshCcw, Save, Grid3x3, Magnet,
+  MousePointer2, Upload, Sparkles, ChevronDown, X, Layers,
+  Image as ImageIcon, Type, Square, Circle, Triangle, Minus,
+} from "lucide-react";
+import { alignShapes, distributeShapes, reorderShape } from "@/lib/alignment-utils";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+  DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-
 import { createTemplate, updateTemplate } from "@/lib/template-storage";
 import { uploadFileToSpaces } from "@/lib/upload-client";
 import { resolveTemplateImages } from "@/lib/resolve-template-images";
 
-const CANVAS_WIDTH = 1080;
+const CANVAS_WIDTH  = 1080;
 const CANVAS_HEIGHT = 1350;
 
 const DEFAULT_CAMPAIGN_DATA: CampaignData = {
-  hook: "Unlock the Power of AI",
-  subheading: "Streamline Your Content Creation",
-  bullets: [
-    "Save time with AI automation",
-    "Engage your audience effortlessly",
-    "Transform your approach",
-  ],
-  proof: "Businesses using AI create 60% more content",
-  cta: "Get Started Today",
-  hashtags: "#AI #Innovation #Automation",
+  hook:        "Unlock the Power of AI",
+  subheading:  "Streamline Your Content Creation",
+  bullets:     ["Save time with AI automation", "Engage your audience effortlessly", "Transform your approach"],
+  proof:       "Businesses using AI create 60% more content",
+  cta:         "Get Started Today",
+  hashtags:    "#AI #Innovation #Automation",
   companyName: "NEUROFLOW",
-  location: "MARKETING",
-  ctaLink: "https://example.com",
+  location:    "MARKETING",
+  ctaLink:     "https://example.com",
 };
 
-function isString(x: any): x is string {
-  return typeof x === "string";
-}
-
+function isString(x: any): x is string { return typeof x === "string"; }
 function ensureBgString(bg: any): string | null {
   if (!bg) return null;
   if (typeof bg === "string") return bg;
   return null;
 }
 
+// ── Design tokens matching PropertyInspector ─────────────────────────────────
+const T = {
+  bg:          "#090c09",
+  bgPanel:     "linear-gradient(160deg,#0a0f0a 0%,#0d1410 50%,#0a0a0a 100%)",
+  border:      "rgba(30,95,59,0.3)",
+  borderHover: "rgba(30,95,59,0.6)",
+  accent:      "#1e5f3b",
+  accentLight: "#4ade80",
+  accentGlow:  "rgba(30,95,59,0.25)",
+  text:        "#e5e7eb",
+  textMuted:   "#6b7280",
+  textDim:     "#374151",
+  font:        "'Bebas Neue', Impact, sans-serif",
+  mono:        "monospace",
+};
+
+// ── Shared styled primitives ──────────────────────────────────────────────────
+
+function Panel({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
+  return (
+    <div style={{
+      background: T.bgPanel,
+      border: `1px solid ${T.border}`,
+      borderRadius: 10,
+      padding: "14px",
+      boxShadow: "0 0 0 1px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.03)",
+      ...style,
+    }}>
+      {children}
+    </div>
+  );
+}
+
+function PanelTitle({ children, icon }: { children: React.ReactNode; icon?: React.ReactNode }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+      {icon && <span style={{ color: T.accentLight, opacity: 0.8, display: "flex" }}>{icon}</span>}
+      <span style={{
+        fontFamily: T.font, fontSize: 12, letterSpacing: "0.2em",
+        color: T.accentLight, textTransform: "uppercase" as const,
+      }}>
+        {children}
+      </span>
+      <div style={{ flex: 1, height: 1, background: `linear-gradient(to right,${T.border},transparent)` }} />
+    </div>
+  );
+}
+
+function StudioButton({
+  children, onClick, disabled, variant = "default", fullWidth, icon, size = "sm",
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  variant?: "default" | "outline" | "accent" | "ghost" | "danger";
+  fullWidth?: boolean;
+  icon?: React.ReactNode;
+  size?: "sm" | "md";
+}) {
+  const [hovered, setHovered] = useState(false);
+
+  const styles: React.CSSProperties = {
+    display: "inline-flex", alignItems: "center", justifyContent: "center",
+    gap: 6, cursor: disabled ? "not-allowed" : "pointer",
+    fontFamily: T.mono, fontSize: size === "sm" ? 10 : 12,
+    letterSpacing: "0.05em", textTransform: "uppercase" as const,
+    borderRadius: 5, padding: size === "sm" ? "5px 10px" : "8px 16px",
+    width: fullWidth ? "100%" : undefined,
+    transition: "all 0.15s", opacity: disabled ? 0.45 : 1,
+    border: "1px solid",
+    ...(variant === "accent" ? {
+      background: hovered ? "#1e5f3b" : T.accentGlow,
+      borderColor: hovered ? "#2d7a4f" : T.accent,
+      color: "#4ade80",
+      boxShadow: hovered ? `0 0 18px rgba(30,95,59,0.4)` : "none",
+    } : variant === "outline" ? {
+      background: hovered ? "rgba(255,255,255,0.04)" : "transparent",
+      borderColor: hovered ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.08)",
+      color: hovered ? T.text : "#9ca3af",
+    } : variant === "ghost" ? {
+      background: hovered ? "rgba(255,255,255,0.04)" : "transparent",
+      borderColor: "transparent",
+      color: hovered ? T.text : T.textMuted,
+    } : variant === "danger" ? {
+      background: hovered ? "rgba(239,68,68,0.15)" : "transparent",
+      borderColor: hovered ? "rgba(239,68,68,0.5)" : "rgba(239,68,68,0.2)",
+      color: "#f87171",
+    } : {
+      background: hovered ? "#1e5f3b" : T.accentGlow,
+      borderColor: T.accent,
+      color: "#4ade80",
+    }),
+  };
+
+  return (
+    <button
+      style={styles}
+      onClick={onClick}
+      disabled={disabled}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {icon && <span style={{ display: "flex", opacity: 0.8 }}>{icon}</span>}
+      {children}
+    </button>
+  );
+}
+
+function ToggleRow({ label, checked, onChange, icon }: {
+  label: string; checked: boolean; onChange: (v: boolean) => void; icon?: React.ReactNode;
+}) {
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", justifyContent: "space-between",
+      padding: "6px 0",
+    }}>
+      <span style={{
+        display: "flex", alignItems: "center", gap: 6,
+        fontFamily: T.mono, fontSize: 10, color: T.textMuted,
+        letterSpacing: "0.06em", textTransform: "uppercase" as const,
+      }}>
+        {icon && <span style={{ color: T.accentLight, opacity: 0.7 }}>{icon}</span>}
+        {label}
+      </span>
+      <div
+        onClick={() => onChange(!checked)}
+        style={{
+          width: 32, height: 17, borderRadius: 9,
+          background: checked ? T.accent : "rgba(255,255,255,0.08)",
+          border: `1px solid ${checked ? "#2d7a4f" : "rgba(255,255,255,0.1)"}`,
+          cursor: "pointer", position: "relative", transition: "all 0.2s",
+          boxShadow: checked ? `0 0 10px rgba(30,95,59,0.4)` : "none",
+        }}
+      >
+        <div style={{
+          position: "absolute", top: 2,
+          left: checked ? 16 : 2,
+          width: 11, height: 11, borderRadius: "50%",
+          background: checked ? "#4ade80" : "#6b7280",
+          transition: "left 0.2s, background 0.2s",
+        }} />
+      </div>
+    </div>
+  );
+}
+
+// Premium component groups
+const PREMIUM_GROUPS = [
+  {
+    label: "Marketing",
+    items: [
+      ["offer","Offer/Discount"],["flashSale","Flash Sale"],["hero","Hero Product"],
+      ["boldStatement","Bold Statement"],["fullBleedHero","Full Bleed Hero"],
+      ["massiveTypography","Massive Type"],["comparison","Old vs New"],
+    ],
+  },
+  {
+    label: "Editorial",
+    items: [
+      ["editorial","Editorial Blog"],["thoughtLeader","Thought Leader"],
+      ["darkEditorial","Dark Editorial"],["magazinePhotoGrid","Magazine Grid"],
+      ["collageGrid","Collage Grid"],
+    ],
+  },
+  {
+    label: "Lifestyle",
+    items: [
+      ["lifestyleHero","Lifestyle Hero"],["lifestyleShowcase","Lifestyle Showcase"],
+      ["skincare","Skincare Split"],["splitPhotoContent","Split Photo"],
+      ["singleHeroPhoto","Hero Photo"],["instagramStory","IG Story"],
+    ],
+  },
+  {
+    label: "Brand",
+    items: [
+      ["boldBrand","Bold Brand"],["luxuryDark","Luxury Dark"],
+      ["splitColor","Split Color"],["testimonial","Testimonial"],
+      ["communityEvent","Community Event"],["albumCover","Album Cover"],
+    ],
+  },
+  {
+    label: "Tech & SaaS",
+    items: [
+      ["saasAd","SaaS Ad"],["characterDashboard","3D Character"],["productAbstract","Product Abstract"],
+    ],
+  },
+] as const;
+
+const AI_TEMPLATES = [
+  ["cdProductFloat","Product Float"],["cdStatsShowcase","Stats Showcase"],
+  ["cdBrandVs","Brand vs"],["cdPersonHero","Person Hero"],["cdLifestyleScene","Lifestyle Scene"],
+] as const;
+
+// Collapsible section
+function Collapsible({ title, children, defaultOpen = false }: {
+  title: string; children: React.ReactNode; defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div>
+      <button
+        onClick={() => setOpen((p) => !p)}
+        style={{
+          width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "5px 0", background: "transparent", border: "none", cursor: "pointer",
+        }}
+      >
+        <span style={{ fontFamily: T.mono, fontSize: 9, color: T.textMuted, letterSpacing: "0.08em", textTransform: "uppercase" as const }}>
+          {title}
+        </span>
+        <ChevronDown size={10} color={T.textMuted} style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }} />
+      </button>
+      {open && <div style={{ paddingTop: 6 }}>{children}</div>}
+    </div>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
 export default function EditorPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const [activeTemplate, setActiveTemplate] = useState<Template | null>(null);
-
+  const [activeTemplate, setActiveTemplate]   = useState<Template | null>(null);
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
-  const [campaignData, setCampaignData] = useState<CampaignData>(DEFAULT_CAMPAIGN_DATA);
-  const [shapes, setShapes] = useState<TemplateShape[]>([]);
+  const [campaignData, setCampaignData]       = useState<CampaignData>(DEFAULT_CAMPAIGN_DATA);
+  const [shapes, setShapes]                   = useState<TemplateShape[]>([]);
   const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
   const [selectedShapeIds, setSelectedShapeIds] = useState<string[]>([]);
-  const [logoPlacement, setLogoPlacement] = useState<
-    { url: string; x: number; y: number; width: number; height: number; opacity: number } | undefined
-  >(undefined);
+  const [logoPlacement, setLogoPlacement]     = useState<{ url: string; x: number; y: number; width: number; height: number; opacity: number } | undefined>(undefined);
 
-  const [showGrid, setShowGrid] = useState(false);
-  const [snapToGrid, setSnapToGrid] = useState(false);
+  const [showGrid, setShowGrid]           = useState(false);
+  const [snapToGrid, setSnapToGrid]       = useState(false);
   const [snapToObjects, setSnapToObjects] = useState(true);
 
   const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [pan, setPan]   = useState({ x: 0, y: 0 });
 
-   const fitCanvas = () => {
-    setZoom(1) 
-    setPan({ x: 0, y: 0 })
-  }
-  // ✅ Image upload dialog state
-  const [imageUploadOpen, setImageUploadOpen] = useState(false);
+  const [imageUploadOpen, setImageUploadOpen]       = useState(false);
   const [pendingImageShapeId, setPendingImageShapeId] = useState<string | null>(null);
-  const [imageUrl, setImageUrl] = useState("");
+  const [imageUrl, setImageUrl]                     = useState("");
 
-  const [saveOpen, setSaveOpen] = useState(false);
-  const [saveName, setSaveName] = useState("");
-  const [saveDesc, setSaveDesc] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const [saveOpen, setSaveOpen]   = useState(false);
+  const [saveName, setSaveName]   = useState("");
+  const [saveDesc, setSaveDesc]   = useState("");
+  const [saving, setSaving]       = useState(false);
+  const [err, setErr]             = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("design");
 
-  const safeBackground = useMemo(() => ensureBgString(backgroundImage), [backgroundImage]);
-
+  const safeBackground    = useMemo(() => ensureBgString(backgroundImage), [backgroundImage]);
   const isEditingExisting = !!activeTemplate?.id;
+  const fileBaseName      = useMemo(() => {
+    const company = campaignData?.companyName || "campaign";
+    const date    = new Date().toISOString().split("T")[0];
+    return `${company}-${date}`;
+  }, [campaignData?.companyName]);
+
+  const fitCanvas = () => { setZoom(1); setPan({ x: 0, y: 0 }); };
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Delete" || e.key === "Backspace") {
-        const tag = (e.target as HTMLElement).tagName;
-        if (tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement).isContentEditable) return;
-        if (selectedShapeId || selectedShapeIds.length > 0) {
-          e.preventDefault();
-          handleDeleteSelected();
-        }
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement).isContentEditable) return;
+      if ((e.key === "Delete" || e.key === "Backspace") && (selectedShapeId || selectedShapeIds.length > 0)) {
+        e.preventDefault(); handleDeleteSelected();
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === "d") {
-        e.preventDefault();
-        handleDuplicateSelected();
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key === "a") {
-        e.preventDefault();
-        setSelectedShapeIds(shapes.map((s) => s.id));
-        setSelectedShapeId(null);
-      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "d") { e.preventDefault(); handleDuplicateSelected(); }
+      if ((e.ctrlKey || e.metaKey) && e.key === "a") { e.preventDefault(); setSelectedShapeIds(shapes.map((s) => s.id)); setSelectedShapeId(null); }
     };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, [shapes, selectedShapeId, selectedShapeIds]);
 
   const resetToNewTemplate = () => {
-    setErr(null);
-    setActiveTemplate(null);
-    setBackgroundImage(null);
-    setShapes([]);
-    setSelectedShapeId(null);
-    setSelectedShapeIds([]);
-    setLogoPlacement(undefined);
-    setSaveName("");
-    setSaveDesc("");
+    setErr(null); setActiveTemplate(null); setBackgroundImage(null);
+    setShapes([]); setSelectedShapeId(null); setSelectedShapeIds([]);
+    setLogoPlacement(undefined); setSaveName(""); setSaveDesc("");
   };
 
   const handleSelectTemplate = (t: Template) => {
-    setActiveTemplate(t);
-    setShapes(t.shapes || []);
+    setActiveTemplate(t); setShapes(t.shapes || []);
     setBackgroundImage(t.backgroundImage || null);
     setLogoPlacement(t.logoPlacement);
-    setSelectedShapeId(null);
-    setSelectedShapeIds([]);
+    setSelectedShapeId(null); setSelectedShapeIds([]);
   };
 
-  // ✅ CRITICAL FIX: Better shape creation with visible defaults
   const handleAddShape = (type: TemplateShape["type"]) => {
-    const centerX = CANVAS_WIDTH / 2;
-    const centerY = CANVAS_HEIGHT / 2;
+    const cx = CANVAS_WIDTH / 2;
+    const cy = CANVAS_HEIGHT / 2;
 
-    let width = 260;
-    let height = 90;
-    let x = centerX - 130;
-    let y = centerY - 45;
-    let textColor = "#000000";
-
-    if (type === "circle") {
-      width = 150;
-      height = 150;
-      x = centerX - 75;
-      y = centerY - 75;
-    } else if (type === "text") {
-      width = 400;
-      height = 100;
-      x = centerX - 200; // ✅ CENTER THE TEXT
-      y = 100;
-      textColor = "#ffffff"; // ✅ WHITE TEXT (visible on dark bg)
-    } else if (type === "button") {
-      width = 200;
-      height = 50;
-      x = centerX - 100;
-      y = centerY - 25;
-      textColor = "#ffffff";
-    } else if (type === "image") {
-      // ✅ IMAGE: Show upload dialog immediately
-      const newShapeId = `shape-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-      const newShape: TemplateShape = {
-        id: newShapeId,
-        type: "image",
-        x: centerX - 130,
-        y: centerY - 130,
-        width: 260,
-        height: 260,
-        zIndex: shapes.length + 1,
-        opacity: 1,
-        backgroundColor: "transparent",
-        borderColor: "transparent",
-        borderWidth: 0,
-        src: undefined, // ✅ No image yet
-        fit: "cover",
-        radius: 8,
-        shadowBlur: 0,
-        shadowX: 0,
-        shadowY: 0,
-        shadowColor: "#000000",
-      };
-
-      setShapes((prev) => [...prev, newShape]);
-      setSelectedShapeId(newShapeId);
-      setPendingImageShapeId(newShapeId);
-      setImageUploadOpen(true); // ✅ OPEN DIALOG
-      return; // Don't continue with normal flow
+    if (type === "image") {
+      const id = `shape-${Date.now()}-${Math.random().toString(36).slice(2,9)}`;
+      setShapes((p) => [...p, {
+        id, type: "image", x: cx-130, y: cy-130, width: 260, height: 260,
+        zIndex: shapes.length+1, opacity: 1, backgroundColor: "transparent",
+        borderColor: "transparent", borderWidth: 0,
+        src: undefined, fit: "cover", radius: 8,
+        shadowBlur: 0, shadowX: 0, shadowY: 0, shadowColor: "#000000",
+      }]);
+      setSelectedShapeId(id);
+      setPendingImageShapeId(id);
+      setImageUploadOpen(true);
+      return;
     }
 
-    const newShape: TemplateShape = {
-      id: `shape-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+    const base: Partial<TemplateShape> = {
+      id:         `shape-${Date.now()}-${Math.random().toString(36).slice(2,9)}`,
       type,
-      x,
-      y,
-      width,
-      height,
-      zIndex: shapes.length + 1,
-      opacity: 1,
-
-      backgroundColor: type === "text" ? undefined : type === "button" ? "#3b82f6" : "#ffffff",
+      zIndex:     shapes.length + 1,
+      opacity:    1,
+      shadowBlur: 0, shadowX: 0, shadowY: 0, shadowColor: "#000000",
       borderColor: "#000000",
-      borderWidth: type === "text" ? 0 : 1,
-      borderRadius: type === "rounded-rect" ? 8 : type === "button" ? 6 : undefined,
-
-      textColor,
-      fontSize: type === "button" ? 16 : type === "text" ? 32 : 24, // ✅ BIGGER text
-      fontFamily: "Arial",
-      fontWeight: type === "button" ? 600 : type === "text" ? 700 : 400, // ✅ BOLD text
-      textAlign: type === "button" ? "center" : type === "text" ? "center" : "left",
-      padding: 10,
-
-      dataField: type === "text" ? "hook" : undefined,
-      direction: type === "triangle" ? "up" : undefined,
-      
-      buttonText: type === "button" ? "Click Here" : undefined,
-      buttonLink: type === "button" ? campaignData.ctaLink || "https://example.com" : undefined,
-      hoverColor: type === "button" ? "#2563eb" : undefined,
-
-      lineWidth: type === "line" ? 6 : undefined,
-      lineDash: type === "line" ? [] : undefined,
-      lineCap: type === "line" ? "round" : undefined,
-
-      shadowBlur: 0,
-      shadowX: 0,
-      shadowY: 0,
-      shadowColor: "#000000",
     };
 
-    console.log("✅ Adding shape:", type, {
-      id: newShape.id,
-      x: newShape.x,
-      y: newShape.y,
-      textColor: newShape.textColor,
-      fontSize: newShape.fontSize,
-      dataField: newShape.dataField,
-    });
+    let extra: Partial<TemplateShape> = {};
 
-    setShapes((prev) => [...prev, newShape]);
-    setSelectedShapeId(newShape.id);
+    if (type === "text") {
+      extra = {
+        x: cx-200, y: 100, width: 400, height: 100,
+        textColor:     "#1e5f3b",
+        fontSize:      300,
+        fontFamily:    "Bebas Neue",
+        fontWeight:    700,
+        textAlign:     "left",
+        textTransform: "uppercase",
+        borderWidth:   0,
+        dataField:     "hook",
+        backgroundColor: undefined,
+      };
+    } else if (type === "button") {
+      extra = {
+        x: cx-100, y: cy-25, width: 200, height: 50,
+        backgroundColor: "#1e5f3b", textColor: "#4ade80",
+        fontSize: 16, fontFamily: "Bebas Neue", fontWeight: 700,
+        textAlign: "center", borderWidth: 0, borderRadius: 6,
+        buttonText: "Click Here",
+        buttonLink: campaignData.ctaLink || "https://example.com",
+        hoverColor: "#2d7a4f",
+      };
+    } else if (type === "circle") {
+      extra = { x: cx-75, y: cy-75, width: 150, height: 150, backgroundColor: "#ffffff", borderWidth: 1 };
+    } else if (type === "bullet-group") {
+      extra = { x: cx-130, y: cy-45, width: 260, height: 90, fontSize: 20, fontFamily: "Bebas Neue", textColor: "#e5e7eb", borderWidth: 0 };
+    } else if (type === "line") {
+      extra = { x: cx-130, y: cy, width: 260, height: 6, lineWidth: 6, lineDash: [], lineCap: "round", borderWidth: 0 };
+    } else {
+      extra = {
+        x: cx-130, y: cy-45, width: 260, height: 90,
+        backgroundColor: "#ffffff", borderWidth: 1,
+        borderRadius: type === "rounded-rect" ? 8 : undefined,
+        direction: type === "triangle" ? "up" : undefined,
+      };
+    }
+
+    setShapes((p) => [...p, { ...base, ...extra } as TemplateShape]);
+    setSelectedShapeId(base.id as string);
     setSelectedShapeIds([]);
   };
 
-  // ✅ Handle image upload
   const handleImageUpload = () => {
     if (!imageUrl.trim() || !pendingImageShapeId) return;
-
-    const shape = shapes.find((s) => s.id === pendingImageShapeId);
-    if (!shape) return;
-
-    const updated = {
-      ...shape,
-      src: imageUrl.trim(),
-    };
-
-    setShapes((prev) => prev.map((s) => (s.id === pendingImageShapeId ? updated : s)));
-    setImageUploadOpen(false);
-    setImageUrl("");
-    setPendingImageShapeId(null);
+    setShapes((p) => p.map((s) => s.id === pendingImageShapeId ? { ...s, src: imageUrl.trim() } : s));
+    setImageUploadOpen(false); setImageUrl(""); setPendingImageShapeId(null);
   };
 
-  // ✅ Handle image upload via file picker
   const handleImageFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+    const file = e.target.files?.[0]; if (!file) return;
     const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result as string;
-      setImageUrl(dataUrl);
-    };
+    reader.onload = (ev) => setImageUrl(ev.target?.result as string);
     reader.readAsDataURL(file);
   };
 
   const handleGeneratePremiumTemplate = async () => {
     setErr(null);
-
     try {
-      const res = await synthesizeAndSaveTemplate({
-        brand_id: "neuroflow",
-        canvas_width: CANVAS_WIDTH,
-        canvas_height: CANVAS_HEIGHT,
-      });
-
+      const res = await synthesizeAndSaveTemplate({ brand_id: "neuroflow", canvas_width: CANVAS_WIDTH, canvas_height: CANVAS_HEIGHT });
       if (!res.ok) throw new Error(res.error || "Synthesis failed");
-
       if (res.template) {
-        setShapes(res.template.shapes || []);
-        setBackgroundImage(res.template.backgroundImage || null);
-        setLogoPlacement(res.template.logoPlacement || undefined);
-        setActiveTemplate(res.template);
+        setShapes(res.template.shapes || []); setBackgroundImage(res.template.backgroundImage || null);
+        setLogoPlacement(res.template.logoPlacement || undefined); setActiveTemplate(res.template);
       }
-    } catch (e: any) {
-      setErr(e?.message || "Failed to generate template");
-    }
+    } catch (e: any) { setErr(e?.message || "Failed to generate template"); }
   };
 
-  const handleSelectShape = (id: string, multiSelect: boolean = false) => {
-    if (!id) {
-      // ✅ Deselect all
-      setSelectedShapeId(null);
-      setSelectedShapeIds([]);
-      return;
-    }
-    if (multiSelect) {
-      setSelectedShapeIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-      setSelectedShapeId(null);
-    } else {
-      setSelectedShapeId(id);
-      setSelectedShapeIds([]);
-    }
+  const handleSelectShape = (id: string, multiSelect = false) => {
+    if (!id) { setSelectedShapeId(null); setSelectedShapeIds([]); return; }
+    if (multiSelect) { setSelectedShapeIds((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id]); setSelectedShapeId(null); }
+    else { setSelectedShapeId(id); setSelectedShapeIds([]); }
   };
 
-  const handleUpdateShape = (shape: TemplateShape) => {
-    setShapes((prev) => prev.map((s) => (s.id === shape.id ? shape : s)));
-  };
+  const handleUpdateShape = (shape: TemplateShape) =>
+    setShapes((p) => p.map((s) => s.id === shape.id ? shape : s));
 
-  const handleShapeDrag = (id: string, x: number, y: number) => {
-    const shape = shapes.find((s) => s.id === id);
-    if (!shape) return;
-    handleUpdateShape({ ...shape, x, y });
+  const handleShapeDrag   = (id: string, x: number, y: number) => {
+    const s = shapes.find((s) => s.id === id); if (!s) return; handleUpdateShape({ ...s, x, y });
   };
-
   const handleShapeResize = (id: string, width: number, height: number) => {
-    const shape = shapes.find((s) => s.id === id);
-    if (!shape) return;
-    handleUpdateShape({ ...shape, width, height });
+    const s = shapes.find((s) => s.id === id); if (!s) return; handleUpdateShape({ ...s, width, height });
   };
 
   const handleDeleteSelected = () => {
-    if (selectedShapeId) {
-      setShapes((prev) => prev.filter((s) => s.id !== selectedShapeId));
-      setSelectedShapeId(null);
-    }
-    if (selectedShapeIds.length > 0) {
-      setShapes((prev) => prev.filter((s) => !selectedShapeIds.includes(s.id)));
-      setSelectedShapeIds([]);
-    }
+    if (selectedShapeId)         { setShapes((p) => p.filter((s) => s.id !== selectedShapeId)); setSelectedShapeId(null); }
+    if (selectedShapeIds.length) { setShapes((p) => p.filter((s) => !selectedShapeIds.includes(s.id))); setSelectedShapeIds([]); }
   };
 
   const handleDuplicateSelected = () => {
-    const idsToDup =
-      selectedShapeIds.length > 0 ? selectedShapeIds : selectedShapeId ? [selectedShapeId] : [];
-
-    if (idsToDup.length === 0) return;
-
-    const newShapes: TemplateShape[] = [];
-    idsToDup.forEach((id) => {
-      const s = shapes.find((x) => x.id === id);
-      if (!s) return;
-      newShapes.push({
-        ...s,
-        id: `shape-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-        x: s.x + 12,
-        y: s.y + 12,
-        zIndex: (s.zIndex || 1) + 1,
-      });
+    const ids = selectedShapeIds.length ? selectedShapeIds : selectedShapeId ? [selectedShapeId] : [];
+    if (!ids.length) return;
+    const duped: TemplateShape[] = [];
+    ids.forEach((id) => {
+      const s = shapes.find((x) => x.id === id); if (!s) return;
+      duped.push({ ...s, id: `shape-${Date.now()}-${Math.random().toString(36).slice(2,9)}`, x: s.x+12, y: s.y+12, zIndex: (s.zIndex||1)+1 });
     });
-
-    setShapes((prev) => [...prev, ...newShapes]);
+    setShapes((p) => [...p, ...duped]);
   };
 
-  const handleAlign = (alignment: "left" | "center-h" | "right" | "top" | "center-v" | "bottom") => {
-    const ids = selectedShapeIds.length > 0 ? selectedShapeIds : selectedShapeId ? [selectedShapeId] : [];
-    if (ids.length < 2) return;
-
-    const aligned = alignShapes(shapes, ids, alignment);
-    setShapes(aligned);
+  const handleAlign      = (a: "left"|"center-h"|"right"|"top"|"center-v"|"bottom") => {
+    const ids = selectedShapeIds.length ? selectedShapeIds : selectedShapeId ? [selectedShapeId] : [];
+    if (ids.length < 2) return; setShapes(alignShapes(shapes, ids, a));
   };
-
-  const handleDistribute = (direction: "horizontal" | "vertical") => {
-    const ids = selectedShapeIds.length > 0 ? selectedShapeIds : selectedShapeId ? [selectedShapeId] : [];
-    if (ids.length < 3) return;
-
-    const distributed = distributeShapes(shapes, ids, direction);
-    setShapes(distributed);
+  const handleDistribute = (d: "horizontal"|"vertical") => {
+    const ids = selectedShapeIds.length ? selectedShapeIds : selectedShapeId ? [selectedShapeId] : [];
+    if (ids.length < 3) return; setShapes(distributeShapes(shapes, ids, d));
   };
-
-  const handleReorder = (action: "front" | "forward" | "backward" | "back") => {
-    if (!selectedShapeId) return;
-
-    const reordered = reorderShape(shapes, selectedShapeId, action);
-    setShapes(reordered);
+  const handleReorder    = (a: "front"|"forward"|"backward"|"back") => {
+    if (!selectedShapeId) return; setShapes(reorderShape(shapes, selectedShapeId, a));
   };
 
   const handleExportPNG = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
+    const canvas = canvasRef.current; if (!canvas) return;
     const link = document.createElement("a");
-    link.href = canvas.toDataURL("image/png");
-    link.download = `campaign-${Date.now()}.png`;
-    link.click();
+    link.href = canvas.toDataURL("image/png"); link.download = `campaign-${Date.now()}.png`; link.click();
   };
 
   const applyTemplateToEditor = (t: Template) => {
-    setErr(null);
-    setActiveTemplate(t);
-    setBackgroundImage(ensureBgString((t as any).backgroundImage));
-    setShapes(Array.isArray(t.shapes) ? t.shapes : []);
-    setLogoPlacement(t.logoPlacement);
-    setSelectedShapeId(null);
-    setSelectedShapeIds([]);
-    setSaveName(t.name || "");
-    setSaveDesc(t.description || "");
+    setErr(null); setActiveTemplate(t); setBackgroundImage(ensureBgString((t as any).backgroundImage));
+    setShapes(Array.isArray(t.shapes) ? t.shapes : []); setLogoPlacement(t.logoPlacement);
+    setSelectedShapeId(null); setSelectedShapeIds([]); setSaveName(t.name||""); setSaveDesc(t.description||"");
   };
 
   const openSaveDialog = () => {
-    setErr(null);
-    setSaveName(activeTemplate?.name || "New Template");
-    setSaveDesc(activeTemplate?.description || "");
-    setSaveOpen(true);
+    setErr(null); setSaveName(activeTemplate?.name || "New Template"); setSaveDesc(activeTemplate?.description || ""); setSaveOpen(true);
   };
 
   const canvasToFile = async (canvas: HTMLCanvasElement, filename: string) => {
-
-    fitCanvas()
-    const blob: Blob = await new Promise((resolve, reject) => {
-      canvas.toBlob(
-        (b) => {
-          if (!b) return reject(new Error("Failed to export canvas as PNG blob"));
-          resolve(b);
-        },
-        "image/png",
-        1.0
-      );
+    fitCanvas();
+    const blob: Blob = await new Promise((res, rej) => {
+      canvas.toBlob((b) => { if (!b) rej(new Error("Failed")); else res(b); }, "image/png", 1.0);
     });
     return new File([blob], filename, { type: "image/png" });
   };
 
-  const fileBaseName = useMemo(() => {
-      const company = campaignData?.companyName || "campaign";
-      const date = new Date().toISOString().split("T")[0];
-      return `${company}-${date}`;
-    }, [campaignData?.companyName]);
-
   const doCreate = async () => {
-    setErr(null);
-    const name = saveName.trim();
-    if (!name) {
-      setErr("Template name is required.");
-      return;
-    }
-
-    setSaving(true);
-    fitCanvas();
-    const file = await canvasToFile(canvasRef.current as HTMLCanvasElement, `${fileBaseName}.png`);
-    const url = await uploadFileToSpaces(file);
+    setErr(null); const name = saveName.trim(); if (!name) { setErr("Template name is required."); return; }
+    setSaving(true); fitCanvas();
+    const file = await canvasToFile(canvasRef.current!, `${fileBaseName}.png`);
+    const url  = await uploadFileToSpaces(file);
     try {
-      const payload = {
-        name,
-        description: saveDesc.trim() || null,
-        shapes,
-        canvasWidth: CANVAS_WIDTH,
-        canvasHeight: CANVAS_HEIGHT,
-        backgroundImage: safeBackground,
-        logoPlacement: logoPlacement ?? null,
-        thumbnail_url:url
-      };
-
-      const res = await createTemplate(payload as any);
+      const res = await createTemplate({ name, description: saveDesc.trim()||null, shapes, canvasWidth: CANVAS_WIDTH, canvasHeight: CANVAS_HEIGHT, backgroundImage: safeBackground, logoPlacement: logoPlacement??null, thumbnail_url: url } as any);
       if (!res?.ok) throw new Error("Failed to create template");
-
-      setActiveTemplate({
-        id: res.id,
-        name,
-        description: saveDesc.trim() || undefined,
-        shapes,
-        canvasWidth: CANVAS_WIDTH,
-        canvasHeight: CANVAS_HEIGHT,
-        backgroundImage: safeBackground,
-        logoPlacement,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-
+      setActiveTemplate({ id: res.id, name, description: saveDesc.trim()||undefined, shapes, canvasWidth: CANVAS_WIDTH, canvasHeight: CANVAS_HEIGHT, backgroundImage: safeBackground, logoPlacement, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
       setSaveOpen(false);
-    } catch (e: any) {
-      setErr(e?.message || "Failed to create template");
-    } finally {
-      setSaving(false);
-    }
+    } catch (e: any) { setErr(e?.message||"Failed to create template"); } finally { setSaving(false); }
   };
 
   const doUpdate = async () => {
-    if (!activeTemplate?.id) return;
-    setErr(null);
-    setSaving(true);
-
-    const file = await canvasToFile(canvasRef.current as HTMLCanvasElement, `${fileBaseName}.png`);
-    const url = await uploadFileToSpaces(file);
-
+    if (!activeTemplate?.id) return; setErr(null); setSaving(true);
+    const file = await canvasToFile(canvasRef.current!, `${fileBaseName}.png`);
+    const url  = await uploadFileToSpaces(file);
     try {
-      const payload = {
-        name: activeTemplate.name,
-        description: activeTemplate.description ?? null,
-        shapes,
-        canvasWidth: CANVAS_WIDTH,
-        canvasHeight: CANVAS_HEIGHT,
-        backgroundImage: safeBackground,
-        logoPlacement: logoPlacement ?? null,
-        thumbnail_url:url
-      };
-
-      const res = await updateTemplate(activeTemplate.id, payload as any);
+      const res = await updateTemplate(activeTemplate.id, { name: activeTemplate.name, description: activeTemplate.description??null, shapes, canvasWidth: CANVAS_WIDTH, canvasHeight: CANVAS_HEIGHT, backgroundImage: safeBackground, logoPlacement: logoPlacement??null, thumbnail_url: url } as any);
       if (!res?.ok) throw new Error("Failed to update template");
-
-      setActiveTemplate((prev) =>
-        prev
-          ? {
-              ...prev,
-              shapes,
-              backgroundImage: safeBackground,
-              logoPlacement,
-              updatedAt: new Date().toISOString(),
-            }
-          : prev
-      );
-    } catch (e: any) {
-      setErr(e?.message || "Failed to update template");
-    } finally {
-      setSaving(false);
-    }
+      setActiveTemplate((p) => p ? { ...p, shapes, backgroundImage: safeBackground, logoPlacement, updatedAt: new Date().toISOString() } : p);
+    } catch (e: any) { setErr(e?.message||"Failed to update template"); } finally { setSaving(false); }
   };
 
   const insertPremiumComponent = async (key: PremiumComponentKey) => {
-    const newShapes = getPremiumComponent(key, CANVAS_WIDTH, CANVAS_HEIGHT);
-
-    const resolvedShapes = await resolveTemplateImages(newShapes, campaignData);
-
+    const newShapes    = getPremiumComponent(key, CANVAS_WIDTH, CANVAS_HEIGHT);
+    const resolved     = await resolveTemplateImages(newShapes, campaignData);
     setShapes((prev) => {
-      const maxZ = prev.reduce((m, s) => Math.max(m, s.zIndex || 1), 1);
-      return [
-        ...prev,
-        ...resolvedShapes.map((s, i) => ({ ...s, zIndex: maxZ + i + 1 })),
-      ];
+      const maxZ = prev.reduce((m, s) => Math.max(m, s.zIndex||1), 1);
+      return [...prev, ...resolved.map((s, i) => ({ ...s, zIndex: maxZ+i+1 }))];
     });
-
-    setSelectedShapeId(null);
-    setSelectedShapeIds([]);
+    setSelectedShapeId(null); setSelectedShapeIds([]);
   };
 
-  console.log("active template", activeTemplate)
+  const selectedShape = shapes.find((s) => s.id === selectedShapeId);
 
   return (
-    <main className="min-h-screen bg-background">
-      <div className="border-b border-border bg-card">
-        <div className="flex items-center justify-between p-4 max-w-full mx-auto">
-          <div className="min-w-0">
-            <h1 className="text-2xl font-serif font-bold text-foreground">
-              Campaign Designer Pro
-            </h1>
-            <p className="text-xs text-muted-foreground">
-              Professional design tools - Fixed drag, text visibility & image upload
-            </p>
-          </div>
+    <div style={{ minHeight: "100vh", background: T.bg, color: T.text, fontFamily: T.mono, display: "flex", flexDirection: "column" }}>
 
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={resetToNewTemplate} className="bg-transparent">
-              <RefreshCcw className="w-4 h-4 mr-2" />
-              New Template
-            </Button>
-
-            <Button
-              onClick={handleExportPNG}
-              className="bg-accent hover:bg-accent/90 text-accent-foreground"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Export PNG
-            </Button>
+      {/* ── Top Bar ─────────────────────────────────────────────────────────── */}
+      <div style={{
+        background: "linear-gradient(180deg,#0d1410 0%,#090c09 100%)",
+        borderBottom: `1px solid ${T.border}`,
+        padding: "0 20px",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        height: 52,
+        boxShadow: "0 1px 0 rgba(0,0,0,0.4)",
+      }}>
+        {/* Logo / title */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{
+            width: 28, height: 28, borderRadius: 6,
+            background: T.accentGlow, border: `1px solid ${T.accent}`,
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <Layers size={14} color={T.accentLight} />
           </div>
+          <div>
+            <div style={{ fontFamily: T.font, fontSize: 16, letterSpacing: "0.18em", color: T.text }}>
+              CAMPAIGN DESIGNER
+            </div>
+            <div style={{ fontSize: 9, color: T.textMuted, letterSpacing: "0.1em" }}>
+              {activeTemplate?.name ? `EDITING: ${activeTemplate.name.toUpperCase()}` : "NEW TEMPLATE"}
+            </div>
+          </div>
+        </div>
+
+        {/* Status chips */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <div style={{
+            fontSize: 9, fontFamily: T.mono, color: T.textMuted,
+            border: `1px solid ${T.border}`, borderRadius: 3,
+            padding: "2px 8px", letterSpacing: "0.08em",
+          }}>
+            {CANVAS_WIDTH}×{CANVAS_HEIGHT}
+          </div>
+          <div style={{
+            fontSize: 9, fontFamily: T.mono,
+            color: shapes.length > 0 ? T.accentLight : T.textMuted,
+            border: `1px solid ${shapes.length > 0 ? T.border : "rgba(255,255,255,0.06)"}`,
+            borderRadius: 3, padding: "2px 8px", letterSpacing: "0.08em",
+          }}>
+            {shapes.length} SHAPE{shapes.length !== 1 ? "S" : ""}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div style={{ display: "flex", gap: 8 }}>
+          <StudioButton onClick={resetToNewTemplate} variant="ghost" icon={<RefreshCcw size={12} />}>
+            New
+          </StudioButton>
+          {isEditingExisting ? (
+            <StudioButton onClick={doUpdate} disabled={saving} variant="accent" icon={<Save size={12} />}>
+              {saving ? "Saving…" : "Update"}
+            </StudioButton>
+          ) : (
+            <StudioButton onClick={openSaveDialog} disabled={saving} variant="accent" icon={<Save size={12} />}>
+              Save
+            </StudioButton>
+          )}
+          <StudioButton onClick={handleExportPNG} icon={<Download size={12} />}>
+            Export PNG
+          </StudioButton>
         </div>
       </div>
 
-      <div className="flex gap-4 p-4 max-w-full mx-auto">
-        <div className="w-80 shrink-0 flex-none flex flex-col gap-4 overflow-y-auto max-h-[calc(100vh-100px)]">
-          <Tabs defaultValue="design" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="design" className="text-xs">
-                Design
-              </TabsTrigger>
-              <TabsTrigger value="data" className="text-xs">
-                Content
-              </TabsTrigger>
-              <TabsTrigger value="templates" className="text-xs">
-                Templates
-              </TabsTrigger>
-            </TabsList>
+      {/* ── Body ────────────────────────────────────────────────────────────── */}
+      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
 
-            <TabsContent value="design" className="space-y-4">
-              <Card className="p-4 border-border">
-                <h3 className="text-sm font-semibold text-foreground mb-3">Editor Controls</h3>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="show-grid" className="text-xs flex items-center gap-2">
-                      <Grid3x3 className="w-3.5 h-3.5" />
-                      Show Grid
-                    </Label>
-                    <Switch
-                      id="show-grid"
-                      checked={showGrid}
-                      onCheckedChange={setShowGrid}
-                    />
+        {/* ── Left panel ────────────────────────────────────────────────────── */}
+        <div style={{
+          width: 260, flexShrink: 0,
+          background: "linear-gradient(180deg,#0a0f0a 0%,#080b08 100%)",
+          borderRight: `1px solid ${T.border}`,
+          display: "flex", flexDirection: "column",
+          overflowY: "auto",
+        }}>
+
+          {/* Tab nav */}
+          <div style={{
+            display: "flex", borderBottom: `1px solid ${T.border}`,
+            background: "rgba(0,0,0,0.3)",
+          }}>
+            {(["design","content","templates"] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                style={{
+                  flex: 1, padding: "10px 0",
+                  fontFamily: T.font, fontSize: 10, letterSpacing: "0.14em",
+                  textTransform: "uppercase" as const, cursor: "pointer",
+                  background: "transparent", border: "none",
+                  borderBottom: activeTab === tab ? `2px solid ${T.accentLight}` : "2px solid transparent",
+                  color: activeTab === tab ? T.accentLight : T.textMuted,
+                  transition: "all 0.15s",
+                }}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+
+            {/* ── DESIGN TAB ─────────────────────────────────────────────────── */}
+            {activeTab === "design" && (
+              <>
+                {/* Canvas controls */}
+                <Panel>
+                  <PanelTitle icon={<Grid3x3 size={11} />}>Canvas</PanelTitle>
+                  <ToggleRow label="Grid" checked={showGrid}    onChange={setShowGrid}    icon={<Grid3x3 size={10} />} />
+                  <ToggleRow label="Snap to Objects" checked={snapToObjects} onChange={setSnapToObjects} icon={<Magnet size={10} />} />
+                </Panel>
+
+                {/* Background */}
+                <Panel>
+                  <PanelTitle icon={<ImageIcon size={11} />}>Background</PanelTitle>
+                  <ImageUploader
+                    onImageSelect={(val: any) => {
+                      if (isString(val)) setBackgroundImage(val);
+                      else setErr("Background must be a URL string.");
+                    }}
+                    currentImage={safeBackground}
+                  />
+                </Panel>
+
+                {/* Logo */}
+                <Panel>
+                  <PanelTitle>Logo</PanelTitle>
+                  <LogoEditor logo={logoPlacement} onLogoChange={setLogoPlacement} />
+                </Panel>
+
+                {/* Add shapes */}
+                <Panel>
+                  <PanelTitle icon={<Plus size={11} />}>Add Shape</PanelTitle>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5 }}>
+                    {[
+                      ["text",         "Text",      <Type size={10} />],
+                      ["rectangle",    "Rect",      <Square size={10} />],
+                      ["circle",       "Circle",    <Circle size={10} />],
+                      ["rounded-rect", "Rounded",   <Square size={10} />],
+                      ["triangle",     "Triangle",  <Triangle size={10} />],
+                      ["image",        "Image",     <ImageIcon size={10} />],
+                    ].map(([type, label, icon]) => (
+                      <StudioButton key={type as string} onClick={() => handleAddShape(type as any)} variant="outline" icon={icon as React.ReactNode}>
+                        {label as string}
+                      </StudioButton>
+                    ))}
+                    <StudioButton onClick={() => handleAddShape("button")} variant="outline" icon={<MousePointer2 size={10} />} fullWidth>
+                      Button
+                    </StudioButton>
+                    <StudioButton onClick={() => handleAddShape("bullet-group")} variant="outline" icon={<Plus size={10} />} fullWidth>
+                      Bullet List
+                    </StudioButton>
+                    <StudioButton onClick={() => handleAddShape("line")} variant="outline" icon={<Minus size={10} />} fullWidth>
+                      Line
+                    </StudioButton>
                   </div>
+                </Panel>
 
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="snap-objects" className="text-xs flex items-center gap-2">
-                      <Magnet className="w-3.5 h-3.5" />
-                      Snap to Objects
-                    </Label>
-                    <Switch
-                      id="snap-objects"
-                      checked={snapToObjects}
-                      onCheckedChange={setSnapToObjects}
-                    />
+                {/* Premium components */}
+                <Panel>
+                  <PanelTitle icon={<Layers size={11} />}>Components</PanelTitle>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {PREMIUM_GROUPS.map((g) => (
+                      <Collapsible key={g.label} title={g.label}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
+                          {g.items.map(([key, label]) => (
+                            <StudioButton key={key} size="sm" variant="outline" onClick={() => insertPremiumComponent(key as PremiumComponentKey)}>
+                              {label}
+                            </StudioButton>
+                          ))}
+                        </div>
+                      </Collapsible>
+                    ))}
+
+                    <Collapsible title="✦ Clipdrop AI">
+                      <div style={{
+                        fontSize: 9, color: "#a78bfa", marginBottom: 6,
+                        padding: "4px 6px", borderRadius: 4,
+                        background: "rgba(167,139,250,0.08)",
+                        border: "1px solid rgba(167,139,250,0.2)",
+                        letterSpacing: "0.05em",
+                      }}>
+                        Uses AI credits
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
+                        {AI_TEMPLATES.map(([key, label]) => (
+                          <StudioButton key={key} size="sm" variant="outline" onClick={() => insertPremiumComponent(key as PremiumComponentKey)}
+                            style={{ borderColor: "rgba(167,139,250,0.3)", color: "#c4b5fd" } as any}
+                          >
+                            {label}
+                          </StudioButton>
+                        ))}
+                      </div>
+                    </Collapsible>
                   </div>
+                </Panel>
 
-                  <div className="text-[10px] text-muted-foreground pt-1">
-                    ✅ Fixed: Smooth drag, visible text, image upload dialog
+                {/* Generate */}
+                <StudioButton onClick={handleGeneratePremiumTemplate} variant="accent" fullWidth icon={<Sparkles size={12} />} size="md">
+                  Generate AI Template
+                </StudioButton>
+
+                {err && (
+                  <div style={{
+                    fontSize: 10, color: "#f87171", padding: "6px 8px",
+                    background: "rgba(239,68,68,0.08)",
+                    border: "1px solid rgba(239,68,68,0.2)", borderRadius: 4,
+                  }}>
+                    {err}
                   </div>
-                </div>
-              </Card>
+                )}
+              </>
+            )}
 
-              <Card className="p-4 border-border">
-                <h3 className="text-sm font-semibold text-foreground mb-3">Background</h3>
-                <ImageUploader
-                  onImageSelect={(val: any) => {
-                    if (isString(val)) setBackgroundImage(val);
-                    else setErr("Background must be a URL or data URL string.");
-                  }}
-                  currentImage={safeBackground}
+            {/* ── CONTENT TAB ─────────────────────────────────────────────────── */}
+            {activeTab === "content" && (
+              <Panel>
+                <PanelTitle>Campaign Content</PanelTitle>
+                <CampaignDataForm data={campaignData} onChange={setCampaignData} />
+              </Panel>
+            )}
+
+            {/* ── TEMPLATES TAB ───────────────────────────────────────────────── */}
+            {activeTab === "templates" && (
+              <>
+                <Panel>
+                  <PanelTitle icon={<Save size={11} />}>Save</PanelTitle>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {isEditingExisting ? (
+                      <StudioButton onClick={doUpdate} disabled={saving} variant="accent" fullWidth icon={<Save size={12} />} size="md">
+                        {saving ? "Updating…" : "Update Template"}
+                      </StudioButton>
+                    ) : (
+                      <StudioButton onClick={openSaveDialog} disabled={saving} variant="accent" fullWidth icon={<Save size={12} />} size="md">
+                        Save Template
+                      </StudioButton>
+                    )}
+                    {activeTemplate?.id && (
+                      <div style={{ fontSize: 9, color: T.textMuted, wordBreak: "break-all", fontFamily: T.mono }}>
+                        ID: {activeTemplate.id}
+                      </div>
+                    )}
+                    {err && <div style={{ fontSize: 10, color: "#f87171" }}>{err}</div>}
+                  </div>
+                </Panel>
+
+                <TemplateManagerV2
+                  selectedTemplateId={activeTemplate?.id || null}
+                  onSelectTemplate={handleSelectTemplate}
                 />
-              </Card>
+              </>
+            )}
+          </div>
+        </div>
 
-              <LogoEditor logo={logoPlacement} onLogoChange={setLogoPlacement} />
-              
-              <Card className="p-4 border-border">
-                <h3 className="text-sm font-semibold text-foreground mb-3">Premium Components</h3>
-                <div className="grid grid-cols-2 gap-2">
-                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("offer")}>Offer/Discount</Button>
-                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("hero")}>Hero Product</Button>
-                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("skincare")}>Skincare Split</Button>
-                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("boldBrand")}>Bold Brand</Button>
-                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("flashSale")}>Flash Sale</Button>
-                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("testimonial")}>Testimonial</Button>
-                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("editorial")}>Editorial Blog</Button>
-                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("luxuryDark")}>Luxury Dark</Button>
-                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("splitColor")}>Split Color</Button>
-                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("instagramStory")}>IG Story</Button>
-                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("communityEvent")}>Community Event</Button>
-                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("albumCover")}>Album Cover</Button>
-                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("boldStatement")}>Bold Statement</Button>
-                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("fullBleedHero")}>Full Bleed Hero</Button>
-                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("massiveTypography")}>Massive Type</Button>
-                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("comparison")}>Old vs New</Button>
-                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("collageGrid")}>Collage Grid</Button>
-                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("singleHeroPhoto")}>Hero Photo</Button>
-                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("splitPhotoContent")}>Split Photo</Button>
-                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("magazinePhotoGrid")}>Magazine Grid</Button>
-                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("thoughtLeader")}>Thought Leader</Button>
-                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("lifestyleShowcase")}>Lifestyle Showcase</Button>
-                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("darkEditorial")}>Dark Editorial</Button>
-                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("lifestyleHero")}>Lifestyle Hero</Button>
-                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("productAbstract")}>Product Abstract</Button>
-                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("saasAd")}>SaaS Ad</Button>
-                  <Button variant="outline" size="sm" className="text-xs" onClick={() => insertPremiumComponent("characterDashboard")}>3D Character</Button>
-                </div>
-              </Card>
-
-              <Card className="p-4 border-border space-y-3">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-semibold text-foreground">✨ Clipdrop AI Templates</h3>
-                  <span className="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
-                    Uses AI Credits
-                  </span>
-                </div>
-                <p className="text-[10px] text-muted-foreground">
-                  These templates use Clipdrop to remove or replace image backgrounds automatically.
-                </p>
-                <div className="grid grid-cols-2 gap-2">
-                  <Button variant="outline" size="sm" className="text-xs border-purple-300 text-purple-700" onClick={() => insertPremiumComponent("cdProductFloat")}>
-                    ✨ Product Float
-                  </Button>
-                  <Button variant="outline" size="sm" className="text-xs border-purple-300 text-purple-700" onClick={() => insertPremiumComponent("cdStatsShowcase")}>
-                    ✨ Stats Showcase
-                  </Button>
-                  <Button variant="outline" size="sm" className="text-xs border-purple-300 text-purple-700" onClick={() => insertPremiumComponent("cdBrandVs")}>
-                    ✨ Brand vs
-                  </Button>
-                  <Button variant="outline" size="sm" className="text-xs border-purple-300 text-purple-700" onClick={() => insertPremiumComponent("cdPersonHero")}>
-                    ✨ Person Hero
-                  </Button>
-                  <Button variant="outline" size="sm" className="text-xs border-purple-300 text-purple-700 col-span-2" onClick={() => insertPremiumComponent("cdLifestyleScene")}>
-                    ✨ Lifestyle Scene
-                  </Button>
-                </div>
-              </Card>
-
-              <Card className="p-4 border-border">
-                <h3 className="text-sm font-semibold text-foreground mb-3">Add Shape</h3>
-                <div className="grid grid-cols-2 gap-2">
-                  <Button onClick={() => handleAddShape("text")} variant="outline" size="sm" className="text-xs">
-                    <Plus className="w-3 h-3 mr-1" /> Text
-                  </Button>
-                  <Button onClick={() => handleAddShape("rectangle")} variant="outline" size="sm" className="text-xs">
-                    <Plus className="w-3 h-3 mr-1" /> Rectangle
-                  </Button>
-                  <Button onClick={() => handleAddShape("circle")} variant="outline" size="sm" className="text-xs">
-                    <Plus className="w-3 h-3 mr-1" /> Circle
-                  </Button>
-                  <Button onClick={() => handleAddShape("rounded-rect")} variant="outline" size="sm" className="text-xs">
-                    <Plus className="w-3 h-3 mr-1" /> Rounded
-                  </Button>
-                  <Button onClick={() => handleAddShape("triangle")} variant="outline" size="sm" className="text-xs">
-                    <Plus className="w-3 h-3 mr-1" /> Triangle
-                  </Button>
-                  <Button onClick={() => handleAddShape("image")} variant="outline" size="sm" className="text-xs">
-                    <Upload className="w-3 h-3 mr-1" /> Image
-                  </Button>
-                  <Button onClick={() => handleAddShape("button")} variant="outline" size="sm" className="text-xs col-span-2">
-                    <MousePointer2 className="w-3 h-3 mr-1" /> Clickable Button
-                  </Button>
-                  <Button onClick={() => handleAddShape("bullet-group")} variant="outline" size="sm" className="text-xs col-span-2">
-                    <Plus className="w-3 h-3 mr-1" /> Bullet List
-                  </Button>
-                  <Button
-                    onClick={() => handleAddShape("line")}
-                    variant="outline"
-                    size="sm"
-                    className="text-xs col-span-2"
-                  >
-                    <Plus className="w-3 h-3 mr-1" /> Line
-                  </Button>
-                </div>
-              </Card>
-
-              {(selectedShapeId || selectedShapeIds.length > 0) && (
+        {/* ── Canvas area ───────────────────────────────────────────────────── */}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: "#060806" }}>
+          {/* Canvas toolbar */}
+          <div style={{
+            height: 36, borderBottom: `1px solid ${T.border}`,
+            display: "flex", alignItems: "center", padding: "0 14px", gap: 12,
+            background: "rgba(0,0,0,0.3)",
+          }}>
+            <span style={{ fontSize: 9, color: T.textMuted, letterSpacing: "0.08em" }}>
+              {selectedShapeIds.length > 0
+                ? `${selectedShapeIds.length} SHAPES SELECTED`
+                : selectedShape
+                ? `${selectedShape.type.toUpperCase()} SELECTED`
+                : "CANVAS"}
+            </span>
+            {(selectedShapeId || selectedShapeIds.length > 0) && (
+              <>
+                <div style={{ width: 1, height: 14, background: T.border }} />
                 <AdvancedShapeTools
-                  selectedShapeIds={
-                    selectedShapeIds.length > 0
-                      ? selectedShapeIds
-                      : selectedShapeId
-                      ? [selectedShapeId]
-                      : []
-                  }
+                  selectedShapeIds={selectedShapeIds.length ? selectedShapeIds : selectedShapeId ? [selectedShapeId] : []}
                   onDuplicate={handleDuplicateSelected}
                   onDelete={handleDeleteSelected}
                   onAlign={handleAlign}
                   onDistribute={handleDistribute}
                   onReorder={handleReorder}
                 />
-              )}
+              </>
+            )}
+            <div style={{ flex: 1 }} />
+            <span style={{ fontSize: 9, color: T.textMuted }}>{Math.round(zoom * 100)}%</span>
+          </div>
 
-              {selectedShapeId && (
-                <PropertyInspector
-                  shape={shapes.find((s) => s.id === selectedShapeId)!}
-                  campaignData={campaignData}
-                  onUpdate={handleUpdateShape}
-                />
-              )}
-            </TabsContent>
-
-            <TabsContent value="data" className="space-y-4">
-              <Card className="p-4 border-border">
-                <h3 className="text-sm font-semibold text-foreground mb-3">Campaign Content</h3>
-                <CampaignDataForm data={campaignData} onChange={setCampaignData} />
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="templates" className="space-y-4">
-              <Card className="p-4 border-border space-y-3">
-                <div className="text-sm font-semibold text-foreground">
-                  {isEditingExisting ? "Editing existing template" : "New template"}
-                </div>
-
-                {isEditingExisting ? (
-                  <Button onClick={doUpdate} disabled={saving} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
-                    <Save className="w-4 h-4 mr-2" />
-                    {saving ? "Updating..." : "Update Template"}
-                  </Button>
-                ) : (
-                  <Button onClick={openSaveDialog} disabled={saving} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
-                    <Save className="w-4 h-4 mr-2" />
-                    Save Template
-                  </Button>
-                )}
-                <Button onClick={handleGeneratePremiumTemplate} className="bg-foreground text-background hover:bg-foreground/90 w-full">
-                  Generate Premium Template
-                </Button>
-
-                {activeTemplate?.id && (
-                  <div className="text-[11px] text-muted-foreground break-all">
-                    Active Template ID: <span className="font-mono">{activeTemplate.id}</span>
-                  </div>
-                )}
-
-                {err && <div className="text-xs text-red-600">{err}</div>}
-              </Card>
-
-              <TemplateManagerV2
-                selectedTemplateId={activeTemplate?.id || null}
-                onSelectTemplate={handleSelectTemplate}
-              />
-            </TabsContent>
-          </Tabs>
-        </div>
-
-        <div className="flex-1 min-w-0 flex flex-col gap-4">
-
-          <Card className="flex-1 border-border bg-card p-4">
-            <div className="w-full h-[70vh] bg-white rounded border border-border overflow-auto">
-            {/* Give a real scroll content box */}
-            <div className="min-w-max min-h-max p-3">
+          {/* Canvas */}
+          <div style={{ flex: 1, overflow: "auto", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+            <div style={{
+              background: "#fff",
+              borderRadius: 4,
+              boxShadow: `0 0 0 1px rgba(30,95,59,0.2), 0 24px 80px rgba(0,0,0,0.7)`,
+              overflow: "hidden",
+            }}>
               <TemplateCanvas
                 ref={canvasRef}
                 shapes={shapes}
@@ -852,121 +856,120 @@ export default function EditorPage() {
                 snapToGrid={snapToGrid}
                 snapToObjects={snapToObjects}
               />
-              </div>
             </div>
-          </Card>
-
-          <Card className="p-3 border-border">
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>Canvas: {CANVAS_WIDTH} × {CANVAS_HEIGHT}px</span>
-              <span>{shapes.length} shape{shapes.length !== 1 ? "s" : ""}</span>
-              <span>
-                {selectedShapeIds.length > 0
-                  ? `${selectedShapeIds.length} selected`
-                  : selectedShapeId
-                  ? "1 selected"
-                  : "None selected"}
-              </span>
-            </div>
-          </Card>
+          </div>
         </div>
+
+        {/* ── Right panel — Properties ───────────────────────────────────────── */}
+        {selectedShape && (
+          <div style={{
+            width: 240, flexShrink: 0,
+            background: "linear-gradient(180deg,#0a0f0a 0%,#080b08 100%)",
+            borderLeft: `1px solid ${T.border}`,
+            overflowY: "auto", padding: 12,
+          }}>
+            <PropertyInspector
+              shape={selectedShape}
+              campaignData={campaignData}
+              onUpdate={handleUpdateShape}
+            />
+          </div>
+        )}
       </div>
 
-      {/* ✅ IMAGE UPLOAD DIALOG */}
+      {/* ── Image Upload Dialog ──────────────────────────────────────────────── */}
       <Dialog open={imageUploadOpen} onOpenChange={setImageUploadOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent style={{ background: "#0d1410", border: `1px solid ${T.border}`, borderRadius: 10, color: T.text, maxWidth: 420 }}>
           <DialogHeader>
-            <DialogTitle>Upload Image</DialogTitle>
-            <DialogDescription>
-              Choose an image file or enter an image URL
+            <DialogTitle style={{ fontFamily: T.font, letterSpacing: "0.16em", color: T.accentLight }}>
+              ADD IMAGE
+            </DialogTitle>
+            <DialogDescription style={{ fontSize: 11, color: T.textMuted }}>
+              Upload from your computer or paste a URL
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Upload from computer</Label>
-              <Input
-                type="file"
-                accept="image/*"
-                onChange={handleImageFile}
-                className="cursor-pointer"
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div>
+              <div style={{ fontSize: 9, color: T.textMuted, letterSpacing: "0.1em", marginBottom: 6 }}>UPLOAD FILE</div>
+              <input type="file" accept="image/*" onChange={handleImageFile}
+                style={{ width: "100%", fontSize: 11, color: T.textMuted, cursor: "pointer", fontFamily: T.mono }}
               />
             </div>
-
-            <div className="flex items-center gap-2">
-              <div className="flex-1 border-t" />
-              <span className="text-xs text-muted-foreground">OR</span>
-              <div className="flex-1 border-t" />
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ flex: 1, height: 1, background: T.border }} />
+              <span style={{ fontSize: 9, color: T.textMuted }}>OR</span>
+              <div style={{ flex: 1, height: 1, background: T.border }} />
             </div>
-
-            <div className="space-y-2">
-              <Label>Image URL</Label>
-              <Input
+            <div>
+              <div style={{ fontSize: 9, color: T.textMuted, letterSpacing: "0.1em", marginBottom: 6 }}>IMAGE URL</div>
+              <input
                 value={imageUrl}
                 onChange={(e) => setImageUrl(e.target.value)}
                 placeholder="https://example.com/image.jpg"
+                style={{ ...{ width: "100%", background: "rgba(255,255,255,0.04)", border: `1px solid ${T.border}`, borderRadius: 4, color: T.text, fontSize: 12, padding: "6px 10px", outline: "none", fontFamily: T.mono, boxSizing: "border-box" as const } }}
+                onFocus={(e) => { e.currentTarget.style.borderColor = T.accent; }}
+                onBlur={(e)  => { e.currentTarget.style.borderColor = T.border; }}
               />
             </div>
-
             {imageUrl && (
-              <div className="p-2 border rounded">
-                <img 
-                  src={imageUrl} 
-                  alt="Preview" 
-                  className="max-h-40 mx-auto"
-                  onError={() => setErr("Invalid image URL")}
-                />
+              <div style={{ borderRadius: 6, overflow: "hidden", border: `1px solid ${T.border}`, maxHeight: 160, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.3)" }}>
+                <img src={imageUrl} alt="Preview" style={{ maxHeight: 160, maxWidth: "100%", objectFit: "contain" }} />
               </div>
             )}
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setImageUploadOpen(false);
-              setImageUrl("");
-            }}>
+          <DialogFooter style={{ gap: 8, paddingTop: 8 }}>
+            <StudioButton variant="outline" onClick={() => { setImageUploadOpen(false); setImageUrl(""); }}>
               Cancel
-            </Button>
-            <Button onClick={handleImageUpload} disabled={!imageUrl.trim()}>
-              <Upload className="w-4 h-4 mr-2" />
+            </StudioButton>
+            <StudioButton variant="accent" onClick={handleImageUpload} disabled={!imageUrl.trim()} icon={<Upload size={12} />}>
               Add Image
-            </Button>
+            </StudioButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Save Template Dialog */}
+      {/* ── Save Dialog ─────────────────────────────────────────────────────── */}
       <Dialog open={saveOpen} onOpenChange={(o) => !saving && setSaveOpen(o)}>
-        <DialogContent className="max-w-sm">
+        <DialogContent style={{ background: "#0d1410", border: `1px solid ${T.border}`, borderRadius: 10, color: T.text, maxWidth: 360 }}>
           <DialogHeader>
-            <DialogTitle>Save template</DialogTitle>
-            <DialogDescription>Name + description</DialogDescription>
+            <DialogTitle style={{ fontFamily: T.font, letterSpacing: "0.16em", color: T.accentLight }}>
+              SAVE TEMPLATE
+            </DialogTitle>
+            <DialogDescription style={{ fontSize: 11, color: T.textMuted }}>
+              Name your template to save it to the library
+            </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <div className="text-sm font-medium">Name</div>
-              <Input value={saveName} onChange={(e) => setSaveName(e.target.value)} />
-            </div>
-
-            <div className="space-y-1">
-              <div className="text-sm font-medium">Description</div>
-              <Input value={saveDesc} onChange={(e) => setSaveDesc(e.target.value)} placeholder="Optional" />
-            </div>
-
-            {err && <div className="text-xs text-red-600">{err}</div>}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {[
+              ["NAME", saveName, setSaveName, "My Template"],
+              ["DESCRIPTION", saveDesc, setSaveDesc, "Optional description"],
+            ].map(([label, val, setter, ph]) => (
+              <div key={label as string}>
+                <div style={{ fontSize: 9, color: T.textMuted, letterSpacing: "0.1em", marginBottom: 5 }}>{label as string}</div>
+                <input
+                  value={val as string}
+                  onChange={(e) => (setter as any)(e.target.value)}
+                  placeholder={ph as string}
+                  style={{ width: "100%", background: "rgba(255,255,255,0.04)", border: `1px solid ${T.border}`, borderRadius: 4, color: T.text, fontSize: 12, padding: "6px 10px", outline: "none", fontFamily: T.mono, boxSizing: "border-box" as const }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = T.accent; }}
+                  onBlur={(e)  => { e.currentTarget.style.borderColor = T.border; }}
+                />
+              </div>
+            ))}
+            {err && <div style={{ fontSize: 10, color: "#f87171", padding: "4px 6px", background: "rgba(239,68,68,0.08)", borderRadius: 3 }}>{err}</div>}
           </div>
 
-          <DialogFooter className="gap-2 sm:gap-2">
-            <Button variant="outline" onClick={() => { if (saving) return; setSaveOpen(false); }}>
-              Cancel
-            </Button>
-            <Button onClick={doCreate} disabled={saving}>
-              {saving ? "Saving..." : "Save"}
-            </Button>
+          <DialogFooter style={{ gap: 8, paddingTop: 8 }}>
+            <StudioButton variant="outline" onClick={() => { if (!saving) setSaveOpen(false); }}>Cancel</StudioButton>
+            <StudioButton variant="accent" onClick={doCreate} disabled={saving} icon={<Save size={12} />}>
+              {saving ? "Saving…" : "Save"}
+            </StudioButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </main>
+    </div>
   );
 }

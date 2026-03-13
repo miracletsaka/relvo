@@ -1,608 +1,304 @@
+/**
+ * MultiSceneVideo.tsx
+ * remotion/compositions/MultiSceneVideo.tsx
+ *
+ * v3 — Mind-blowing transitions + fully mixed voice routing.
+ *
+ * TRANSITIONS (6 types, cycling by scene index):
+ *   0 → LightSweep    — white energy streak left→right
+ *   1 → GlitchSlice   — RGB split + horizontal slices
+ *   2 → ZoomBlur      — punch-in zoom from 128% + blur dissolve (wrapper)
+ *   3 → ColorBurn     — brand accent radial flare from center
+ *   4 → WipeReveal    — diagonal blade wipe with accent edge
+ *   5 → ParticleFlash — stutter flash + particle burst
+ *
+ * VOICE ROUTING (fully mixed):
+ *   - Webcam scene     → sceneAudioUrl  (recorded clip audio, clip muted=false)
+ *   - Non-webcam scene → brollAudioUrl  (ElevenLabs slice for that scene)
+ *   - Pure AI video    → global voiceUrl (single continuous ElevenLabs track)
+ *   - Global voiceUrl is NEVER played on webcam scenes — no double voice
+ *
+ * VIDEO:
+ *   - All clips loop automatically if shorter than scene duration
+ *   - Webcam clip audio enabled; background clips muted
+ */
+
 import React from "react";
 import {
-  AbsoluteFill, Audio, Easing, Img, interpolate,
-  OffthreadVideo, Sequence, Series,
-  useCurrentFrame, useVideoConfig,
+  AbsoluteFill,
+  Audio,
+  Sequence,
+  Video,
+  Img,
+  useCurrentFrame,
+  useVideoConfig,
+  interpolate,
 } from "remotion";
-import OverlayMediaLayer from "./OverlayMediaLayer";
-import type { VoiceSegment } from "@/lib/generate-voiceover-script";
-import type { StyleDNA } from "@/lib/generate-voiceover-script";
-import type { TemplateShape } from "@/lib/types";
-import { AnimatedTemplate } from "./AnimatedTemplate";
-import { SpeechMarkerLayer, type SpeechMarker } from "./SpeechMarker";
-import { BeatOverlay } from "./BeatOverlay";
-import CaptionLayer from "./CaptionLayer";
-// DemoOverlayCard and LowerThirdBadge available for future use
 
-// ── Props — must stay in sync with route.ts inputProps ───────────────────────
+import { CinematicTextOverlay } from "./CinematicTextOverlay";
+import { SceneTransition, ZoomBlurWrapper, TRANSITION_FRAMES } from "./SceneTransitions";
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+interface SceneSegment {
+  screenText?:       string;
+  narration?:        string;
+  position?:         "opening" | "middle" | "closing";
+  durationSeconds?:  number;
+  sceneEnergy?:      "low" | "medium" | "high";
+  ctaText?:          string;
+  [key: string]:     any;
+}
+
+interface UploadedOverlay {
+  id:            string;
+  type:          "video" | "image";
+  url:           string;
+  startSeconds?: number;
+  endSeconds?:   number;
+  x:             number;
+  y:             number;
+  w:             number;
+  h:             number;
+  radius?:       number;
+}
+
 export interface MultiSceneVideoProps {
-  segments:            VoiceSegment[];
-  sceneVideos:         (string | null)[];
-  sceneImages:         (string | null)[];
-  sceneShapes:         TemplateShape[][];
-  sceneIsWebcam:       boolean[];
-  sceneDurations:      number[];
-  userRecordedVoice:   boolean;
-  campaignData:        Record<string, any>;
-  accentColor:         string;
-  companyName:         string;
-  styleDNA?:           StyleDNA;
-  musicUrl?:           string;
-  voiceUrl?:           string;
-  sceneAudioUrls:      (string | null)[];   // webcam clip audio per-scene (CASE A)
-  brollAudioUrls:      (string | null)[];   // b-roll recorded audio per-scene (CASE A)
-  sceneSpeechMarkers?: SpeechMarker[][];    // word-sync keyword chips
-  captionsMode?:       "off" | "kinetic";   // global captions mode (default: "off")
-  audioPath?:          string;              // legacy fallback
-  uploadedSceneMedia?: Array<{ index: number; url: string; type: "video" | "image" }>;
-  sceneCampaignData?:  Record<string, any>[];
-  uploadedOverlaysByScene?: Record<number, Array<{
-    id: string;
-    type: "video" | "image";
-    url: string;
-    startSeconds: number;
-    endSeconds: number;
-    x: number;
-    y: number;
-    w: number;
-    h: number;
-    radius?: number;
-  }>>;
+  segments:             SceneSegment[];
+  sceneVideos:          (string | null)[];
+  sceneImages:          (string | null)[];
+  sceneDurations:       number[];
+  sceneIsWebcam?:       boolean[];
+
+  // Voice routing:
+  // voiceUrl      = global AI track (ONLY when zero webcam scenes)
+  // sceneAudioUrls= per-scene webcam recorded audio
+  // brollAudioUrls= per-scene AI narration slice (mixed mode non-webcam scenes)
+  voiceUrl?:            string;
+  musicUrl?:            string;
+  musicVolume?:         number;    // default 0.15; 0.55 when voice disabled
+  sceneAudioUrls?:      (string | null)[];
+  brollAudioUrls?:      (string | null)[];
+  userRecordedVoice?:   boolean;
+
+  // Backward-compat — ignored (CinematicTextOverlay handles text)
+  sceneShapes?:         any[][];
+  sceneSpeechMarkers?:  any[][];
+  captionsMode?:        "off" | "kinetic";
+
+  accentColor?:         string;
+  companyName?:         string;
+  styleDNA?:            Record<string, any>;
+  campaignData?:        Record<string, any>;
+
+  uploadedOverlaysByScene?: Record<number, UploadedOverlay[]>;
+  uploadedSceneMedia?:      Array<{ index: number; url: string; type: "video" | "image" }>;
 }
 
-// ── B-roll audio may be plain URL or JSON slice { url, startFrom, endAt } ────
-function parseBrollAudio(raw: string): { url: string; startFrom?: number; endAt?: number } {
-  if (raw.startsWith("{")) {
-    try { return JSON.parse(raw); } catch {}
-  }
-  return { url: raw };
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function asFiniteSeconds(v: any, fallback = 6): number {
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
 }
 
-// ── Animation helpers ─────────────────────────────────────────────────────────
-type AnimVariant = "slideUp" | "slideLeft" | "zoomIn" | "fadeScale";
-
-function resolveAnimVariant(segment: VoiceSegment, styleDNA?: StyleDNA): AnimVariant {
-  if (styleDNA?.textAnimStyle === "slide-left")  return "slideLeft";
-  if (styleDNA?.textAnimStyle === "zoom-in")     return "zoomIn";
-  if (styleDNA?.textAnimStyle === "typewriter")  return "slideUp";
-  if (segment.animationStyle  === "energetic")   return "zoomIn";
-  if (segment.animationStyle  === "calm")        return "fadeScale";
-  if (segment.animationStyle  === "dramatic")    return "slideLeft";
-  return "slideUp";
+// ── Music track with ducking ──────────────────────────────────────────────────
+function MusicTrack({ url, totalFrames, fullVol = 0.15, duckedVol = 0.04 }: {
+  url: string; totalFrames: number; fullVol?: number; duckedVol?: number
+}) {
+  const frame = useCurrentFrame();
+  const volume = interpolate(
+    frame,
+    [0, 15, totalFrames - 15, totalFrames],
+    [fullVol, duckedVol, duckedVol, fullVol],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+  );
+  return <Audio src={url} volume={volume} />;
 }
 
-function useTextAnim(frame: number, dur: number, variant: AnimVariant, delay = 9, amp = 1.0) {
-  const tf      = frame - delay;
-  const opacity = interpolate(tf, [0, 14, dur - 14, dur - 4], [0, 1, 1, 0], {
-    extrapolateLeft: "clamp", extrapolateRight: "clamp",
-  });
-  let transform = "";
-  if (variant === "slideUp")   transform = `translateY(${interpolate(tf,[0,14],[36*amp,0],{extrapolateLeft:"clamp",extrapolateRight:"clamp",easing:Easing.out(Easing.cubic)})}px)`;
-  if (variant === "slideLeft") transform = `translateX(${interpolate(tf,[0,14],[48*amp,0],{extrapolateLeft:"clamp",extrapolateRight:"clamp",easing:Easing.out(Easing.cubic)})}px)`;
-  if (variant === "zoomIn")    transform = `scale(${interpolate(tf,[0,14],[1-0.22*amp,1],{extrapolateLeft:"clamp",extrapolateRight:"clamp",easing:Easing.out(Easing.back(1.3))})})`;
-  if (variant === "fadeScale") transform = `scale(${interpolate(tf,[0,14],[1+0.1*amp,1],{extrapolateLeft:"clamp",extrapolateRight:"clamp",easing:Easing.out(Easing.quad)})})`;
-  return { opacity, transform };
+// ── Global voice track ────────────────────────────────────────────────────────
+// voiceUrl is ONLY set in pure-AI mode (zero webcam scenes).
+// In mixed mode, AI audio is in brollAudioUrls per scene instead.
+// So this always plays at full volume — no muting logic needed.
+function GlobalVoiceTrack({ url }: { url: string }) {
+  return <Audio src={url} volume={1} />;
 }
 
-// ── AdScene ───────────────────────────────────────────────────────────────────
-// Clean layering — nothing overlaps:
-//   Layer 0: background video/image/gradient
-//   Layer 1: dark tint
-//   Layer 2: overlay media (PIP)
-//   Layer 3: scene text — ONE block only, positioned by scene type
-//   Layer 4: brand badge (top-left, small)
-//   Layer 5: CTA button (closing scenes only, centered)
-//   Layer 6: speech marker chips (non-intrusive, sides only)
-function AdScene({
+// ── Scene component ───────────────────────────────────────────────────────────
+
+interface SceneProps {
+  segment:        SceneSegment;
+  sceneIndex:     number;
+  videoUrl:       string | null;
+  imageUrl:       string | null;
+  durationFrames: number;
+  accentColor:    string;
+  isWebcam:       boolean;
+  overlays?:      UploadedOverlay[];
+  sceneAudioUrl?: string | null;
+  brollAudioUrl?: string | null;
+}
+
+const SceneInner: React.FC<SceneProps> = ({
   segment,
   sceneIndex,
   videoUrl,
   imageUrl,
-  shapes,
-  campaignData,
-  sceneCampaignDataItem, // add back
+  durationFrames,
   accentColor,
-  companyName,
   isWebcam,
-  styleDNA,
-  speechMarkers,
-  captionsMode,
   overlays,
-  uploadedSceneMedia,
-}: {
-  segment: VoiceSegment;
-  sceneIndex: number;
-  videoUrl: string | null;
-  imageUrl: string | null;
-  shapes: TemplateShape[];
-  sceneCampaignDataItem?: Record<string, any>; // add back
-  campaignData: Record<string, any>;
-  accentColor: string;
-  companyName: string;
-  isWebcam: boolean;
-  styleDNA?: StyleDNA;
-  speechMarkers: SpeechMarker[];
-  captionsMode?: "off" | "kinetic";
-  overlays?: Array<{
-    id: string;
-    type: "video" | "image";
-    url: string;
-    startSeconds: number;
-    endSeconds: number;
-    x: number;
-    y: number;
-    w: number;
-    h: number;
-    radius?: number;
-  }>;
-  uploadedSceneMedia?: Array<{
-    index: number;
-    url: string;
-    type: "video" | "image";
-  }>; // added back
-}) {
-  const frame = useCurrentFrame();
-  const { durationInFrames } = useVideoConfig();
+  sceneAudioUrl,
+  brollAudioUrl,
+}) => {
+  const screenText   = segment.screenText?.trim() ?? "";
+  const useZoomBlur  = sceneIndex % 6 === 2; // ZoomBlur is a wrapper, applied here
 
-  const safeDuration =
-    Number.isFinite(durationInFrames) && durationInFrames > 0
-      ? durationInFrames
-      : 150;
+  const content = (
+    <AbsoluteFill style={{ backgroundColor: "#0c0c0f", overflow: "hidden" }}>
 
-  const sceneEnergy = safeNum((segment as any).sceneEnergy, 0.6);
-  const overlayInt = safeNum((styleDNA as any)?.overlayIntensity, 0.45);
-  const motionInt = safeNum((styleDNA as any)?.motionIntensity, 0.75);
-
-  const font = styleDNA?.primaryFont || "Oswald";
-  const fontWeight = styleDNA?.fontWeight || 900;
-  const letterSpacing = styleDNA?.letterSpacing ?? -2;
-  const textTransform = styleDNA?.textTransform || "uppercase";
-  const bgTint = styleDNA?.bgTint || "rgba(0,0,0,0.45)";
-  const overlayOp = overlayInt;
-  const motionAmp = motionInt * sceneEnergy;
-  const animVariant = resolveAnimVariant(segment, styleDNA);
-
-  const sceneOp = Math.min(
-    interpolate(frame, [0, 10], [0, 1], {
-      extrapolateLeft: "clamp",
-      extrapolateRight: "clamp",
-    }),
-    interpolate(frame, [safeDuration - 10, safeDuration], [1, 0], {
-      extrapolateLeft: "clamp",
-      extrapolateRight: "clamp",
-    })
-  );
-
-  const bgScale = interpolate(frame, [0, safeDuration], [1, 1 + 0.07 * sceneEnergy], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-
-  const mainAnim = useTextAnim(frame, safeDuration, animVariant, 9, motionAmp);
-
-  const ctaStart = Math.max(0, safeDuration - 42);
-
-  const ctaOp = interpolate(frame - ctaStart, [0, 16], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-
-  const ctaScale = interpolate(frame - ctaStart, [0, 16], [0.9, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.out(Easing.back(1.3)),
-  });
-
-  const barP = interpolate(frame, [9, 28], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-
-  const brandOp = interpolate(frame, [6, 22], [0, 0.92], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-
-  const textStyle: React.CSSProperties = {
-    fontFamily: `"${font}", Impact, "Arial Black", sans-serif`,
-    fontWeight,
-    letterSpacing: `${letterSpacing}px`,
-    textTransform: textTransform as any,
-  };
-
-  // added back from old version
-  const uploadedMedia = uploadedSceneMedia?.find((m) => m.index === sceneIndex);
-  const resolvedVideoUrl = uploadedMedia
-    ? uploadedMedia.type === "video"
-      ? uploadedMedia.url
-      : null
-    : videoUrl;
-  const resolvedImageUrl = uploadedMedia
-    ? uploadedMedia.type === "image"
-      ? uploadedMedia.url
-      : null
-    : imageUrl;
-
-  const showCTA = !!segment.showCTA && !!segment.ctaText;
-  const mainBottom = showCTA ? (isWebcam ? 300 : 250) : isWebcam ? 120 : 140;
-
-  return (
-    <AbsoluteFill style={{ opacity: sceneOp }}>
-      {/* Background */}
-      {resolvedVideoUrl ? (
-        <OffthreadVideo
-          src={resolvedVideoUrl}
-          style={{ width: "100%", height: "100%", objectFit: "cover" }}
-          volume={0}
+      {/* ── Background video ──────────────────────────────────────────── */}
+      {/* Webcam clips: muted=false → embedded audio plays naturally       */}
+      {/* B-roll/asset clips: muted=true → AI voice from brollAudioUrl     */}
+      {videoUrl && (
+        <Video
+          src={videoUrl}
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+          loop={!isWebcam}
+          muted={!isWebcam}
+          volume={isWebcam ? 1 : 0}
         />
-      ) : resolvedImageUrl ? (
+      )}
+
+      {/* ── Background image fallback ──────────────────────────────────── */}
+      {!videoUrl && imageUrl && (
         <Img
-          src={resolvedImageUrl}
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            transform: `scale(${bgScale})`,
-          }}
-        />
-      ) : (
-        <div
-          style={{
-            width: "100%",
-            height: "100%",
-            background: "linear-gradient(135deg,#0f0c29 0%,#302b63 50%,#24243e 100%)",
-          }}
+          src={imageUrl}
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
         />
       )}
 
-      {/* Atmospheric tint */}
-      <AbsoluteFill style={{ backgroundColor: bgTint, opacity: overlayOp }} />
+      {/* ── Gradient scrim — bottom-heavy, improves text legibility ───── */}
+      <div style={{
+        position:      "absolute",
+        inset:         0,
+        background:    "linear-gradient(to bottom, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0) 35%, rgba(0,0,0,0.6) 100%)",
+        pointerEvents: "none",
+      }} />
 
-      {isWebcam ? (
-        <>
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              background:
-                "radial-gradient(ellipse at center,transparent 45%,rgba(0,0,0,.42) 100%)",
-              pointerEvents: "none",
-            }}
-          />
-          <div
-            style={{
-              position: "absolute",
-              bottom: 0,
-              left: 0,
-              right: 0,
-              height: 340,
-              background: "linear-gradient(to top,rgba(0,0,0,.85) 0%,transparent 100%)",
-            }}
-          />
+      {/* Webcam audio is embedded in the video clip — no separate Audio tag needed */}
 
-          <div
-            style={{
-              position: "absolute",
-              top: 52,
-              left: 52,
-              opacity: brandOp,
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-            }}
-          >
-            <div
-              style={{
-                width: 10,
-                height: 10,
-                borderRadius: "50%",
-                backgroundColor: accentColor,
-                boxShadow: `0 0 10px ${accentColor}`,
-              }}
-            />
-            <span
-              style={{
-                ...textStyle,
-                fontSize: 20,
-                color: "rgba(255,255,255,.92)",
-                letterSpacing: "4px",
-              }}
-            >
-              {companyName.toUpperCase()}
-            </span>
-          </div>
+      {/* ── AI voice slice for this non-webcam scene ───────────────────── */}
+      {/* AI voice for this scene — plain URL, plays from frame 0 of this Sequence */}
+      {brollAudioUrl && <Audio src={brollAudioUrl} volume={1} />}
 
-          <div
-            style={{
-              position: "absolute",
-              bottom: mainBottom,
-              left: 60,
-              right: 60,
-              ...mainAnim,
-              ...textStyle,
-              fontSize: 54,
-              color: "#fff",
-              textAlign: "center",
-              lineHeight: 1.08,
-              textShadow: "0 4px 24px rgba(0,0,0,.92)",
-              zIndex: 50,
-            }}
-          >
-            {segment.screenText}
-          </div>
+      {/* ── Uploaded overlays ──────────────────────────────────────────── */}
+      {overlays?.map((o) => {
+        const sf = Math.round((o.startSeconds ?? 0) * 30);
+        const ef = Math.round((o.endSeconds   ?? durationFrames / 30) * 30);
+        return (
+          <Sequence key={o.id} from={sf} durationInFrames={ef - sf}>
+            {o.type === "video" ? (
+              <Video src={o.url} style={{
+                position: "absolute", left: `${o.x}%`, top: `${o.y}%`,
+                width: `${o.w}%`, height: `${o.h}%`,
+                borderRadius: o.radius ? `${o.radius}%` : undefined, objectFit: "cover",
+              }} />
+            ) : (
+              <Img src={o.url} style={{
+                position: "absolute", left: `${o.x}%`, top: `${o.y}%`,
+                width: `${o.w}%`, height: `${o.h}%`,
+                borderRadius: o.radius ? `${o.radius}%` : undefined, objectFit: "contain",
+              }} />
+            )}
+          </Sequence>
+        );
+      })}
 
-          <div
-            style={{
-              position: "absolute",
-              bottom: mainBottom - 30,
-              left: "50%",
-              transform: "translateX(-50%)",
-              width: `${barP * 120}px`,
-              height: 4,
-              backgroundColor: accentColor,
-              borderRadius: 999,
-              boxShadow: `0 0 20px ${accentColor}60`,
-              zIndex: 45,
-            }}
-          />
-
-          {showCTA && (
-            <div
-              style={{
-                position: "absolute",
-                bottom: 120,
-                left: 0,
-                right: 0,
-                display: "flex",
-                justifyContent: "center",
-                opacity: ctaOp,
-                transform: `scale(${ctaScale})`,
-                zIndex: 100,
-              }}
-            >
-              <div
-                style={{
-                  backgroundColor: accentColor,
-                  borderRadius: 60,
-                  padding: "22px 52px",
-                  ...textStyle,
-                  fontSize: 32,
-                  color: "#fff",
-                  boxShadow: `0 12px 40px rgba(0,0,0,.5),0 0 60px ${accentColor}40`,
-                  whiteSpace: "nowrap",
-                  maxWidth: "88%",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                }}
-              >
-                {segment.ctaText}
-              </div>
-            </div>
-          )}
-        </>
-      ) : (
-        <>
-          <AbsoluteFill
-            style={{
-              backgroundColor: `rgba(0,0,0,${
-                segment.position === "opening"
-                  ? 0.22
-                  : segment.position === "closing"
-                  ? 0.48
-                  : 0.35
-              })`,
-            }}
-          />
-
-          <div
-            style={{
-              position: "absolute",
-              bottom: 0,
-              left: 0,
-              right: 0,
-              height: 520,
-              background: "linear-gradient(to top,rgba(0,0,0,.88) 0%,transparent 100%)",
-            }}
-          />
-
-          {shapes.length > 0 && (
-            <AnimatedTemplate
-              shapes={shapes}
-              campaignData={campaignData}
-              styleDNA={styleDNA}
-              templateOpacity={interpolate(frame, [8, 26], [0, 0.9], {
-                extrapolateLeft: "clamp",
-                extrapolateRight: "clamp",
-              })}
-            />
-          )}
-
-          <div
-            style={{
-              position: "absolute",
-              bottom: mainBottom - 34,
-              left: 60,
-              width: `${barP * 110}px`,
-              height: 4,
-              backgroundColor: accentColor,
-              borderRadius: 2,
-              boxShadow: `0 0 20px ${accentColor}60`,
-              zIndex: 40,
-            }}
-          />
-
-          {segment.screenText && (
-            <div
-              style={{
-                position: "absolute",
-                bottom: mainBottom,
-                left: 60,
-                right: 60,
-                ...mainAnim,
-                ...textStyle,
-                fontSize: segment.position === "opening" ? 82 : 66,
-                color: "#fff",
-                textAlign: "center",
-                lineHeight: 1.08,
-                textShadow: "0 6px 32px rgba(0,0,0,.92)",
-                zIndex: 50,
-              }}
-            >
-              {segment.screenText}
-            </div>
-          )}
-
-          {showCTA && (
-            <div
-              style={{
-                position: "absolute",
-                bottom: 120,
-                left: 0,
-                right: 0,
-                display: "flex",
-                justifyContent: "center",
-                opacity: ctaOp,
-                transform: `scale(${ctaScale})`,
-                zIndex: 100,
-              }}
-            >
-              <div
-                style={{
-                  backgroundColor: accentColor,
-                  borderRadius: 60,
-                  padding: "24px 56px",
-                  ...textStyle,
-                  fontSize: 34,
-                  color: "#fff",
-                  boxShadow: `0 12px 40px rgba(0,0,0,.5),0 0 80px ${accentColor}50`,
-                  whiteSpace: "nowrap",
-                  maxWidth: "88%",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                }}
-              >
-                {segment.ctaText}
-              </div>
-            </div>
-          )}
-        </>
-      )}
-
-      <OverlayMediaLayer overlays={overlays} />
-      <BeatOverlay segment={segment as any} accentColor={accentColor} />
-
-      {captionsMode === "kinetic" ? (
-        <CaptionLayer
-          mode="kinetic"
-          markers={speechMarkers}
+      {/* ── Cinematic text (only text layer — no template shapes) ─────── */}
+      {screenText && (
+        <CinematicTextOverlay
+          text={screenText}
+          durationInFrames={durationFrames}
           accentColor={accentColor}
-          styleDNA={styleDNA}
+          position="bottom"
         />
-      ) : null}
+      )}
 
-      <SpeechMarkerLayer
-        markers={speechMarkers}
-        styleDNA={styleDNA}
+      {/* ── Scene transition effect (entrance) ────────────────────────── */}
+      <SceneTransition
+        index={sceneIndex}
+        durationInFrames={durationFrames}
         accentColor={accentColor}
       />
+
     </AbsoluteFill>
   );
-}
 
-// ── Root composition ──────────────────────────────────────────────────────────
+  // ZoomBlur wraps the whole scene content with a zoom+blur spring entrance
+  return useZoomBlur ? <ZoomBlurWrapper>{content}</ZoomBlurWrapper> : content;
+};
+
+// ── Main composition ──────────────────────────────────────────────────────────
+
 export const MultiSceneVideo: React.FC<MultiSceneVideoProps> = ({
-  segments, sceneVideos, sceneImages, sceneShapes,
-  sceneIsWebcam, sceneDurations, userRecordedVoice,
-  campaignData, accentColor, companyName,
-  styleDNA, musicUrl, voiceUrl,
-  sceneAudioUrls, brollAudioUrls,
-  sceneSpeechMarkers, audioPath,
-  uploadedSceneMedia,
-  uploadedOverlaysByScene,
-  sceneCampaignData,
+  segments,
+  sceneVideos,
+  sceneImages,
+  sceneDurations,
+  sceneIsWebcam     = [],
+  voiceUrl,
+  musicUrl,
+  musicVolume       = 0.15,
+  sceneAudioUrls    = [],
+  brollAudioUrls    = [],
+  accentColor       = "#7c3aed",
+  uploadedOverlaysByScene = {},
+  sceneShapes:         _s,
+  sceneSpeechMarkers:  _m,
+  captionsMode:        _c,
 }) => {
-  const fps = 30;
+  const { fps } = useVideoConfig();
 
-  // Cumulative start frames — used for <Sequence from> positioning
-  const sceneStartFrames: number[] = [];
-  let acc = 0;
-  for (const d of (sceneDurations ?? [])) {
-    sceneStartFrames.push(acc);
-    acc += Math.round(d * fps);
+  const startFrames: number[] = [];
+  let cumulative = 0;
+  for (const d of sceneDurations) {
+    startFrames.push(cumulative);
+    cumulative += Math.round(asFiniteSeconds(d, 6) * fps);
   }
+  const totalFrames = Math.max(1, cumulative);
 
   return (
-    <AbsoluteFill style={{ backgroundColor: "#000" }}>
-      {musicUrl && <Audio src={musicUrl} volume={0.12} />}
+    <AbsoluteFill style={{ backgroundColor: "#0c0c0f" }}>
 
-      {!userRecordedVoice && voiceUrl && (
-        <Audio src={voiceUrl} volume={1} />
-      )}
+      {/* voiceUrl intentionally unused — each AI scene has its own audio via brollAudioUrls */}
 
-      {userRecordedVoice && (sceneAudioUrls ?? []).map((audioUrl, i) => {
-        if (!audioUrl) return null;
-        const startFrame     = sceneStartFrames[i] ?? 0;
-        const durationFrames = Math.round((sceneDurations?.[i] ?? 6) * fps);
+      {/* ── Background music with ducking ─────────────────────────────── */}
+      {musicUrl && <MusicTrack url={musicUrl} totalFrames={totalFrames} fullVol={musicVolume} duckedVol={musicVolume > 0.3 ? musicVolume * 0.4 : 0.04} />}
+
+      {/* ── Scenes ────────────────────────────────────────────────────── */}
+      {segments.map((seg, i) => {
+        const dur    = asFiniteSeconds(sceneDurations[i] ?? 6, 6);
+        const frames = Math.round(dur * fps);
+
         return (
-          <Sequence key={`wc-audio-${i}`} from={startFrame} durationInFrames={durationFrames}>
-            <Audio src={audioUrl} volume={1} />
-          </Sequence>
-        );
-      })}
-
-      {userRecordedVoice && (brollAudioUrls ?? []).map((raw, i) => {
-        if (!raw) return null;
-        const startFrame     = sceneStartFrames[i] ?? 0;
-        const durationFrames = Math.round((sceneDurations?.[i] ?? 6) * fps);
-        const { url, startFrom, endAt } = parseBrollAudio(raw);
-        return (
-          <Sequence key={`broll-audio-${i}`} from={startFrame} durationInFrames={durationFrames}>
-            <Audio
-              src={url}
-              volume={1}
-              startFrom={startFrom}
-              endAt={endAt}
+          <Sequence key={i} from={startFrames[i]} durationInFrames={frames}>
+            <SceneInner
+              segment={seg}
+              sceneIndex={i}
+              videoUrl={sceneVideos[i] ?? null}
+              imageUrl={sceneImages[i] ?? null}
+              durationFrames={frames}
+              accentColor={accentColor}
+              isWebcam={sceneIsWebcam[i] ?? false}
+              overlays={uploadedOverlaysByScene[i]}
+              sceneAudioUrl={sceneAudioUrls[i]}
+              brollAudioUrl={brollAudioUrls[i]}
             />
           </Sequence>
         );
       })}
 
-      {/* Legacy audioPath fallback */}
-      {!musicUrl && !voiceUrl && audioPath && <Audio src={audioPath} volume={1} />}
-
-      {/* ── Video scenes ──────────────────────────────────────────────────── */}
-      <Series>
-        {segments.map((segment, i) => {
-          const dSecs   = sceneDurations?.[i] ?? segment.durationSeconds;
-          const dFrames = Math.max(1, Math.round(dSecs * fps));
-          return (
-            <Series.Sequence key={i} durationInFrames={dFrames}>
-              <AdScene
-                segment={segment}
-                sceneIndex={i}
-                overlays={uploadedOverlaysByScene?.[i]}
-                uploadedSceneMedia={uploadedSceneMedia}
-                videoUrl={sceneVideos[i] ?? null}
-                imageUrl={sceneImages[i] ?? null}
-                shapes={sceneShapes[i] ?? []}
-                campaignData={sceneCampaignData?.[i] ?? campaignData}
-                sceneCampaignDataItem={sceneCampaignData?.[i]}
-                accentColor={accentColor}
-                companyName={companyName}
-                isWebcam={sceneIsWebcam[i] ?? false}
-                styleDNA={styleDNA}
-                speechMarkers={sceneSpeechMarkers?.[i] ?? []}
-              />
-            </Series.Sequence>
-          );
-        })}
-      </Series>
     </AbsoluteFill>
   );
 };
-function safeNum(value: any, defaultValue: number): number {
-  if (typeof value === 'number' && isFinite(value)) {
-    return value;
-  }
-  return defaultValue;
-}

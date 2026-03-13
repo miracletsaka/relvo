@@ -7,12 +7,26 @@ import { Textarea } from "@/components/ui/textarea";
 import { TemplateShape, CampaignData } from "@/lib/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { Separator } from "@/components/ui/separator";
-import { ExternalLink, RotateCw } from "lucide-react";
+import { ExternalLink, RotateCw, Type, Square, Image, Minus, AlignLeft, Layers, Sliders } from "lucide-react";
 
-// ✅ FIXED: Proper font options
 const FONT_OPTIONS = [
-  // Sans-serif / UI
+  { label: "Bebas Neue", value: "Bebas Neue" },
+  { label: "Anton", value: "Anton" },
+  { label: "Oswald", value: "Oswald" },
+  { label: "Impact", value: "Impact" },
+  { label: "Barlow Condensed", value: "Barlow Condensed" },
+  { label: "Black Han Sans", value: "Black Han Sans" },
+  { label: "Rajdhani", value: "Rajdhani" },
+  { label: "Montserrat", value: "Montserrat" },
+  { label: "Poppins", value: "Poppins" },
+  { label: "Inter", value: "Inter" },
+  { label: "DM Sans", value: "DM Sans" },
+  { label: "Outfit", value: "Outfit" },
+  { label: "Lato", value: "Lato" },
+  { label: "Nunito", value: "Nunito" },
+  { label: "Raleway", value: "Raleway" },
+  { label: "Open Sans", value: "Open Sans" },
+  { label: "Roboto", value: "Roboto" },
   { label: "Arial", value: "Arial" },
   { label: "Arial Black", value: "Arial Black" },
   { label: "Verdana", value: "Verdana" },
@@ -23,45 +37,19 @@ const FONT_OPTIONS = [
   { label: "Gill Sans", value: "Gill Sans" },
   { label: "Century Gothic", value: "Century Gothic" },
   { label: "Futura", value: "Futura" },
-  // Serif / Editorial / Blog
   { label: "Times New Roman", value: "Times New Roman" },
   { label: "Georgia", value: "Georgia" },
-  { label: "Palatino", value: "Palatino" },
   { label: "Garamond", value: "Garamond" },
-  { label: "Book Antiqua", value: "Book Antiqua" },
   { label: "Baskerville", value: "Baskerville" },
-  // Display / Marketing / Impact
-  { label: "Impact", value: "Impact" },
-  { label: "Oswald", value: "Oswald" },
-  { label: "Anton", value: "Anton" },
-  { label: "Bebas Neue", value: "Bebas Neue" },
-  { label: "Rajdhani", value: "Rajdhani" },
-  { label: "Barlow Condensed", value: "Barlow Condensed" },
-  { label: "Black Han Sans", value: "Black Han Sans" },
-  // E-commerce / Modern
-  { label: "Montserrat", value: "Montserrat" },
-  { label: "Poppins", value: "Poppins" },
-  { label: "Lato", value: "Lato" },
-  { label: "Nunito", value: "Nunito" },
-  { label: "Raleway", value: "Raleway" },
-  { label: "Open Sans", value: "Open Sans" },
-  { label: "Roboto", value: "Roboto" },
-  { label: "Inter", value: "Inter" },
-  { label: "DM Sans", value: "DM Sans" },
-  { label: "Outfit", value: "Outfit" },
-  // Elegant / Luxury
   { label: "Playfair Display", value: "Playfair Display" },
   { label: "Cormorant Garamond", value: "Cormorant Garamond" },
+  { label: "Cinzel", value: "Cinzel" },
   { label: "Libre Baskerville", value: "Libre Baskerville" },
   { label: "EB Garamond", value: "EB Garamond" },
-  { label: "Cinzel", value: "Cinzel" },
-  // Friendly / Creative
-  { label: "Nunito Sans", value: "Nunito Sans" },
-  { label: "Quicksand", value: "Quicksand" },
-  { label: "Comic Sans MS", value: "Comic Sans MS" },
   { label: "Pacifico", value: "Pacifico" },
   { label: "Lobster", value: "Lobster" },
-  // Monospace
+  { label: "Quicksand", value: "Quicksand" },
+  { label: "Comic Sans MS", value: "Comic Sans MS" },
   { label: "Courier New", value: "Courier New" },
   { label: "Inconsolata", value: "Inconsolata" },
 ];
@@ -72,6 +60,171 @@ interface PropertyInspectorProps {
   onUpdate: (shape: TemplateShape) => void;
 }
 
+// ── Shared primitives ─────────────────────────────────────────────────────────
+
+function SectionLabel({ icon, children }: { icon?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-2 pt-1 pb-0.5">
+      {icon && <span className="text-[#4ade80] opacity-80">{icon}</span>}
+      <span
+        style={{
+          fontFamily: "'Bebas Neue', Impact, sans-serif",
+          fontSize: 11,
+          letterSpacing: "0.18em",
+          color: "#4ade80",
+          textTransform: "uppercase" as const,
+          opacity: 0.9,
+        }}
+      >
+        {children}
+      </span>
+      <div className="flex-1 h-px bg-gradient-to-r from-[#1e5f3b]/60 to-transparent ml-1" />
+    </div>
+  );
+}
+
+function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span
+        style={{
+          fontFamily: "monospace",
+          fontSize: 10,
+          color: "#6b7280",
+          textTransform: "uppercase" as const,
+          letterSpacing: "0.06em",
+          minWidth: 56,
+          flexShrink: 0,
+        }}
+      >
+        {label}
+      </span>
+      <div className="flex-1">{children}</div>
+    </div>
+  );
+}
+
+function StyledInput(props: React.InputHTMLAttributes<HTMLInputElement> & { onChange?: any }) {
+  return (
+    <input
+      {...props}
+      style={{
+        width: "100%",
+        background: "rgba(255,255,255,0.04)",
+        border: "1px solid rgba(255,255,255,0.08)",
+        borderRadius: 4,
+        color: "#e5e7eb",
+        fontSize: 12,
+        padding: "4px 8px",
+        height: 28,
+        outline: "none",
+        fontFamily: "monospace",
+        transition: "border-color 0.15s",
+        ...props.style,
+      }}
+      onFocus={(e) => {
+        e.currentTarget.style.borderColor = "#1e5f3b";
+        props.onFocus?.(e);
+      }}
+      onBlur={(e) => {
+        e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)";
+        props.onBlur?.(e);
+      }}
+    />
+  );
+}
+
+function StyledSelect({
+  value,
+  onValueChange,
+  children,
+}: {
+  value: string;
+  onValueChange: (v: string) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <Select value={value} onValueChange={onValueChange}>
+      <SelectTrigger
+        style={{
+          width: "100%",
+          background: "rgba(255,255,255,0.04)",
+          border: "1px solid rgba(255,255,255,0.08)",
+          borderRadius: 4,
+          color: "#e5e7eb",
+          fontSize: 12,
+          height: 28,
+          fontFamily: "monospace",
+        }}
+      >
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent
+        style={{
+          background: "#111",
+          border: "1px solid rgba(255,255,255,0.1)",
+          borderRadius: 6,
+          color: "#e5e7eb",
+          fontSize: 12,
+        }}
+      >
+        {children}
+      </SelectContent>
+    </Select>
+  );
+}
+
+function ColorField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <FieldRow label={label}>
+      <div className="flex gap-2 items-center">
+        <div
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: 4,
+            border: "2px solid rgba(255,255,255,0.12)",
+            background: value,
+            flexShrink: 0,
+            position: "relative",
+            overflow: "hidden",
+            cursor: "pointer",
+          }}
+        >
+          <input
+            type="color"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            style={{
+              position: "absolute",
+              inset: 0,
+              opacity: 0,
+              cursor: "pointer",
+              width: "100%",
+              height: "100%",
+            }}
+          />
+        </div>
+        <StyledInput
+          value={value}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => onChange(e.target.value)}
+          style={{ fontFamily: "monospace", fontSize: 11 }}
+        />
+      </div>
+    </FieldRow>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
 export default function PropertyInspector({
   shape,
   campaignData,
@@ -79,11 +232,11 @@ export default function PropertyInspector({
 }: PropertyInspectorProps) {
   if (!shape) return null;
 
-  const isText = shape.type === "text";
-  const isButton = shape.type === "button";
+  const isText        = shape.type === "text";
+  const isButton      = shape.type === "button";
   const isBulletGroup = shape.type === "bullet-group";
-  const isImage = shape.type === "image";
-  const isLine = shape.type === "line";
+  const isImage       = shape.type === "image";
+  const isLine        = shape.type === "line";
 
   const hasGeometryFill =
     shape.type === "rectangle" ||
@@ -104,543 +257,504 @@ export default function PropertyInspector({
     return Array.isArray(d) && d.length ? "dashed" : "solid";
   })();
 
+  const shapeIcon =
+    isText ? <Type size={11} /> :
+    isImage ? <Image size={11} /> :
+    isLine ? <Minus size={11} /> :
+    <Square size={11} />;
+
   return (
-    <Card className="p-4 border-border">
-      <h3 className="text-sm font-semibold text-foreground mb-3">Properties</h3>
+    <div
+      style={{
+        background: "linear-gradient(160deg, #0a0f0a 0%, #0d1410 50%, #0a0a0a 100%)",
+        border: "1px solid rgba(30,95,59,0.35)",
+        borderRadius: 10,
+        padding: "14px 14px 18px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 14,
+        boxShadow: "0 0 0 1px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.03)",
+        fontFamily: "monospace",
+      }}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div
+            style={{
+              width: 24,
+              height: 24,
+              borderRadius: 5,
+              background: "rgba(30,95,59,0.25)",
+              border: "1px solid rgba(30,95,59,0.5)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#4ade80",
+            }}
+          >
+            {shapeIcon}
+          </div>
+          <span
+            style={{
+              fontFamily: "'Bebas Neue', Impact, sans-serif",
+              fontSize: 13,
+              letterSpacing: "0.22em",
+              color: "#f3f4f6",
+              textTransform: "uppercase" as const,
+            }}
+          >
+            {shape.type.replace("-", " ")}
+          </span>
+        </div>
+        <div
+          style={{
+            fontSize: 9,
+            fontFamily: "monospace",
+            color: "rgba(30,95,59,0.7)",
+            letterSpacing: "0.1em",
+            border: "1px solid rgba(30,95,59,0.25)",
+            borderRadius: 3,
+            padding: "1px 6px",
+          }}
+        >
+          PROPERTIES
+        </div>
+      </div>
 
-      <div className="space-y-3">
-        {/* Position & Size */}
+      {/* ── GEOMETRY ──────────────────────────────────────────────────────── */}
+      <div className="flex flex-col gap-2">
+        <SectionLabel icon={<Sliders size={10} />}>Geometry</SectionLabel>
         <div className="grid grid-cols-2 gap-2">
-          <div className="space-y-1">
-            <Label className="text-xs">X</Label>
-            <Input
-              type="number"
-              value={Math.round(shape.x)}
-              onChange={(e) => handleChange({ x: parseFloat(e.target.value) })}
-              className="h-7 text-xs"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Y</Label>
-            <Input
-              type="number"
-              value={Math.round(shape.y)}
-              onChange={(e) => handleChange({ y: parseFloat(e.target.value) })}
-              className="h-7 text-xs"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Width</Label>
-            <Input
-              type="number"
-              value={Math.round(shape.width)}
-              onChange={(e) => handleChange({ width: parseFloat(e.target.value) })}
-              className="h-7 text-xs"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Height</Label>
-            <Input
-              type="number"
-              value={Math.round(shape.height)}
-              onChange={(e) => handleChange({ height: parseFloat(e.target.value) })}
-              className="h-7 text-xs"
-            />
-          </div>
-        </div>
-
-        {/* ✅ NEW: ROTATION (for all shapes) */}
-        <div className="space-y-1">
-          <Label className="text-xs flex items-center gap-1">
-            <RotateCw className="w-3 h-3" />
-            Rotation: {shape.rotation || 0}°
-          </Label>
-          <Slider
-            value={[shape.rotation || 0]}
-            onValueChange={([v]) => handleChange({ rotation: v })}
-            min={0}
-            max={360}
-            step={1}
-            className="py-2"
-          />
-          <div className="flex gap-1">
-            <button
-              onClick={() => handleChange({ rotation: 0 })}
-              className="text-[10px] px-2 py-0.5 border rounded hover:bg-gray-50"
-            >
-              0°
-            </button>
-            <button
-              onClick={() => handleChange({ rotation: 45 })}
-              className="text-[10px] px-2 py-0.5 border rounded hover:bg-gray-50"
-            >
-              45°
-            </button>
-            <button
-              onClick={() => handleChange({ rotation: 90 })}
-              className="text-[10px] px-2 py-0.5 border rounded hover:bg-gray-50"
-            >
-              90°
-            </button>
-            <button
-              onClick={() => handleChange({ rotation: 180 })}
-              className="text-[10px] px-2 py-0.5 border rounded hover:bg-gray-50"
-            >
-              180°
-            </button>
-            <button
-              onClick={() => handleChange({ rotation: 270 })}
-              className="text-[10px] px-2 py-0.5 border rounded hover:bg-gray-50"
-            >
-              270°
-            </button>
-          </div>
-        </div>
-
-        <Separator />
-
-        {/* LINE-SPECIFIC */}
-        {isLine && (
-          <>
-            <div className="space-y-1">
-              <Label className="text-xs">Line Thickness</Label>
-              <Input
+          {(["x","y","width","height"] as const).map((field) => (
+            <FieldRow key={field} label={field.toUpperCase()}>
+              <StyledInput
                 type="number"
-                value={(shape as any).lineWidth ?? 6}
-                onChange={(e) => handleChange({ lineWidth: parseInt(e.target.value || "0", 10) } as any)}
-                className="h-7 text-xs"
-                min={1}
-                max={80}
-              />
-            </div>
-
-            <div className="space-y-1">
-              <Label className="text-xs">Line Style</Label>
-              <Select
-                value={dashMode}
-                onValueChange={(v) =>
-                  handleChange({
-                    lineDash: v === "dashed" ? [12, 10] : [],
-                  } as any)
+                value={Math.round((shape as any)[field])}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  handleChange({ [field]: parseFloat(e.target.value) })
                 }
-              >
-                <SelectTrigger className="h-7 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="solid">Solid</SelectItem>
-                  <SelectItem value="dashed">Dashed</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1">
-              <Label className="text-xs">Line Cap</Label>
-              <Select
-                value={(shape as any).lineCap ?? "round"}
-                onValueChange={(v) => handleChange({ lineCap: v } as any)}
-              >
-                <SelectTrigger className="h-7 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="round">Round</SelectItem>
-                  <SelectItem value="butt">Butt</SelectItem>
-                  <SelectItem value="square">Square</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <Separator />
-          </>
-        )}
-
-        {/* BUTTON-SPECIFIC */}
-        {isButton && (
-          <>
-            <div className="space-y-1">
-              <Label className="text-xs">Button Text</Label>
-              <Input
-                value={(shape as any).buttonText || ""}
-                onChange={(e) => handleChange({ buttonText: e.target.value } as any)}
-                className="h-7 text-xs"
-                placeholder="Click Here"
               />
-            </div>
-
-            <div className="space-y-1">
-              <Label className="text-xs flex items-center gap-1">
-                <ExternalLink className="w-3 h-3" />
-                Button Link (URL)
-              </Label>
-              <Input
-                value={(shape as any).buttonLink || ""}
-                onChange={(e) => handleChange({ buttonLink: e.target.value } as any)}
-                className="h-7 text-xs"
-                placeholder="https://example.com"
-              />
-            </div>
-
-            <Separator />
-          </>
-        )}
-
-        {/* Text/Button/Bullets Font Properties */}
-        {(isText || isButton || isBulletGroup) && (
-          <>
-            {/* ✅ FIXED: Font Family dropdown with simple values */}
-            <div className="space-y-1">
-              <Label className="text-xs">Font Family</Label>
-              <Select
-                value={shape.fontFamily || "Arial"}
-                onValueChange={(v) => handleChange({ fontFamily: v })}
-              >
-                <SelectTrigger className="h-7 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {FONT_OPTIONS.map((f) => (
-                    <SelectItem key={f.value} value={f.value}>
-                      {f.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1">
-              <Label className="text-xs">Font Size</Label>
-              <Input
-                type="number"
-                value={shape.fontSize || 16}
-                onChange={(e) => handleChange({ fontSize: parseInt(e.target.value) })}
-                className="h-7 text-xs"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <Label className="text-xs">Text Transform</Label>
-              <Select
-                value={(shape as any).textTransform || "none"}
-                onValueChange={(v) => handleChange({ textTransform: v } as any)}
-              >
-                <SelectTrigger className="h-7 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None (as typed)</SelectItem>
-                  <SelectItem value="uppercase">UPPERCASE</SelectItem>
-                  <SelectItem value="lowercase">lowercase</SelectItem>
-                  <SelectItem value="capitalize">Capitalize Each Word</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1">
-              <Label className="text-xs">Text Color</Label>
-              <div className="flex gap-2">
-                <Input
-                  type="color"
-                  value={shape.textColor || "#000000"}
-                  onChange={(e) => handleChange({ textColor: e.target.value })}
-                  className="h-7 w-12 p-1"
-                />
-                <Input
-                  value={shape.textColor || "#000000"}
-                  onChange={(e) => handleChange({ textColor: e.target.value })}
-                  className="h-7 text-xs flex-1"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <Label className="text-xs">Font Weight</Label>
-              <Select
-                value={String(shape.fontWeight || 400)}
-                onValueChange={(v) => handleChange({ fontWeight: parseInt(v) })}
-              >
-                <SelectTrigger className="h-7 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="300">Light (300)</SelectItem>
-                  <SelectItem value="400">Regular (400)</SelectItem>
-                  <SelectItem value="600">Semibold (600)</SelectItem>
-                  <SelectItem value="700">Bold (700)</SelectItem>
-                  <SelectItem value="900">Black (900)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {!isBulletGroup && (
-              <div className="space-y-1">
-                <Label className="text-xs">Text Align</Label>
-                <Select
-                  value={shape.textAlign || "left"}
-                  onValueChange={(v: any) => handleChange({ textAlign: v })}
-                >
-                  <SelectTrigger className="h-7 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="left">Left</SelectItem>
-                    <SelectItem value="center">Center</SelectItem>
-                    <SelectItem value="right">Right</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            <Separator />
-          </>
-        )}
-
-        {/* ✅ NEW: Data Source OR Custom Text (for text shapes) */}
-        {isText && (
-          <>
-            <div className="space-y-1">
-              <Label className="text-xs">Text Mode</Label>
-              <Select
-                value={shape.dataField ? "dynamic" : "custom"}
-                onValueChange={(v) => {
-                  if (v === "custom") {
-                    // Switch to custom text mode
-                    handleChange({ 
-                      dataField: undefined,
-                      customText: shape.customText || "Enter your text"
-                    });
-                  } else {
-                    // Switch to dynamic mode
-                    handleChange({ 
-                      dataField: "hook",
-                      customText: undefined
-                    });
-                  }
-                }}
-              >
-                <SelectTrigger className="h-7 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="dynamic">Dynamic (from campaign data)</SelectItem>
-                  <SelectItem value="custom">Custom (fixed text)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Show data source selector if dynamic */}
-            {shape.dataField && (
-              <div className="space-y-1">
-                <Label className="text-xs">Data Source</Label>
-                <Select
-                  value={shape.dataField}
-                  onValueChange={(v) => handleChange({ dataField: v })}
-                >
-                  <SelectTrigger className="h-7 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="hook">Hook</SelectItem>
-                    <SelectItem value="subheading">Subheading</SelectItem>
-                    <SelectItem value="proof">Proof</SelectItem>
-                    <SelectItem value="cta">CTA</SelectItem>
-                    <SelectItem value="hashtags">Hashtags</SelectItem>
-                    <SelectItem value="companyName">Company Name</SelectItem>
-                    <SelectItem value="location">Location</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {/* Show custom text input if custom mode */}
-            {!shape.dataField && (
-              <div className="space-y-1">
-                <Label className="text-xs">Custom Text</Label>
-                <Textarea
-                  value={shape.customText || ""}
-                  onChange={(e) => handleChange({ customText: e.target.value })}
-                  className="text-xs min-h-[60px]"
-                  placeholder="Enter your text here..."
-                />
-              </div>
-            )}
-
-            <Separator />
-          </>
-        )}
-
-        {/* Geometry Fill Colors */}
-        {hasGeometryFill && (
-          <>
-            <div className="space-y-1">
-              <Label className="text-xs">Background Color</Label>
-              <div className="flex gap-2">
-                <Input
-                  type="color"
-                  value={shape.backgroundColor || "#ffffff"}
-                  onChange={(e) => handleChange({ backgroundColor: e.target.value })}
-                  className="h-7 w-12 p-1"
-                />
-                <Input
-                  value={shape.backgroundColor || "#ffffff"}
-                  onChange={(e) => handleChange({ backgroundColor: e.target.value })}
-                  className="h-7 text-xs flex-1"
-                />
-              </div>
-            </div>
-
-            <Separator />
-          </>
-        )}
-
-        {/* Border / Stroke Controls */}
-        {hasBorderControls && (
-          <>
-            <div className="space-y-1">
-              <Label className="text-xs">{isLine ? "Line Color" : "Border Color"}</Label>
-              <div className="flex gap-2">
-                <Input
-                  type="color"
-                  value={shape.borderColor || "#000000"}
-                  onChange={(e) => handleChange({ borderColor: e.target.value })}
-                  className="h-7 w-12 p-1"
-                />
-                <Input
-                  value={shape.borderColor || "#000000"}
-                  onChange={(e) => handleChange({ borderColor: e.target.value })}
-                  className="h-7 text-xs flex-1"
-                />
-              </div>
-            </div>
-
-            {!isLine && (
-              <div className="space-y-1">
-                <Label className="text-xs">Border Width</Label>
-                <Input
-                  type="number"
-                  value={shape.borderWidth || 0}
-                  onChange={(e) => handleChange({ borderWidth: parseInt(e.target.value) })}
-                  className="h-7 text-xs"
-                />
-              </div>
-            )}
-
-            {(shape.type === "rounded-rect" || isButton) && (
-              <div className="space-y-1">
-                <Label className="text-xs">Border Radius</Label>
-                <Input
-                  type="number"
-                  value={shape.borderRadius || 8}
-                  onChange={(e) => handleChange({ borderRadius: parseInt(e.target.value) })}
-                  className="h-7 text-xs"
-                />
-              </div>
-            )}
-
-            <Separator />
-          </>
-        )}
-
-        {/* Image Properties */}
-        {isImage && (
-          <>
-            <div className="space-y-1">
-              <Label className="text-xs">Image URL</Label>
-              <Input
-                value={(shape as any).src || ""}
-                onChange={(e) => handleChange({ src: e.target.value } as any)}
-                className="h-7 text-xs"
-                placeholder="https://example.com/image.jpg"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <Label className="text-xs">Fit Mode</Label>
-              <Select
-                value={(shape as any).fit || "cover"}
-                onValueChange={(v: any) => handleChange({ fit: v })}
-              >
-                <SelectTrigger className="h-7 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cover">Cover (fill)</SelectItem>
-                  <SelectItem value="contain">Contain (fit)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1">
-              <Label className="text-xs">Corner Radius</Label>
-              <Input
-                type="number"
-                value={(shape as any).radius || 0}
-                onChange={(e) => handleChange({ radius: parseInt(e.target.value) } as any)}
-                className="h-7 text-xs"
-              />
-            </div>
-
-            <Separator />
-          </>
-        )}
-
-        {/* Opacity */}
-        <div className="space-y-1">
-          <Label className="text-xs">Opacity: {Math.round((shape.opacity || 1) * 100)}%</Label>
-          <Slider
-            value={[(shape.opacity || 1) * 100]}
-            onValueChange={([v]) => handleChange({ opacity: v / 100 })}
-            min={0}
-            max={100}
-            step={5}
-            className="py-2"
-          />
+            </FieldRow>
+          ))}
         </div>
 
-        {/* Shadow */}
-        <Separator />
-        <div className="space-y-2">
-          <Label className="text-xs font-semibold">Shadow</Label>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-1">
-              <Label className="text-[10px] text-muted-foreground">Blur</Label>
-              <Input
-                type="number"
-                value={shape.shadowBlur || 0}
-                onChange={(e) => handleChange({ shadowBlur: parseInt(e.target.value) })}
-                className="h-7 text-xs"
+        {/* Rotation */}
+        <FieldRow label="ROTATE">
+          <div className="flex items-center gap-2">
+            <div className="flex-1">
+              <Slider
+                value={[shape.rotation || 0]}
+                onValueChange={([v]) => handleChange({ rotation: v })}
+                min={0}
+                max={360}
+                step={1}
+                className="py-1"
               />
             </div>
-            <div className="space-y-1">
-              <Label className="text-[10px] text-muted-foreground">Color</Label>
-              <Input
+            <span style={{ fontSize: 11, color: "#9ca3af", minWidth: 36, textAlign: "right" }}>
+              {shape.rotation || 0}°
+            </span>
+          </div>
+        </FieldRow>
+        <div className="flex gap-1 flex-wrap">
+          {[0, 45, 90, 180, 270].map((deg) => (
+            <button
+              key={deg}
+              onClick={() => handleChange({ rotation: deg })}
+              style={{
+                fontSize: 10,
+                padding: "2px 8px",
+                borderRadius: 3,
+                border: `1px solid ${shape.rotation === deg ? "rgba(30,95,59,0.8)" : "rgba(255,255,255,0.08)"}`,
+                background: shape.rotation === deg ? "rgba(30,95,59,0.25)" : "transparent",
+                color: shape.rotation === deg ? "#4ade80" : "#6b7280",
+                cursor: "pointer",
+                fontFamily: "monospace",
+                transition: "all 0.12s",
+              }}
+            >
+              {deg}°
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── LINE ──────────────────────────────────────────────────────────── */}
+      {isLine && (
+        <div className="flex flex-col gap-2">
+          <SectionLabel icon={<Minus size={10} />}>Line</SectionLabel>
+          <FieldRow label="THICK">
+            <StyledInput
+              type="number"
+              value={(shape as any).lineWidth ?? 6}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                handleChange({ lineWidth: parseInt(e.target.value || "0", 10) } as any)
+              }
+              min={1}
+              max={80}
+            />
+          </FieldRow>
+          <FieldRow label="STYLE">
+            <StyledSelect
+              value={dashMode}
+              onValueChange={(v) =>
+                handleChange({ lineDash: v === "dashed" ? [12, 10] : [] } as any)
+              }
+            >
+              <SelectItem value="solid">Solid</SelectItem>
+              <SelectItem value="dashed">Dashed</SelectItem>
+            </StyledSelect>
+          </FieldRow>
+          <FieldRow label="CAP">
+            <StyledSelect
+              value={(shape as any).lineCap ?? "round"}
+              onValueChange={(v) => handleChange({ lineCap: v } as any)}
+            >
+              <SelectItem value="round">Round</SelectItem>
+              <SelectItem value="butt">Butt</SelectItem>
+              <SelectItem value="square">Square</SelectItem>
+            </StyledSelect>
+          </FieldRow>
+        </div>
+      )}
+
+      {/* ── BUTTON ────────────────────────────────────────────────────────── */}
+      {isButton && (
+        <div className="flex flex-col gap-2">
+          <SectionLabel icon={<Square size={10} />}>Button</SectionLabel>
+          <FieldRow label="TEXT">
+            <StyledInput
+              value={(shape as any).buttonText || ""}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                handleChange({ buttonText: e.target.value } as any)
+              }
+              placeholder="Click Here"
+            />
+          </FieldRow>
+          <FieldRow label="LINK">
+            <StyledInput
+              value={(shape as any).buttonLink || ""}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                handleChange({ buttonLink: e.target.value } as any)
+              }
+              placeholder="https://example.com"
+            />
+          </FieldRow>
+        </div>
+      )}
+
+      {/* ── TYPOGRAPHY ────────────────────────────────────────────────────── */}
+      {(isText || isButton || isBulletGroup) && (
+        <div className="flex flex-col gap-2">
+          <SectionLabel icon={<Type size={10} />}>Typography</SectionLabel>
+
+          <FieldRow label="FONT">
+            <StyledSelect
+              value={shape.fontFamily || "Bebas Neue"}
+              onValueChange={(v) => handleChange({ fontFamily: v })}
+            >
+              {FONT_OPTIONS.map((f) => (
+                <SelectItem key={f.value} value={f.value}>
+                  {f.label}
+                </SelectItem>
+              ))}
+            </StyledSelect>
+          </FieldRow>
+
+          <FieldRow label="SIZE">
+            <StyledInput
+              type="number"
+              value={shape.fontSize ?? 300}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                handleChange({ fontSize: parseInt(e.target.value) })
+              }
+            />
+          </FieldRow>
+
+          <FieldRow label="WEIGHT">
+            <StyledSelect
+              value={String(shape.fontWeight || 400)}
+              onValueChange={(v) => handleChange({ fontWeight: parseInt(v) })}
+            >
+              <SelectItem value="300">Light (300)</SelectItem>
+              <SelectItem value="400">Regular (400)</SelectItem>
+              <SelectItem value="600">Semibold (600)</SelectItem>
+              <SelectItem value="700">Bold (700)</SelectItem>
+              <SelectItem value="900">Black (900)</SelectItem>
+            </StyledSelect>
+          </FieldRow>
+
+          <FieldRow label="CASE">
+            <StyledSelect
+              value={(shape as any).textTransform || "none"}
+              onValueChange={(v) => handleChange({ textTransform: v } as any)}
+            >
+              <SelectItem value="none">None</SelectItem>
+              <SelectItem value="uppercase">UPPERCASE</SelectItem>
+              <SelectItem value="lowercase">lowercase</SelectItem>
+              <SelectItem value="capitalize">Capitalize</SelectItem>
+            </StyledSelect>
+          </FieldRow>
+
+          {!isBulletGroup && (
+            <FieldRow label="ALIGN">
+              <StyledSelect
+                value={shape.textAlign || "left"}
+                onValueChange={(v: any) => handleChange({ textAlign: v })}
+              >
+                <SelectItem value="left">Left</SelectItem>
+                <SelectItem value="center">Center</SelectItem>
+                <SelectItem value="right">Right</SelectItem>
+              </StyledSelect>
+            </FieldRow>
+          )}
+
+          <ColorField
+            label="COLOR"
+            value={shape.textColor || "#1e5f3b"}
+            onChange={(v) => handleChange({ textColor: v })}
+          />
+        </div>
+      )}
+
+      {/* ── TEXT CONTENT ──────────────────────────────────────────────────── */}
+      {isText && (
+        <div className="flex flex-col gap-2">
+          <SectionLabel icon={<AlignLeft size={10} />}>Content</SectionLabel>
+
+          <FieldRow label="MODE">
+            <StyledSelect
+              value={shape.dataField ? "dynamic" : "custom"}
+              onValueChange={(v) => {
+                if (v === "custom") {
+                  handleChange({ dataField: undefined, customText: shape.customText || "Enter your text" });
+                } else {
+                  handleChange({ dataField: "hook", customText: undefined });
+                }
+              }}
+            >
+              <SelectItem value="dynamic">Dynamic</SelectItem>
+              <SelectItem value="custom">Custom</SelectItem>
+            </StyledSelect>
+          </FieldRow>
+
+          {shape.dataField && (
+            <FieldRow label="SOURCE">
+              <StyledSelect
+                value={shape.dataField}
+                onValueChange={(v) => handleChange({ dataField: v })}
+              >
+                <SelectItem value="hook">Hook</SelectItem>
+                <SelectItem value="subheading">Subheading</SelectItem>
+                <SelectItem value="proof">Proof</SelectItem>
+                <SelectItem value="cta">CTA</SelectItem>
+                <SelectItem value="hashtags">Hashtags</SelectItem>
+                <SelectItem value="companyName">Company Name</SelectItem>
+                <SelectItem value="location">Location</SelectItem>
+              </StyledSelect>
+            </FieldRow>
+          )}
+
+          {!shape.dataField && (
+            <textarea
+              value={shape.customText || ""}
+              onChange={(e) => handleChange({ customText: e.target.value })}
+              placeholder="Enter your text here..."
+              rows={3}
+              style={{
+                width: "100%",
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 4,
+                color: "#e5e7eb",
+                fontSize: 12,
+                padding: "6px 8px",
+                resize: "vertical",
+                outline: "none",
+                fontFamily: "monospace",
+                lineHeight: 1.5,
+              }}
+              onFocus={(e) => { e.currentTarget.style.borderColor = "#1e5f3b"; }}
+              onBlur={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"; }}
+            />
+          )}
+        </div>
+      )}
+
+      {/* ── FILL ──────────────────────────────────────────────────────────── */}
+      {hasGeometryFill && (
+        <div className="flex flex-col gap-2">
+          <SectionLabel icon={<Square size={10} />}>Fill</SectionLabel>
+          <ColorField
+            label="BG"
+            value={shape.backgroundColor || "#ffffff"}
+            onChange={(v) => handleChange({ backgroundColor: v })}
+          />
+        </div>
+      )}
+
+      {/* ── BORDER ────────────────────────────────────────────────────────── */}
+      {hasBorderControls && (
+        <div className="flex flex-col gap-2">
+          <SectionLabel>Border</SectionLabel>
+          <ColorField
+            label={isLine ? "COLOR" : "COLOR"}
+            value={shape.borderColor || "#000000"}
+            onChange={(v) => handleChange({ borderColor: v })}
+          />
+          {!isLine && (
+            <FieldRow label="WIDTH">
+              <StyledInput
+                type="number"
+                value={shape.borderWidth || 0}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  handleChange({ borderWidth: parseInt(e.target.value) })
+                }
+              />
+            </FieldRow>
+          )}
+          {(shape.type === "rounded-rect" || isButton) && (
+            <FieldRow label="RADIUS">
+              <StyledInput
+                type="number"
+                value={shape.borderRadius || 8}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  handleChange({ borderRadius: parseInt(e.target.value) })
+                }
+              />
+            </FieldRow>
+          )}
+        </div>
+      )}
+
+      {/* ── IMAGE ─────────────────────────────────────────────────────────── */}
+      {isImage && (
+        <div className="flex flex-col gap-2">
+          <SectionLabel icon={<Image size={10} />}>Image</SectionLabel>
+          <FieldRow label="SRC">
+            <StyledInput
+              value={(shape as any).src || ""}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                handleChange({ src: e.target.value } as any)
+              }
+              placeholder="https://..."
+            />
+          </FieldRow>
+          <FieldRow label="FIT">
+            <StyledSelect
+              value={(shape as any).fit || "cover"}
+              onValueChange={(v: any) => handleChange({ fit: v })}
+            >
+              <SelectItem value="cover">Cover</SelectItem>
+              <SelectItem value="contain">Contain</SelectItem>
+            </StyledSelect>
+          </FieldRow>
+          <FieldRow label="RADIUS">
+            <StyledInput
+              type="number"
+              value={(shape as any).radius || 0}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                handleChange({ radius: parseInt(e.target.value) } as any)
+              }
+            />
+          </FieldRow>
+        </div>
+      )}
+
+      {/* ── APPEARANCE ────────────────────────────────────────────────────── */}
+      <div className="flex flex-col gap-2">
+        <SectionLabel icon={<Layers size={10} />}>Appearance</SectionLabel>
+
+        <FieldRow label="OPACITY">
+          <div className="flex items-center gap-2">
+            <div className="flex-1">
+              <Slider
+                value={[(shape.opacity ?? 1) * 100]}
+                onValueChange={([v]) => handleChange({ opacity: v / 100 })}
+                min={0}
+                max={100}
+                step={1}
+                className="py-1"
+              />
+            </div>
+            <span style={{ fontSize: 11, color: "#9ca3af", minWidth: 36, textAlign: "right" }}>
+              {Math.round((shape.opacity ?? 1) * 100)}%
+            </span>
+          </div>
+        </FieldRow>
+      </div>
+
+      {/* ── SHADOW ────────────────────────────────────────────────────────── */}
+      <div className="flex flex-col gap-2">
+        <SectionLabel>Shadow</SectionLabel>
+        <div className="grid grid-cols-2 gap-2">
+          <FieldRow label="BLUR">
+            <StyledInput
+              type="number"
+              value={shape.shadowBlur || 0}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                handleChange({ shadowBlur: parseInt(e.target.value) })
+              }
+            />
+          </FieldRow>
+          <FieldRow label="X">
+            <StyledInput
+              type="number"
+              value={shape.shadowX || 0}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                handleChange({ shadowX: parseInt(e.target.value) })
+              }
+            />
+          </FieldRow>
+          <FieldRow label="Y">
+            <StyledInput
+              type="number"
+              value={shape.shadowY || 0}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                handleChange({ shadowY: parseInt(e.target.value) })
+              }
+            />
+          </FieldRow>
+          <FieldRow label="CLR">
+            <div
+              style={{
+                width: "100%",
+                height: 28,
+                borderRadius: 4,
+                border: "1px solid rgba(255,255,255,0.08)",
+                background: shape.shadowColor || "#000000",
+                position: "relative",
+                overflow: "hidden",
+                cursor: "pointer",
+              }}
+            >
+              <input
                 type="color"
                 value={shape.shadowColor || "#000000"}
                 onChange={(e) => handleChange({ shadowColor: e.target.value })}
-                className="h-7 w-full p-1"
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  opacity: 0,
+                  cursor: "pointer",
+                  width: "100%",
+                  height: "100%",
+                }}
               />
             </div>
-            <div className="space-y-1">
-              <Label className="text-[10px] text-muted-foreground">Offset X</Label>
-              <Input
-                type="number"
-                value={shape.shadowX || 0}
-                onChange={(e) => handleChange({ shadowX: parseInt(e.target.value) })}
-                className="h-7 text-xs"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-[10px] text-muted-foreground">Offset Y</Label>
-              <Input
-                type="number"
-                value={shape.shadowY || 0}
-                onChange={(e) => handleChange({ shadowY: parseInt(e.target.value) })}
-                className="h-7 text-xs"
-              />
-            </div>
-          </div>
+          </FieldRow>
         </div>
       </div>
-    </Card>
+
+      {/* Footer accent */}
+      <div
+        style={{
+          height: 1,
+          background: "linear-gradient(90deg, rgba(30,95,59,0.6) 0%, rgba(30,95,59,0.1) 60%, transparent 100%)",
+          marginTop: 2,
+        }}
+      />
+    </div>
   );
 }

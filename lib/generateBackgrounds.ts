@@ -53,20 +53,48 @@ export async function generateBackgrounds(
     const basePrompt = String(prompt ?? "").trim();
 
     const enhancedPrompt =
-    `example of the outcome design: Soft light grey studio background, professional product photography lighting, 
-    shallow depth of field, clean minimal commercial aesthetic, 
-    scattered fresh olive branches and small green leaves naturally arranged, 
-    warm golden hour side lighting casting soft shadows, 
-    top-down and slight angle mixed perspective, 
-    empty center space for product placement, 
-    high-end beauty brand photography style, 
-    no text, no people, photorealistic, 4:5 portrait. NO PEOPLE, No distructions to the text.` +
-      `Dark green and black futuristic software development company ads background inspired by the glassmorphism + 3D illustration aesthetic. ` +
-      `with glowing emerald gradient, soft vignette lighting, smooth layered rounded shapes, abstract glassmorphism panels, subtle spotlight glow in center, ` +
-      `premium tech advertisement background, modern automation software branding, minimal noise, high depth, soft reflections, clean negative space for UI mockup, ` +
-      `professional marketing poster background, cinematic composition, 3D lighting effect, background only, no text, no devices, no icons ` +
-      `on ${basePrompt}, flat graphic design, background only, no text, no objects, no phone, empty center space, minimal design, no illustration style, no cartoon, ` +
-      `solid colors only, clean minimal commercial advertisement background, professional social media post style, portrait orientation`;
+    `Create a high-quality advertising image for a technology automation service.
+
+    The image should visually represent the main message from the marketing content below.
+
+    STYLE:
+    Photorealistic marketing ad, modern SaaS aesthetic, professional lighting, sharp focus, cinematic quality.
+
+    SCENE RULES:
+    • Use ONE clear subject only (either a real human using a smartphone or a phone showing the software interface).
+    • The subject should demonstrate the product benefit visually.
+    leave a space above or below to i can add text later, but do not include text in the image itself.
+    • The phone screen should display a realistic UI related to the service.
+    • The person should be smiling or engaged with the phone.
+
+    BACKGROUND:
+    • Dark textured background (charcoal, dark green, or black grain texture).
+    • Subtle lighting glow behind the subject.
+    • Clean, premium SaaS advertisement style.
+    leave a space above or below to i can add text later, but do not include text in the image itself.
+
+    LAYOUT:
+    • Vertical social media ad format (1080x1350).
+    • Leave clear space at the top and bottom for marketing text.
+    • Minimal clutter.
+
+    VISUAL ELEMENTS:
+    • Smartphone showing chatbot, booking system, or automation dashboard.
+    • Subtle floating icons related to automation (chat bubbles, calendar booking, AI assistant, phone calls).
+    • Professional marketing style similar to SaaS ads.
+    NO TEXT IN IMAGE ITSELF, but design with space for text overlay.
+
+    TEXT STYLE:
+    • Large bold headline area at the top
+    • Supporting text area near bottom
+    • Bright accent colors (green, yellow, white)
+
+    IMPORTANT:
+    No brand logos, no watermarks, no stock photo text artifacts.
+    No text
+
+    Marketing Content:
+    ${basePrompt}`;
 
     return enhancedPrompt;
   });

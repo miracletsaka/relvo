@@ -527,6 +527,10 @@ export async function publishViaMake(draft_ids: string[]) {
   });
 }
 
+export async function deleteDraft(draftId: string): Promise<void> {
+  await api(`/drafts/${draftId}`, { method: "DELETE" });
+}
+
 export async function markPublished(content_item_ids: string[], published_url?: string) {
   return api<{
     published: number;
@@ -767,7 +771,7 @@ export function bulkApprove(ids: string[]) {
 }
 
 export function bulkReject(ids: string[], reason?: string) {
-  return api<{ rejected: number }>("/approvals/reject", {
+  return api<{ rejected: number }>("/drafts/bulk-reject", {
     method: "POST",
     body: JSON.stringify({ content_item_ids: ids, reason }),
   });
