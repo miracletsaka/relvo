@@ -13,6 +13,7 @@ import { attachMediaToContentItem } from "@/lib/api";
 import type { CampaignData, TemplateShape } from "@/lib/types";
 import { getTemplates } from "@/lib/template-storage";
 import { Check, X, Sparkles, ChevronRight, Image as ImageIcon, AlertCircle, Play, SkipForward } from "lucide-react";
+import { listMediaAssets } from "@/lib/studio/media-asset-api";
 
 type StepStatus = "queued" | "running" | "done" | "failed" | "skipped";
 type DraftRow = { draft: any; status: StepStatus; message?: string; imageUrl?: string | null; };
@@ -41,9 +42,10 @@ export default function AutoGenerateImagesDialog(props: {
   drafts: any[];
   chat: any | null;
   autoStart?: boolean;
+  brandId:string;
   onFinished?: () => Promise<void> | void;
 }) {
-  const { open, onOpenChange, drafts, chat, autoStart, onFinished } = props;
+  const { open, onOpenChange, drafts, chat, autoStart, brandId, onFinished } = props;
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const [rows, setRows] = useState<DraftRow[]>([]);
@@ -56,10 +58,19 @@ export default function AutoGenerateImagesDialog(props: {
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const backgrounds = useMemo(() =>
-    Array.isArray(chat?.background_images) ? chat.background_images.filter(Boolean) : [],
-    [chat]
-  );
+  const [backgrounds, setBackgrounds] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!brandId) return;
+    (async () => {
+      try {
+        const assets = await listMediaAssets({ type: "image", brand_id: brandId });
+        setBackgrounds(assets.map(a => a.url).filter(Boolean));
+      } catch (e) {
+        console.warn("[backgrounds] fetch failed:", e);
+      }
+    })();
+  }, [brandId]);
 
   useEffect(() => {
     if (!open) return;

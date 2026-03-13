@@ -872,6 +872,7 @@ export default function TopicChatDetailPage() {
       />
 
       <AutoGenerateImagesDialog
+        brandId={chat?.brand_id}
         open={regenImgTarget !== null}
         onOpenChange={(o) => { if (!o) setRegenImgTarget(null); }}
         drafts={autoGenDrafts}

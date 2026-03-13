@@ -24,15 +24,6 @@ import { getTemplates } from "@/lib/template-storage";
 import DashboardOverview from "@/components/DashboardOverview";
 import AutoGenerateImagesDialog from "@/components/AutoGenerateImagesDialog";
 
-// ---- helpers ----
-function postsInMonth(targetMonth: string, postsPerWeek: number) {
-  const [yStr, mStr] = targetMonth.split("-");
-  const y = Number(yStr);
-  const m = Number(mStr);
-  const days = new Date(y, m, 0).getDate();
-  const weeks = Math.ceil(days / 7);
-  return Math.max(1, weeks * Math.max(1, postsPerWeek));
-}
 
 type Draft = {
   id: string;
@@ -486,13 +477,6 @@ export default function TopicsPage() {
     [topicsText]
   );
 
-  const plannedPerTopic = useMemo(() => {
-    if (!monthlyMode) return 1;
-    return postsInMonth(targetMonth, postsPerWeek);
-  }, [monthlyMode, targetMonth, postsPerWeek]);
-
-  const totalGenerate = topics.length * plannedPerTopic;
-
   const validate = (): string | null => {
     if (!brandId)           return "Please select a brand.";
     if (topics.length === 0) return "Enter at least 1 topic (one per line).";
@@ -576,7 +560,6 @@ export default function TopicsPage() {
             brand_profile_summary: p?.profile_summary ?? undefined,
             brand_profile_json:   p?.profile_json ?? undefined,
             client_now:           clientNow,
-            timezone:             tz,
             posting_hour_local:   9,
           },
           (id) => { result.topic_chat_id = id; }
@@ -594,8 +577,6 @@ export default function TopicsPage() {
         }
       } catch (e: any) {
         result.status = "failed";
-        result.failed = plannedPerTopic;
-        totalFail    += plannedPerTopic;
         setStatusMsg({ type: "err", text: `"${topic}": ${e?.message ?? "generation failed"}` });
       }
 
@@ -710,12 +691,6 @@ export default function TopicsPage() {
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2M9 5h6"/></svg>
                   {topics.length} topic{topics.length !== 1 ? "s" : ""}
                 </span>
-                {topics.length > 0 && monthlyMode && (
-                  <span className="stat-chip">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                    {totalGenerate} drafts
-                  </span>
-                )}
               </div>
             </div>
 
@@ -832,7 +807,6 @@ export default function TopicsPage() {
               ["Topics",         topics.length],
               ["Target month",   targetMonth],
               ["Posts / week",   postsPerWeek],
-              ["Planned drafts", `${totalGenerate} (${plannedPerTopic} per topic)`],
               ["Images",         skipImages ? "Skipped" : templates.length > 0 ? `Auto — ${templates.length} template${templates.length !== 1 ? "s" : ""} — starts after all drafts saved` : "No templates — will skip"],
             ].map(([k, v]) => (
               <div key={String(k)} className="flex gap-2">
@@ -854,7 +828,6 @@ export default function TopicsPage() {
                 {topics.map((t) => (
                   <tr key={t} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
                     <td className="p-2.5" style={{ color: "rgba(255,255,255,0.7)" }}>{t}</td>
-                    <td className="p-2.5" style={{ color: "rgba(255,255,255,0.5)" }}>{plannedPerTopic}</td>
                     <td className="p-2.5">
                       {skipImages || !templates.length
                         ? <span style={{ color: "rgba(255,255,255,0.3)", fontSize: 11 }}>—</span>
@@ -875,6 +848,7 @@ export default function TopicsPage() {
       {/* ── Auto Image Generation Dialog ── */}
       <AutoGenerateImagesDialog
         open={autoGenOpen}
+        brandId={brandId}
         onOpenChange={(o) => {
           if (!o) { setAutoGenOpen(false); setAutoGenDrafts([]); setAutoStart(false); }
         }}

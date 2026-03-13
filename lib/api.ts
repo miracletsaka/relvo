@@ -393,7 +393,6 @@ export type TopicChatCreatePayload = {
   brand_profile_summary?: string;
   brand_profile_json?: any;
   client_now?: string;        // ISO from browser
-  timezone?: string;          // "Europe/London"
   posting_hour_local?: number; // 9
   // Optional: if you allow user to choose which platform pages are active later (Option A doesn’t need it)
 };
