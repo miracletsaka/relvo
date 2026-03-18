@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { registerUser, listUsers, type UserRow } from "@/lib/api";
-import { RefreshCcw, Plus, Users, Check, AlertTriangle, Mail, ShieldCheck, ShieldOff, X, UserCircle2 } from "lucide-react";
+import { registerUser, listUsers, deleteUser, type UserRow } from "@/lib/api";
+import { RefreshCcw, Plus, Users, Check, AlertTriangle, Mail, ShieldCheck, ShieldOff, X, UserCircle2, Trash2 } from "lucide-react";
 
 function fmtDate(iso?: string | null) {
   if (!iso) return "—";
@@ -106,11 +106,12 @@ export default function UsersPage() {
         .usr-card { background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; padding: 13px 15px; display: flex; align-items: center; gap: 12px; transition: border-color 0.18s; }
         .usr-card:hover { border-color: rgba(255,255,255,0.12); }
         .usr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px,1fr)); gap: 8px; }
+        @media (max-width: 500px) { .usr-grid { grid-template-columns: 1fr; } .usr-root { padding: 16px 12px; } }
       `}</style>
 
       <div className="usr-root">
 
-        {/* ── Header ── */}
+        {/* Header */}
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
           <div>
             <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(124,58,237,0.7)", marginBottom: 4, fontFamily: "DM Mono, monospace" }}>
@@ -133,7 +134,7 @@ export default function UsersPage() {
           </div>
         </div>
 
-        {/* ── Invite form ── */}
+        {/* Invite form */}
         {showForm && (
           <div className="usr-fade" style={{ background: "rgba(124,58,237,0.07)", border: "1px solid rgba(124,58,237,0.2)", borderRadius: 18, padding: "20px 22px", marginBottom: 24 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: "#c4b5fd", marginBottom: 14 }}>Invite New User</div>
@@ -165,7 +166,7 @@ export default function UsersPage() {
           </div>
         )}
 
-        {/* ── Global toast ── */}
+        {/* Toast */}
         {msg && (
           <div className="usr-fade" style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, marginBottom: 20, fontSize: 12, fontWeight: 700, background: msg.type === "ok" ? "rgba(52,211,153,0.1)" : "rgba(239,68,68,0.1)", border: `1px solid ${msg.type === "ok" ? "rgba(52,211,153,0.25)" : "rgba(239,68,68,0.22)"}`, color: msg.type === "ok" ? "#34d399" : "#f87171" }}>
             {msg.type === "ok" ? <Check style={{ width: 13, height: 13, flexShrink: 0 }} /> : <AlertTriangle style={{ width: 13, height: 13, flexShrink: 0 }} />}
@@ -174,7 +175,7 @@ export default function UsersPage() {
           </div>
         )}
 
-        {/* ── User lists ── */}
+        {/* User lists */}
         {loading && users.length === 0 ? (
           <div className="usr-grid">
             {Array.from({ length: 4 }).map((_, i) => (
@@ -193,7 +194,7 @@ export default function UsersPage() {
               <section style={{ marginBottom: 28 }}>
                 <div className="usr-section-label">Verified · {verified.length}</div>
                 <div className="usr-grid">
-                  {verified.map((u, i) => <UserCard key={u.id} u={u} idx={i} />)}
+                  {verified.map((u, i) => <UserCard key={u.id} u={u} idx={i} onDelete={() => refresh(true)} />)}
                 </div>
               </section>
             )}
@@ -201,7 +202,7 @@ export default function UsersPage() {
               <section>
                 <div className="usr-section-label">Pending Verification · {unverified.length}</div>
                 <div className="usr-grid">
-                  {unverified.map((u, i) => <UserCard key={u.id} u={u} idx={i} />)}
+                  {unverified.map((u, i) => <UserCard key={u.id} u={u} idx={i} onDelete={() => refresh(true)} />)}
                 </div>
               </section>
             )}
@@ -212,12 +213,28 @@ export default function UsersPage() {
   );
 }
 
-function UserCard({ u, idx }: { u: UserRow; idx: number }) {
+function UserCard({ u, idx, onDelete }: { u: UserRow; idx: number; onDelete: () => void }) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting]           = useState(false);
+  const [err, setErr]                     = useState<string | null>(null);
+
   const isVerified = u.is_email_verified;
   const isActive   = u.is_active;
 
+  const handleDelete = async () => {
+    setDeleting(true); setErr(null);
+    try {
+      await deleteUser(u.id);
+      onDelete();
+    } catch (e: any) {
+      setErr(e.message || "Failed to delete user");
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
+  };
+
   return (
-    <div className="usr-card usr-fade" style={{ animationDelay: `${idx * 0.035}s` }}>
+    <div className="usr-card usr-fade" style={{ animationDelay: `${idx * 0.035}s`, flexWrap: "wrap", gap: 10 }}>
       <UserAvatar email={u.email} size={36} />
 
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -227,6 +244,7 @@ function UserCard({ u, idx }: { u: UserRow; idx: number }) {
         <div style={{ fontSize: 9, color: "rgba(255,255,255,0.2)", fontFamily: "DM Mono, monospace", marginTop: 2 }}>
           joined {fmtDate(u.created_at)}
         </div>
+        {err && <div style={{ fontSize: 9, color: "#f87171", fontFamily: "DM Mono, monospace", marginTop: 3 }}>{err}</div>}
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
@@ -238,6 +256,39 @@ function UserCard({ u, idx }: { u: UserRow; idx: number }) {
 
         {/* Active dot */}
         <span style={{ width: 7, height: 7, borderRadius: "50%", background: isActive ? "#34d399" : "rgba(255,255,255,0.12)", flexShrink: 0, boxShadow: isActive ? "0 0 6px #34d39988" : "none" }} title={isActive ? "Active" : "Inactive"} />
+
+        {/* Delete */}
+        {!confirmDelete ? (
+          <button
+            onClick={() => setConfirmDelete(true)}
+            title="Delete user"
+            style={{ background: "none", border: "none", cursor: "pointer", padding: 3, display: "flex", color: "rgba(255,255,255,0.18)", transition: "color 0.15s" }}
+            onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = "#f87171"}
+            onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.18)"}
+          >
+            <Trash2 style={{ width: 13, height: 13 }} />
+          </button>
+        ) : (
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              style={{ display: "flex", alignItems: "center", gap: 4, padding: "3px 8px", background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.35)", borderRadius: 7, color: "#f87171", fontSize: 10, fontWeight: 700, cursor: deleting ? "not-allowed" : "pointer", fontFamily: "Syne, sans-serif" }}
+            >
+              {deleting
+                ? <span style={{ width: 9, height: 9, border: "2px solid rgba(255,255,255,0.2)", borderTopColor: "#f87171", borderRadius: "50%", display: "inline-block", animation: "usrspin 0.6s linear infinite" }} />
+                : <Check style={{ width: 9, height: 9 }} />
+              }
+              Yes
+            </button>
+            <button
+              onClick={() => setConfirmDelete(false)}
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, color: "rgba(255,255,255,0.35)", cursor: "pointer" }}
+            >
+              <X style={{ width: 9, height: 9 }} />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

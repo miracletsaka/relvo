@@ -2,14 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  createBrand, listBrands, updateBrand,
+  createBrand, listBrands, updateBrand, deleteBrand,
   getBrandProfile, startBrandScrape,
   type Brand, type BrandProfile,
 } from "@/lib/api";
 import {
   RefreshCcw, Plus, Building2, ToggleLeft, ToggleRight,
   AlertTriangle, Check, Globe, Wand2, ChevronDown, ChevronUp,
-  Clock, X,
+  Clock, X, Trash2,
 } from "lucide-react";
 
 /* ─── Helpers ─────────────────────────────────── */
@@ -50,8 +50,8 @@ function BrandAvatar({ id, size = 36 }: { id: string; size?: number }) {
 }
 
 /* ─── Brand Card ─────────────────────────────── */
-function BrandCard({ b, onToggle, toggling }: {
-  b: Brand; onToggle: (b: Brand) => void; toggling: boolean;
+function BrandCard({ b, onToggle, toggling, onDelete }: {
+  b: Brand; onToggle: (b: Brand) => void; toggling: boolean; onDelete: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [profile, setProfile] = useState<BrandProfile | null>(null);
@@ -59,6 +59,8 @@ function BrandCard({ b, onToggle, toggling }: {
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [scraping, setScraping] = useState(false);
   const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const hue = Array.from(b.id).reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
   const accentColor = `hsl(${hue},55%,60%)`;
@@ -107,13 +109,25 @@ function BrandCard({ b, onToggle, toggling }: {
 
   const cfg = scfg(profile?.status);
 
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await deleteBrand(b.id);
+      onDelete();
+    } catch (e: any) {
+      setMsg({ type: "err", text: e.message || "Failed to delete brand" });
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
+  };
+
   return (
     <div style={{
       background: "rgba(255,255,255,0.025)",
       border: `1px solid ${expanded ? accentColor + "30" : "rgba(255,255,255,0.07)"}`,
       borderRadius: 16, overflow: "hidden", transition: "border-color 0.2s",
     }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px" }}>
+      <div className="brand-card-header">
         <BrandAvatar id={b.id} size={38} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: b.is_active ? "#e4e4e7" : "rgba(255,255,255,0.3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -129,25 +143,60 @@ function BrandCard({ b, onToggle, toggling }: {
           </div>
         </div>
 
-        <button
-          onClick={() => onToggle(b)} disabled={toggling}
-          style={{ background: "none", border: "none", cursor: toggling ? "not-allowed" : "pointer", padding: 0, display: "flex", opacity: toggling ? 0.4 : 1 }}
-          title={b.is_active ? "Disable" : "Enable"}
-        >
-          {b.is_active
-            ? <ToggleRight style={{ width: 26, height: 26, color: "#34d399" }} />
-            : <ToggleLeft  style={{ width: 26, height: 26, color: "rgba(255,255,255,0.18)" }} />
-          }
-        </button>
+        <div className="brand-card-actions">
+          <button
+            onClick={() => onToggle(b)} disabled={toggling}
+            style={{ background: "none", border: "none", cursor: toggling ? "not-allowed" : "pointer", padding: 0, display: "flex", opacity: toggling ? 0.4 : 1 }}
+            title={b.is_active ? "Disable" : "Enable"}
+          >
+            {b.is_active
+              ? <ToggleRight style={{ width: 24, height: 24, color: "#34d399" }} />
+              : <ToggleLeft  style={{ width: 24, height: 24, color: "rgba(255,255,255,0.18)" }} />
+            }
+          </button>
 
-        <button
-          onClick={handleExpand}
-          style={{ background: expanded ? accentColor + "18" : "rgba(255,255,255,0.05)", border: `1px solid ${expanded ? accentColor + "35" : "rgba(255,255,255,0.09)"}`, borderRadius: 9, padding: "6px 10px", cursor: "pointer", color: expanded ? accentColor : "rgba(255,255,255,0.4)", display: "flex", alignItems: "center", gap: 5, fontSize: 10, fontWeight: 700, fontFamily: "Syne, sans-serif", transition: "all 0.15s" }}
-        >
-          <Globe style={{ width: 11, height: 11 }} />
-          Profile
-          {expanded ? <ChevronUp style={{ width: 10, height: 10 }} /> : <ChevronDown style={{ width: 10, height: 10 }} />}
-        </button>
+          {/* Delete button with confirm */}
+          {!confirmDelete ? (
+            <button
+              onClick={() => setConfirmDelete(true)}
+              title="Delete brand"
+              style={{ background: "none", border: "none", cursor: "pointer", padding: 4, display: "flex", color: "rgba(255,255,255,0.2)", transition: "color 0.15s" }}
+              onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = "#f87171"}
+              onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.2)"}
+            >
+              <Trash2 style={{ width: 13, height: 13 }} />
+            </button>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 8px", background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.35)", borderRadius: 7, color: "#f87171", fontSize: 10, fontWeight: 700, cursor: deleting ? "not-allowed" : "pointer", fontFamily: "Syne, sans-serif" }}
+              >
+                {deleting
+                  ? <span style={{ width: 10, height: 10, border: "2px solid rgba(255,255,255,0.2)", borderTopColor: "#f87171", borderRadius: "50%", display: "inline-block", animation: "brandspin 0.6s linear infinite" }} />
+                  : <Check style={{ width: 10, height: 10 }} />
+                }
+                Yes
+              </button>
+              <button
+                onClick={() => setConfirmDelete(false)}
+                style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, color: "rgba(255,255,255,0.4)", cursor: "pointer" }}
+              >
+                <X style={{ width: 10, height: 10 }} />
+              </button>
+            </div>
+          )}
+
+          <button
+            onClick={handleExpand}
+            style={{ background: expanded ? accentColor + "18" : "rgba(255,255,255,0.05)", border: `1px solid ${expanded ? accentColor + "35" : "rgba(255,255,255,0.09)"}`, borderRadius: 9, padding: "6px 8px", cursor: "pointer", color: expanded ? accentColor : "rgba(255,255,255,0.4)", display: "flex", alignItems: "center", gap: 4, fontSize: 10, fontWeight: 700, fontFamily: "Syne, sans-serif", transition: "all 0.15s", whiteSpace: "nowrap" }}
+          >
+            <Globe style={{ width: 11, height: 11, flexShrink: 0 }} />
+            <span className="brand-profile-label">Profile</span>
+            {expanded ? <ChevronUp style={{ width: 10, height: 10 }} /> : <ChevronDown style={{ width: 10, height: 10 }} />}
+          </button>
+        </div>
       </div>
 
       {expanded && (
@@ -159,8 +208,8 @@ function BrandCard({ b, onToggle, toggling }: {
             </div>
           ) : (
             <>
-              <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
-                <div style={{ flex: 1, minWidth: 200 }}>
+              <div className="brand-scrape-row" style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(255,255,255,0.25)", fontFamily: "DM Mono, monospace", display: "block", marginBottom: 6 }}>Website URL</span>
                   <input
                     className="brand-input"
@@ -288,7 +337,7 @@ export default function BrandsPage() {
     <>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Mono:wght@400;500&display=swap');
-        .brands-root { font-family: 'Syne', sans-serif; background: #0c0c0f; min-height: 100vh; color: #e4e4e7; padding: 28px 24px; }
+        .brands-root { font-family: 'Syne', sans-serif; background: #0c0c0f; min-height: 100vh; color: #e4e4e7; padding: 20px 14px; }
         .brands-root * { box-sizing: border-box; }
         @keyframes brandspin { to { transform: rotate(360deg); } }
         @keyframes brandFade { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
@@ -304,8 +353,21 @@ export default function BrandsPage() {
         .brand-btn-outline:hover:not(:disabled) { background: rgba(255,255,255,0.09); color: #e4e4e7; }
         .brand-btn:disabled { opacity: 0.4; cursor: not-allowed; }
         .brand-section-label { font-size: 9px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(255,255,255,0.22); font-family: 'DM Mono', monospace; margin-bottom: 10px; }
-        .brand-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px,1fr)); gap: 10px; }
-        @media (max-width: 500px) { .brand-grid { grid-template-columns: 1fr; } }
+        .brand-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px,1fr)); gap: 10px; }
+        /* Card header */
+        .brand-card-header { display: flex; align-items: center; gap: 10px; padding: 12px 14px; min-width: 0; overflow: hidden; }
+        .brand-card-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; margin-left: auto; }
+        /* Profile button label — hidden on mobile */
+        .brand-profile-label { display: inline; }
+        /* Scraper URL row */
+        .brand-scrape-row { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
+        .brand-scrape-row > div:first-child { flex: 1; min-width: 0; }
+        @media (max-width: 640px) {
+          .brand-grid { grid-template-columns: 1fr; }
+          .brands-root { padding: 16px 10px; }
+          .brand-card-header { gap: 8px; padding: 10px 12px; }
+          .brand-profile-label { display: none; }
+        }
       `}</style>
 
       <div className="brands-root">
@@ -431,7 +493,7 @@ export default function BrandsPage() {
                 <div className="brand-grid">
                   {active.map((b, i) => (
                     <div key={b.id} className="brand-fade" style={{ animationDelay: `${i * 0.04}s` }}>
-                      <BrandCard b={b} onToggle={toggleActive} toggling={toggling === b.id} />
+                      <BrandCard b={b} onToggle={toggleActive} toggling={toggling === b.id} onDelete={() => refresh(true)} />
                     </div>
                   ))}
                 </div>
@@ -444,7 +506,7 @@ export default function BrandsPage() {
                 <div className="brand-grid">
                   {inactive.map((b, i) => (
                     <div key={b.id} className="brand-fade" style={{ animationDelay: `${i * 0.04}s` }}>
-                      <BrandCard b={b} onToggle={toggleActive} toggling={toggling === b.id} />
+                      <BrandCard b={b} onToggle={toggleActive} toggling={toggling === b.id} onDelete={() => refresh(true)} />
                     </div>
                   ))}
                 </div>

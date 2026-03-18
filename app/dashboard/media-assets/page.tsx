@@ -442,6 +442,8 @@ export default function MediaAssetsPage() {
   const [uploading,       setUploading]       = useState(false)
   const [uploadBrandId,   setUploadBrandId]   = useState<string>('')
   const [uploadBrandName, setUploadBrandName] = useState<string>('')
+  // ── RESPONSIVE: which panel is visible on mobile ──────────────────────────
+  const [mobileTab, setMobileTab] = useState<'upload' | 'library'>('library')
 
   const refresh = async () => {
     setLoading(true); setErr(null)
@@ -467,6 +469,7 @@ export default function MediaAssetsPage() {
       tags:       [],
     }))
     setQueue((prev) => [...prev, ...items])
+    setMobileTab('upload') // auto-switch to upload tab on mobile when files added
   }
 
   const updateQueueItem = (id: string, patch: Partial<QueueItem>) =>
@@ -567,6 +570,49 @@ export default function MediaAssetsPage() {
           padding: 60px 20px; gap: 10px; color: rgba(255,255,255,0.15);
           border: 2px dashed rgba(255,255,255,0.07); border-radius: 16px;
         }
+
+        /* ── RESPONSIVE ADDITIONS (only new CSS below) ── */
+
+        /* Mobile tab bar — hidden on desktop */
+        .ma-main-grid { display: grid; grid-template-columns: 320px 1fr; gap: 20px; align-items: start; }
+        .ma-mobile-tabs {
+          display: none;
+          border-bottom: 1px solid rgba(255,255,255,0.06);
+          margin-bottom: 16px;
+        }
+        .ma-mobile-tab-btn {
+          flex: 1; padding: 11px 8px;
+          font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 700;
+          border: none; background: none; cursor: pointer;
+          color: rgba(255,255,255,0.35);
+          border-bottom: 2px solid transparent;
+          transition: all 0.15s;
+          display: flex; align-items: center; justify-content: center; gap: 6px;
+        }
+        .ma-mobile-tab-btn.active { color: #e4e4e7; border-bottom-color: #7c3aed; }
+
+        @media (max-width: 768px) {
+          /* Show mobile tab bar */
+        .ma-mobile-tabs { display: flex; }
+
+          /* Stack the two-column grid */
+          .ma-main-grid { grid-template-columns: 1fr !important; }
+
+          /* Upload panel: un-stick it (sticky inside a stacked layout breaks scroll) */
+          .ma-upload-col { position: static !important; }
+
+          /* Hide inactive panel */
+          .ma-upload-col.mobile-hidden { display: none !important; }
+          .ma-library-col.mobile-hidden { display: none !important; }
+
+          /* Asset grid: 2 columns on mobile */
+          .ma-asset-grid { grid-template-columns: repeat(2, 1fr) !important; }
+        }
+
+        @media (max-width: 380px) {
+          /* Very small phones: single column */
+          .ma-asset-grid { grid-template-columns: 1fr !important; }
+        }
       `}</style>
 
       <div className="ma-root">
@@ -631,10 +677,43 @@ export default function MediaAssetsPage() {
             </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 20, alignItems: 'start' }}>
+          {/* ── MOBILE TAB BAR (hidden on desktop via CSS) ── */}
+          <div className="ma-mobile-tabs">
+            <button
+              className={`ma-mobile-tab-btn ${mobileTab === 'library' ? 'active' : ''}`}
+              onClick={() => setMobileTab('library')}
+            >
+              <ImageIcon style={{ width: 13, height: 13 }} />
+              Library
+              <span style={{ background: 'rgba(124,58,237,0.2)', borderRadius: 8, padding: '1px 6px', fontSize: 9, fontFamily: 'DM Mono, monospace' }}>
+                {filteredAssets.length}
+              </span>
+            </button>
+            <button
+              className={`ma-mobile-tab-btn ${mobileTab === 'upload' ? 'active' : ''}`}
+              onClick={() => setMobileTab('upload')}
+            >
+              <Upload style={{ width: 13, height: 13 }} />
+              Upload
+              {queue.length > 0 && (
+                <span style={{ background: '#7c3aed', color: 'white', borderRadius: 8, padding: '1px 6px', fontSize: 9, fontFamily: 'DM Mono, monospace' }}>
+                  {queue.length}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* ── MAIN GRID: 320px left + flex right on desktop, stacked on mobile ── */}
+          <div
+            className="ma-main-grid"
+            style={{ display: 'grid', gap: 20, alignItems: 'start' }}
+          >
 
             {/* ── LEFT: Upload panel ── */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, position: 'sticky', top: 20 }}>
+            <div
+              className={`ma-upload-col${mobileTab === 'library' ? ' mobile-hidden' : ''}`}
+              style={{ display: 'flex', flexDirection: 'column', gap: 12, position: 'sticky', top: 20 }}
+            >
               <div style={{
                 background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)',
                 borderRadius: 16, overflow: 'hidden',
@@ -743,7 +822,10 @@ export default function MediaAssetsPage() {
             </div>
 
             {/* ── RIGHT: Library ── */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div
+              className={`ma-library-col${mobileTab === 'upload' ? ' mobile-hidden' : ''}`}
+              style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
+            >
               {/* Controls */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', gap: 6 }}>
@@ -791,7 +873,7 @@ export default function MediaAssetsPage() {
 
               {/* Grid */}
               {loading ? (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
+                <div className="ma-asset-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
                   {Array.from({ length: 8 }).map((_, i) => (
                     <div key={i} className="ma-skeleton" style={{ height: 180, animationDelay: `${i * 0.07}s` }} />
                   ))}
@@ -811,7 +893,7 @@ export default function MediaAssetsPage() {
                   </p>
                 </div>
               ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
+                <div className="ma-asset-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
                   {filteredAssets.map((asset) => (
                     <AssetCard key={asset.id} asset={asset} onDelete={refresh} />
                   ))}

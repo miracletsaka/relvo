@@ -222,6 +222,17 @@ export function synthesizeAndSaveTemplate(payload?: {
   });
 }
 
+export async function deleteBrand(brandId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/brands/${brandId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    let msg = `Failed to delete brand (${res.status})`;
+    try { const j = await res.json(); msg = j?.detail || j?.message || msg; } catch {}
+    throw new Error(msg);
+  }
+}
+ 
 export function synthesizeTemplate() {
   return api<{ ok: boolean; template?: any; error?: string; used_templates?: string[] }>(
     "/templates/synthesize",
@@ -610,6 +621,18 @@ export async function retryFailed(content_item_ids: string[]) {
   });
 }
 
+export async function deleteUser(userId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/auth/users/${userId}`, {
+    method: "DELETE",
+    credentials: "include", // sends session cookie
+  });
+  if (!res.ok) {
+    let msg = `Failed to delete user (${res.status})`;
+    try { const j = await res.json(); msg = j?.detail || j?.message || msg; } catch {}
+    throw new Error(msg);
+  }
+}
+ 
 /* =========================
    ✅ CONTENT LISTS
    ========================= */
