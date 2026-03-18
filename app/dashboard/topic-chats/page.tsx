@@ -7,9 +7,9 @@ import {
   RefreshCcw, Search, X, ChevronRight, Image as ImageIcon,
   Clock, CheckCircle2, XCircle, Calendar, Layers, ArrowUpRight,
   MessageCircle, SlidersHorizontal, Play, Eye, AlertTriangle,
-  CheckCheck, Filter,
+  CheckCheck, Filter, Trash2,
 } from "lucide-react";
-import { listTopicChats, listTopicChatDrafts } from "@/lib/api";
+import { listTopicChats, listTopicChatDrafts, deleteTopicChat } from "@/lib/api";
 
 /* ─── Types ─────────────────────────────────────────────────── */
 type Chat = {
@@ -83,14 +83,97 @@ const STATUS_CFG: Record<string, { color: string; label: string; icon: React.Rea
 };
 function scfg(s: string) { return STATUS_CFG[s.toUpperCase()] ?? { color: "#6b7280", label: s, icon: null }; }
 
+/* ─── DeleteConfirmModal ─────────────────────────────────────── */
+function DeleteConfirmModal({
+  chat,
+  draftCount,
+  onConfirm,
+  onCancel,
+  deleting,
+}: {
+  chat: Chat;
+  draftCount: number;
+  onConfirm: () => void;
+  onCancel: () => void;
+  deleting: boolean;
+}) {
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 9999,
+      background: "rgba(0,0,0,0.7)", backdropFilter: "blur(6px)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      padding: 20,
+    }}>
+      <div style={{
+        background: "#141418", border: "1px solid rgba(248,113,113,0.25)",
+        borderRadius: 18, padding: "28px 28px 24px", maxWidth: 400, width: "100%",
+        boxShadow: "0 24px 60px rgba(0,0,0,0.6)",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(248,113,113,0.12)", border: "1px solid rgba(248,113,113,0.25)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <Trash2 style={{ width: 16, height: 16, color: "#f87171" }} />
+          </div>
+          <h3 style={{ fontSize: 15, fontWeight: 800, color: "#e4e4e7", margin: 0, fontFamily: "Syne, sans-serif" }}>
+            Delete campaign?
+          </h3>
+        </div>
+
+        <p style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", lineHeight: 1.6, margin: "0 0 8px" }}>
+          This will permanently delete:
+        </p>
+        <div style={{ background: "rgba(255,255,255,0.04)", borderRadius: 10, padding: "10px 14px", marginBottom: 20, border: "1px solid rgba(255,255,255,0.07)" }}>
+          <p style={{ fontSize: 12, fontWeight: 700, color: "#e4e4e7", margin: "0 0 4px" }}>
+            {chat.topic || "Untitled topic"}
+          </p>
+          <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", margin: 0, fontFamily: "DM Mono, monospace" }}>
+            {draftCount} draft{draftCount !== 1 ? "s" : ""} · {chat.brand_id} · {chat.target_month}
+          </p>
+        </div>
+
+        <p style={{ fontSize: 11, color: "#f87171", margin: "0 0 20px", fontWeight: 600 }}>
+          This action cannot be undone.
+        </p>
+
+        <div style={{ display: "flex", gap: 10 }}>
+          <button
+            onClick={onCancel}
+            disabled={deleting}
+            style={{ flex: 1, padding: "10px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 11, color: "rgba(255,255,255,0.55)", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "Syne, sans-serif" }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={deleting}
+            style={{ flex: 1, padding: "10px", background: deleting ? "rgba(248,113,113,0.08)" : "rgba(248,113,113,0.15)", border: "1px solid rgba(248,113,113,0.35)", borderRadius: 11, color: deleting ? "rgba(248,113,113,0.4)" : "#f87171", fontSize: 12, fontWeight: 700, cursor: deleting ? "not-allowed" : "pointer", fontFamily: "Syne, sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+          >
+            {deleting ? (
+              <>
+                <span style={{ width: 12, height: 12, border: "2px solid rgba(248,113,113,0.2)", borderTopColor: "#f87171", borderRadius: "50%", animation: "tcspin 0.7s linear infinite", display: "inline-block" }} />
+                Deleting…
+              </>
+            ) : (
+              <>
+                <Trash2 style={{ width: 12, height: 12 }} />
+                Delete
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─── ChatCard ───────────────────────────────────────────────── */
 function ChatCard({
-  chat, drafts, counts, onQuickView,
+  chat, drafts, counts, onQuickView, onDelete,
 }: {
   chat: Chat;
   drafts: Draft[];
   counts: Record<string, number>;
   onQuickView: () => void;
+  onDelete: () => void;
 }) {
   const previews = drafts.filter(d => !!getMedia(d).url).slice(0, 5);
   const withImages = drafts.filter(d => !!getMedia(d).url).length;
@@ -144,13 +227,30 @@ function ChatCard({
             <span style={{ fontSize: 9, fontFamily: "DM Mono, monospace", letterSpacing: "0.08em" }}>NO IMAGES</span>
           </div>
         )}
-        {/* Gradient bottom fade */}
         <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 32, background: "linear-gradient(to top, rgba(9,9,16,0.8), transparent)", pointerEvents: "none" }} />
+
+        {/* Delete button — top right of image strip */}
+        <button
+          onClick={e => { e.preventDefault(); e.stopPropagation(); onDelete(); }}
+          style={{
+            position: "absolute", top: 7, right: 7, zIndex: 10,
+            width: 26, height: 26, borderRadius: 8,
+            background: "rgba(0,0,0,0.55)", border: "1px solid rgba(248,113,113,0.3)",
+            color: "#f87171", cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            backdropFilter: "blur(4px)", transition: "all 0.15s",
+            opacity: 0.7,
+          }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = "1"; (e.currentTarget as HTMLElement).style.background = "rgba(248,113,113,0.2)"; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = "0.7"; (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.55)"; }}
+          title="Delete campaign"
+        >
+          <Trash2 style={{ width: 11, height: 11 }} />
+        </button>
       </div>
 
       {/* Body */}
       <div style={{ padding: "12px 14px", flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
-        {/* Chips row */}
         <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
           {chat.brand_id && (
             <span style={{ background: "rgba(124,58,237,0.14)", border: "1px solid rgba(124,58,237,0.28)", color: "#c4b5fd", fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 8, fontFamily: "DM Mono, monospace", letterSpacing: "0.04em" }}>
@@ -169,12 +269,10 @@ function ChatCard({
           )}
         </div>
 
-        {/* Topic */}
         <p style={{ fontSize: 12, fontWeight: 700, color: "#e4e4e7", lineHeight: 1.42, margin: 0, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
           {chat.topic || "Untitled topic"}
         </p>
 
-        {/* Status pills */}
         <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
           {(["PENDING_APPROVAL", "PUBLISHED", "FAILED"] as const).map(s =>
             counts[s] > 0 && (
@@ -190,7 +288,6 @@ function ChatCard({
           )}
         </div>
 
-        {/* Footer */}
         <div style={{ marginTop: "auto", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, paddingTop: 4 }}>
           <span style={{ fontSize: 9, color: "rgba(255,255,255,0.18)", fontFamily: "DM Mono, monospace" }}>
             {fmtDate(chat.updated_at || chat.created_at)}{total > 0 ? ` · ${total} drafts` : ""}
@@ -237,7 +334,6 @@ function DraftDrawerCard({ d }: { d: Draft }) {
       onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.07)"}
     >
       <div style={{ display: "flex", gap: 10, padding: "11px 12px", alignItems: "flex-start" }}>
-        {/* Thumbnail */}
         <div style={{ width: 52, height: 52, borderRadius: 10, overflow: "hidden", background: "#111115", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
           {m.url && m.kind === "image" ? (
             <>
@@ -328,6 +424,11 @@ export default function TopicChatsPage() {
   const [drawerLoading, setDrawerLoading] = useState(false);
   const [drawerFilter, setDrawerFilter] = useState("all");
 
+  // Delete state
+  const [deleteTarget, setDeleteTarget] = useState<Chat | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteErr, setDeleteErr] = useState<string | null>(null);
+
   const load = useCallback(async (soft = false) => {
     if (soft) setRefreshing(true); else setLoading(true);
     setErr(null);
@@ -378,6 +479,33 @@ export default function TopicChatsPage() {
     }
   };
 
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setDeleteErr(null);
+    try {
+      const ok = await deleteTopicChat(deleteTarget.id);
+      if (!ok) throw new Error("Delete failed");
+      // Remove from local state immediately
+      setChats(prev => prev.filter(c => c.id !== deleteTarget.id));
+      setChatDrafts(prev => {
+        const next = { ...prev };
+        delete next[deleteTarget.id];
+        return next;
+      });
+      // Close drawer if deleted chat was open
+      if (activeChat?.id === deleteTarget.id) {
+        setActiveChat(null);
+        setDrawerDrafts([]);
+      }
+      setDeleteTarget(null);
+    } catch (e: any) {
+      setDeleteErr(e?.message || "Failed to delete");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const drawerCounts = useMemo(() => countByStatus(drawerDrafts), [drawerDrafts]);
 
   const visibleDrafts = useMemo(() => {
@@ -414,6 +542,26 @@ export default function TopicChatsPage() {
         .tc-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
         .tc-filter-panel { animation: tcfade 0.2s ease both; }
       `}</style>
+
+      {/* ── Delete confirm modal ── */}
+      {deleteTarget && (
+        <DeleteConfirmModal
+          chat={deleteTarget}
+          draftCount={chatDrafts[deleteTarget.id]?.length ?? 0}
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => { setDeleteTarget(null); setDeleteErr(null); }}
+          deleting={deleting}
+        />
+      )}
+
+      {deleteErr && (
+        <div style={{ position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)", zIndex: 9998, background: "rgba(248,113,113,0.15)", border: "1px solid rgba(248,113,113,0.3)", borderRadius: 12, padding: "10px 16px", fontSize: 12, color: "#f87171", fontWeight: 600, display: "flex", alignItems: "center", gap: 8, fontFamily: "Syne, sans-serif" }}>
+          <AlertTriangle style={{ width: 13, height: 13 }} />{deleteErr}
+          <button onClick={() => setDeleteErr(null)} style={{ background: "none", border: "none", color: "#f87171", cursor: "pointer", padding: 0, marginLeft: 4, display: "flex" }}>
+            <X style={{ width: 12, height: 12 }} />
+          </button>
+        </div>
+      )}
 
       <div className="tc-root" style={{ padding: "24px 20px" }}>
 
@@ -532,6 +680,7 @@ export default function TopicChatsPage() {
                   drafts={chatDrafts[chat.id] ?? []}
                   counts={countByStatus(chatDrafts[chat.id] ?? [])}
                   onQuickView={() => openDrawer(chat)}
+                  onDelete={() => setDeleteTarget(chat)}
                 />
               </div>
             ))}
@@ -548,7 +697,6 @@ export default function TopicChatsPage() {
         >
           {activeChat && (
             <>
-              {/* Drawer header */}
               <div style={{ padding: "22px 20px 0", flexShrink: 0 }}>
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 16 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -576,15 +724,22 @@ export default function TopicChatsPage() {
                       {activeChat.id}
                     </div>
                   </div>
-                  <Link
-                    href={`/dashboard/topic-chats/${activeChat.id}`}
-                    style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 13px", background: "rgba(124,58,237,0.18)", border: "1px solid rgba(124,58,237,0.38)", borderRadius: 10, color: "#c4b5fd", fontSize: 11, fontWeight: 700, textDecoration: "none", flexShrink: 0, fontFamily: "Syne, sans-serif", whiteSpace: "nowrap" }}
-                  >
-                    Open <ArrowUpRight style={{ width: 11, height: 11 }} />
-                  </Link>
+                  <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                    <button
+                      onClick={() => { setActiveChat(null); setDrawerDrafts([]); setDeleteTarget(activeChat); }}
+                      style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 11px", background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.25)", borderRadius: 10, color: "#f87171", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "Syne, sans-serif" }}
+                    >
+                      <Trash2 style={{ width: 11, height: 11 }} />Delete
+                    </button>
+                    <Link
+                      href={`/dashboard/topic-chats/${activeChat.id}`}
+                      style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 13px", background: "rgba(124,58,237,0.18)", border: "1px solid rgba(124,58,237,0.38)", borderRadius: 10, color: "#c4b5fd", fontSize: 11, fontWeight: 700, textDecoration: "none", fontFamily: "Syne, sans-serif", whiteSpace: "nowrap" }}
+                    >
+                      Open <ArrowUpRight style={{ width: 11, height: 11 }} />
+                    </Link>
+                  </div>
                 </div>
 
-                {/* Filter tabs */}
                 {!drawerLoading && drawerDrafts.length > 0 && (
                   <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 16, padding: "10px 12px", background: "rgba(255,255,255,0.03)", borderRadius: 12, border: "1px solid rgba(255,255,255,0.06)" }}>
                     <button
@@ -616,7 +771,6 @@ export default function TopicChatsPage() {
                 )}
               </div>
 
-              {/* Draft list */}
               <div className="tc-scroll" style={{ flex: 1, overflowY: "auto", padding: "0 20px 28px" }}>
                 {drawerLoading ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

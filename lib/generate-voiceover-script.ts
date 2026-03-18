@@ -42,6 +42,7 @@ export type VoiceoverScript = {
 
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
+import { openai } from "@ai-sdk/openai";
 
 // ── JSON extraction (strips markdown fences) ──────────────────────────────────
 function extractJSON<T>(raw: string): T {
@@ -127,7 +128,7 @@ STRICT RULES:
   let raw: string;
   try {
     const { text } = await generateText({
-      model:       google("gemini-2.5-flash"),
+      model:       openai("gpt-4o-mini"),
       prompt,
       temperature: 0.85,
     });

@@ -194,6 +194,17 @@ export function previewTopicChat(payload: {
   });
 }
 
+export async function deleteTopicChat(chatId: string): Promise<boolean> {
+  try {
+    const res = await api<{ ok: boolean }>(`/topic-chats/${chatId}`, {
+      method: "DELETE",
+    });
+    return !!res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export function synthesizeAndSaveTemplate(payload?: {
   brand_id?: string;
   canvas_width?: number;

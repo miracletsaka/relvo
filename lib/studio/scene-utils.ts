@@ -2,7 +2,7 @@
 // Shared utilities used by both generate-scenes routes.
 
 import { generateText } from "ai";
-import { google }       from "@ai-sdk/google";
+import { openai } from "@ai-sdk/openai";
 
 // ── API base ─────────────────────────────────────────────────────────────────
 export function getApiBase(): string {
@@ -220,16 +220,12 @@ export async function callGemini(
   maxOutputTokens: number = 800,
 ): Promise<string> {
   const { text } = await generateText({
-    model:       google("gemini-2.5-flash"),
+    model:       openai("gpt-4o-mini"),
     prompt,
     temperature: 0.7,
-    providerOptions: {
-      google: {
-        responseMimeType: "application/json", // structured output, no fences
-      },
-    },
+    maxOutputTokens,
   });
 
-  console.log(`[callGemini] raw (${text}`);
+  console.log(`[callGemini→gpt-4o-mini] raw: ${(text ?? "").slice(0, 120)}`);
   return text ?? "";
 }

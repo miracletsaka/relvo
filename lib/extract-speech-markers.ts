@@ -6,6 +6,7 @@ import type { SpeechMarker, MarkerType } from "@/remotion/compositions/SpeechMar
 
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
+import { openai } from "@ai-sdk/openai";
 
 function extractJSON<T>(raw: string): T {
   const clean = raw.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
@@ -47,7 +48,7 @@ Return [] if no strong words exist.
 `;
 
   const { text } = await generateText({
-    model:       google("gemini-2.5-flash"),
+    model:       openai("gpt-4o-mini"),
     prompt,
     temperature: 0.3,
   });

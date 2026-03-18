@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { google } from "@ai-sdk/google";
 import { generateText } from "ai";
+import { openai } from "@ai-sdk/openai";
 
 /**
  * Step 7 — Hook Variations (Agency workflow)
@@ -92,7 +92,7 @@ Rules:
 `;
 
     const { text } = await generateText({
-      model: google("gemini-2.5-flash"),
+      model: openai("gpt-4o-mini"),
       system,
       prompt,
       temperature: 0.9,

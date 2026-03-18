@@ -28,7 +28,7 @@ export default function TopicsTutorialHeroSingle({
     "Watch the short tutorial showing the full flow: Topics → Drafts → Media → Approval, inside NeuroFlow Marketing.",
   youtubeId,
   tutorialTitle = "NeuroFlow Marketing — Tutorial",
-  primaryCta = { label: "Get Started", href: "/dashboard/topics#topic" },
+  primaryCta = { label: "Get Started", href: "/dashboard/create" },
   secondaryCta = { label: "View Scheduled", href: "/dashboard/scheduled" },
 }: Props) {
   const [open, setOpen] = useState(false);

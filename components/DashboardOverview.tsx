@@ -98,7 +98,6 @@ function statusCfg(s: string) {
 }
 
 /* ─── Sub-components ────────────────────────────────────────── */
-
 function KpiCard({ label, value, color, icon, loading, sub }: {
   label: string; value: number | string; color: string;
   icon: React.ReactNode; loading: boolean; sub?: string;
@@ -115,7 +114,6 @@ function KpiCard({ label, value, color, icon, loading, sub }: {
       onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = `${color}45`; (e.currentTarget as HTMLElement).style.transform = "translateY(-1px)"; }}
       onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = `${color}22`; (e.currentTarget as HTMLElement).style.transform = "translateY(0)"; }}
     >
-      {/* glow blob */}
       <div style={{ position: "absolute", top: -20, right: -20, width: 80, height: 80, borderRadius: "50%", background: color, opacity: 0.06, filter: "blur(20px)", pointerEvents: "none" }} />
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(255,255,255,0.3)", fontFamily: "DM Mono, monospace" }}>{label}</span>
@@ -147,30 +145,14 @@ function DraftImageCard({ draft, chat }: { draft: DraftRow; chat: TopicChatRow }
         transition: "border-color 0.15s, transform 0.15s, box-shadow 0.15s",
         cursor: "pointer",
       }}
-        onMouseEnter={e => {
-          const el = e.currentTarget as HTMLElement;
-          el.style.borderColor = "rgba(255,255,255,0.15)";
-          el.style.transform = "translateY(-2px)";
-          el.style.boxShadow = "0 12px 40px rgba(0,0,0,0.4)";
-        }}
-        onMouseLeave={e => {
-          const el = e.currentTarget as HTMLElement;
-          el.style.borderColor = "rgba(255,255,255,0.07)";
-          el.style.transform = "translateY(0)";
-          el.style.boxShadow = "none";
-        }}
+        onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor = "rgba(255,255,255,0.15)"; el.style.transform = "translateY(-2px)"; el.style.boxShadow = "0 12px 40px rgba(0,0,0,0.4)"; }}
+        onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor = "rgba(255,255,255,0.07)"; el.style.transform = "translateY(0)"; el.style.boxShadow = "none"; }}
       >
-        {/* Image area */}
         <div style={{ aspectRatio: "4/3", background: "#111115", position: "relative", overflow: "hidden" }}>
           {mediaUrl && !imgErr ? (
             <>
-              <img
-                src={mediaUrl}
-                alt=""
-                onLoad={() => setImgLoaded(true)}
-                onError={() => setImgErr(true)}
-                style={{ width: "100%", height: "100%", objectFit: "cover", opacity: imgLoaded ? 1 : 0, transition: "opacity 0.3s" }}
-              />
+              <img src={mediaUrl} alt="" onLoad={() => setImgLoaded(true)} onError={() => setImgErr(true)}
+                style={{ width: "100%", height: "100%", objectFit: "cover", opacity: imgLoaded ? 1 : 0, transition: "opacity 0.3s" }} />
               {!imgLoaded && (
                 <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <div style={{ width: 20, height: 20, border: "2px solid rgba(255,255,255,0.1)", borderTopColor: "#a78bfa", borderRadius: "50%", animation: "dbspin 0.8s linear infinite" }} />
@@ -183,7 +165,6 @@ function DraftImageCard({ draft, chat }: { draft: DraftRow; chat: TopicChatRow }
               <span style={{ fontSize: 10, fontFamily: "DM Mono, monospace" }}>no image</span>
             </div>
           )}
-          {/* Overlay badges */}
           <div style={{ position: "absolute", top: 8, left: 8, right: 8, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <span style={{ background: pColor + "cc", color: "white", fontSize: 9, fontWeight: 800, padding: "3px 8px", borderRadius: 8, letterSpacing: "0.08em", textTransform: "uppercase", backdropFilter: "blur(4px)" }}>
               {draft.platform || "—"}
@@ -192,19 +173,12 @@ function DraftImageCard({ draft, chat }: { draft: DraftRow; chat: TopicChatRow }
               {cfg.icon}{cfg.label}
             </span>
           </div>
-          {/* Gradient fade at bottom */}
           {imgLoaded && <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "50%", background: "linear-gradient(to top, rgba(0,0,0,0.7), transparent)", pointerEvents: "none" }} />}
         </div>
-
-        {/* Content */}
         <div style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 5 }}>
-          <p style={{ fontSize: 11, color: "rgba(255,255,255,0.6)", lineHeight: 1.45, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", margin: 0 }}>
-            {hook}
-          </p>
+          <p style={{ fontSize: 11, color: "rgba(255,255,255,0.6)", lineHeight: 1.45, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", margin: 0 }}>{hook}</p>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 9, color: "rgba(255,255,255,0.25)", fontFamily: "DM Mono, monospace" }}>
-              {fmtDate(draft.scheduled_at || draft.created_at)}
-            </span>
+            <span style={{ fontSize: 9, color: "rgba(255,255,255,0.25)", fontFamily: "DM Mono, monospace" }}>{fmtDate(draft.scheduled_at || draft.created_at)}</span>
             {mediaUrl && !imgErr && (
               <span style={{ fontSize: 9, color: "#34d399", fontFamily: "DM Mono, monospace", fontWeight: 700, display: "flex", alignItems: "center", gap: 3 }}>
                 <ImageIcon style={{ width: 8, height: 8 }} />IMG
@@ -228,43 +202,30 @@ function AttentionRow({ chat, draft }: { chat: TopicChatRow; draft: DraftRow }) 
       <div style={{
         display: "flex", alignItems: "center", gap: 12, padding: "10px 12px",
         borderRadius: 12, border: "1px solid rgba(255,255,255,0.06)",
-        background: "rgba(255,255,255,0.02)", transition: "background 0.15s, border-color 0.15s",
-        cursor: "pointer",
+        background: "rgba(255,255,255,0.02)", transition: "background 0.15s, border-color 0.15s", cursor: "pointer",
       }}
         onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.05)"; (e.currentTarget as HTMLElement).style.borderColor = `${cfg.color}30`; }}
         onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.02)"; (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.06)"; }}
       >
-        {/* Thumbnail */}
         <div style={{ width: 44, height: 44, borderRadius: 10, overflow: "hidden", background: "#111115", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
           {mediaUrl
             ? <img src={mediaUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={e => { (e.target as HTMLImageElement).style.display = "none" }} />
             : <ImageIcon style={{ width: 16, height: 16, color: "rgba(255,255,255,0.15)" }} />
           }
         </div>
-
-        {/* Info */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
-            <span style={{ background: pColor + "22", color: pColor, fontSize: 9, fontWeight: 800, padding: "2px 7px", borderRadius: 6, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-              {draft.platform || "—"}
-            </span>
-            <span style={{ background: cfg.color + "18", color: cfg.color, fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 6, display: "flex", alignItems: "center", gap: 3 }}>
-              {cfg.icon}{cfg.label}
-            </span>
-            <span style={{ fontSize: 9, color: "rgba(255,255,255,0.2)", fontFamily: "DM Mono, monospace", marginLeft: "auto" }}>
-              {fmtDate(draft.updated_at || draft.created_at)}
-            </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3, flexWrap: "wrap" }}>
+            <span style={{ background: pColor + "22", color: pColor, fontSize: 9, fontWeight: 800, padding: "2px 7px", borderRadius: 6, letterSpacing: "0.08em", textTransform: "uppercase" }}>{draft.platform || "—"}</span>
+            <span style={{ background: cfg.color + "18", color: cfg.color, fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 6, display: "flex", alignItems: "center", gap: 3 }}>{cfg.icon}{cfg.label}</span>
+            <span style={{ fontSize: 9, color: "rgba(255,255,255,0.2)", fontFamily: "DM Mono, monospace", marginLeft: "auto" }}>{fmtDate(draft.updated_at || draft.created_at)}</span>
           </div>
           <p style={{ fontSize: 11, color: "rgba(255,255,255,0.55)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {(chat.topic || draft.body_text || "—").slice(0, 100)}
           </p>
           {draft.last_error && s === "FAILED" && (
-            <p style={{ fontSize: 10, color: "#f87171", margin: "2px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "DM Mono, monospace" }}>
-              {draft.last_error.slice(0, 80)}
-            </p>
+            <p style={{ fontSize: 10, color: "#f87171", margin: "2px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "DM Mono, monospace" }}>{draft.last_error.slice(0, 80)}</p>
           )}
         </div>
-
         <ChevronRight style={{ width: 14, height: 14, color: "rgba(255,255,255,0.2)", flexShrink: 0 }} />
       </div>
     </Link>
@@ -289,7 +250,6 @@ function ChatRow({ bundle }: { bundle: Bundle }) {
         onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.05)"; (e.currentTarget as HTMLElement).style.borderColor = "rgba(124,58,237,0.25)"; }}
         onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.02)"; (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.07)"; }}
       >
-        {/* Stacked image previews */}
         <div style={{ display: "flex", flexShrink: 0 }}>
           {previews.length > 0 ? previews.map((d, i) => (
             <div key={d.id} style={{ width: 36, height: 36, borderRadius: 9, overflow: "hidden", border: "2px solid #0e0e12", marginLeft: i > 0 ? -10 : 0, background: "#111115" }}>
@@ -301,8 +261,6 @@ function ChatRow({ bundle }: { bundle: Bundle }) {
             </div>
           )}
         </div>
-
-        {/* Info */}
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ fontSize: 12, fontWeight: 700, color: "#e4e4e7", margin: "0 0 5px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {(chat.topic || "Untitled").slice(0, 80)}
@@ -326,21 +284,17 @@ function ChatRow({ bundle }: { bundle: Bundle }) {
             )}
           </div>
         </div>
-
-        {/* Meta */}
         <div style={{ textAlign: "right", flexShrink: 0 }}>
           <div style={{ fontSize: 11, fontWeight: 800, color: "#e4e4e7" }}>{total}</div>
           <div style={{ fontSize: 9, color: "rgba(255,255,255,0.25)", fontFamily: "DM Mono, monospace" }}>drafts</div>
           <div style={{ fontSize: 9, color: "rgba(255,255,255,0.2)", fontFamily: "DM Mono, monospace", marginTop: 3 }}>{fmtDate(chat.updated_at || chat.created_at)}</div>
         </div>
-
         <ChevronRight style={{ width: 14, height: 14, color: "rgba(255,255,255,0.2)", flexShrink: 0 }} />
       </div>
     </Link>
   );
 }
 
-/* ─── Section header ─────────────────────────────────────────── */
 function SectionHeader({ icon, title, count, href }: { icon: React.ReactNode; title: string; count?: number; href?: string }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
@@ -386,14 +340,13 @@ export default function DashboardOverview() {
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  /* computed */
   const globalCounts = useMemo(() => {
     const t: Record<string, number> = {};
     for (const r of rows) for (const [k, v] of Object.entries(r.counts)) t[k] = (t[k] || 0) + v;
     return t;
   }, [rows]);
 
-  const totalDrafts = useMemo(() => rows.reduce((s, r) => s + r.drafts.length, 0), [rows]);
+  const totalDrafts  = useMemo(() => rows.reduce((s, r) => s + r.drafts.length, 0), [rows]);
   const kpi = (s: string) => globalCounts[s.toUpperCase()] || 0;
 
   const needsAttention = useMemo(() => {
@@ -406,7 +359,6 @@ export default function DashboardOverview() {
     return list.slice(0, 12);
   }, [rows]);
 
-  /* all drafts with images — for the visual wall */
   const draftsWithImages = useMemo(() => {
     const all: Array<{ draft: DraftRow; chat: TopicChatRow }> = [];
     for (const r of rows) for (const d of r.drafts) if (getMediaUrl(d)) all.push({ draft: d, chat: r.chat });
@@ -420,27 +372,100 @@ export default function DashboardOverview() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Mono:wght@400;500&display=swap');
         .db-root { font-family: 'Syne', sans-serif; background: #0c0c0f; min-height: 100vh; color: #e4e4e7; }
-        @keyframes dbspin { to { transform: rotate(360deg); } }
-        @keyframes dbfade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-        .db-animate { animation: dbfade 0.3s ease both; }
-        .db-grid-images { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
-        @media (max-width: 640px) { .db-grid-images { grid-template-columns: repeat(2, 1fr); } }
-        .db-skeleton { background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.07) 50%, rgba(255,255,255,0.04) 75%); background-size: 200% 100%; animation: dbshimmer 1.5s infinite; border-radius: 16px; }
+        @keyframes dbspin  { to { transform: rotate(360deg); } }
+        @keyframes dbfade  { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes dbshimmer { 0%{background-position:200% 0;} 100%{background-position:-200% 0;} }
+        .db-animate  { animation: dbfade 0.3s ease both; }
+        .db-skeleton { background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.07) 50%, rgba(255,255,255,0.04) 75%); background-size: 200% 100%; animation: dbshimmer 1.5s infinite; border-radius: 16px; }
         .db-scrollbar::-webkit-scrollbar { width: 3px; }
         .db-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .db-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+
+        /* ── KPI grid: 3 cols on mobile, 6 on desktop ── */
+        .db-kpi-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 10px;
+          margin-bottom: 28px;
+        }
+        @media (min-width: 640px) {
+          .db-kpi-grid { grid-template-columns: repeat(6, 1fr); }
+        }
+
+        /* ── Image grid ── */
+        .db-grid-images {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 10px;
+        }
+        @media (min-width: 480px) {
+          .db-grid-images { grid-template-columns: repeat(3, 1fr); }
+        }
+        @media (min-width: 900px) {
+          .db-grid-images { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+        }
+
+        /* ── Two-column layout: stacked on mobile, side-by-side on desktop ── */
+        .db-two-col {
+          display: flex;
+          flex-direction: column;
+          gap: 24px;
+        }
+        @media (min-width: 900px) {
+          .db-two-col {
+            display: grid;
+            grid-template-columns: 1fr 360px;
+            gap: 20px;
+            align-items: start;
+          }
+        }
+
+        /* Attention panel: not sticky on mobile (too tall), sticky on desktop */
+        .db-attention-panel { position: static; }
+        @media (min-width: 900px) {
+          .db-attention-panel { position: sticky; top: 20px; }
+        }
+
+        /* ── Quick actions ── */
+        .db-actions {
+          display: flex;
+          gap: 8px;
+          flex-wrap: wrap;
+          margin-top: 28px;
+        }
+        .db-action-btn {
+          display: inline-flex; align-items: center; gap: 7px;
+          padding: 9px 14px;
+          border-radius: 11px;
+          font-size: 11px; font-weight: 700;
+          text-decoration: none;
+          font-family: 'Syne', sans-serif;
+          transition: background 0.15s;
+          flex: 1 1 auto;
+          justify-content: center;
+          min-width: 130px;
+        }
+
+        /* ── Header ── */
+        .db-header {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          margin-bottom: 28px;
+          gap: 16px;
+          flex-wrap: wrap;
+        }
       `}</style>
 
-      <div className="db-root" style={{ padding: "24px 20px", maxWidth: 1280, margin: "0 auto" }}>
+      <div className="db-root" style={{ padding: "20px 16px", maxWidth: 1280, margin: "0 auto" }}>
 
         {/* ── Header ── */}
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 28, gap: 16 }}>
+        <div className="db-header">
           <div>
             <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(124,58,237,0.7)", marginBottom: 4, fontFamily: "DM Mono, monospace" }}>
               NeuroFlow · Command Center
             </div>
-            <h1 style={{ fontSize: 28, fontWeight: 800, color: "#e4e4e7", lineHeight: 1.1, margin: 0 }}>
+            <h1 style={{ fontSize: 24, fontWeight: 800, color: "#e4e4e7", lineHeight: 1.1, margin: 0 }}>
               Content Dashboard
             </h1>
             <p style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", marginTop: 5 }}>
@@ -450,7 +475,7 @@ export default function DashboardOverview() {
           <button
             onClick={() => refresh(true)}
             disabled={refreshing}
-            style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 11, color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "Syne, sans-serif", transition: "all 0.15s" }}
+            style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 11, color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "Syne, sans-serif", flexShrink: 0 }}
             onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.09)"; (e.currentTarget as HTMLElement).style.color = "#e4e4e7"; }}
             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.05)"; (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.5)"; }}
           >
@@ -466,30 +491,24 @@ export default function DashboardOverview() {
         )}
 
         {/* ── KPI row ── */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10, marginBottom: 28 }}>
-          <KpiCard label="Campaigns" value={rows.length} color="#a78bfa" icon={<Layers style={{ width: 14, height: 14 }} />} loading={loading} />
-          <KpiCard label="Total Drafts" value={totalDrafts} color="#60a5fa" icon={<Zap style={{ width: 14, height: 14 }} />} loading={loading} />
-          <KpiCard label="Pending" value={kpi("PENDING_APPROVAL")} color="#a78bfa" icon={<Clock style={{ width: 14, height: 14 }} />} loading={loading} sub="needs review" />
-          <KpiCard label="Published" value={kpi("PUBLISHED")} color="#34d399" icon={<CheckCircle2 style={{ width: 14, height: 14 }} />} loading={loading} sub="live posts" />
-          <KpiCard label="Failed" value={kpi("FAILED")} color="#f87171" icon={<XCircle style={{ width: 14, height: 14 }} />} loading={loading} />
-          <KpiCard label="With Images" value={`${imageRate}%`} color="#fbbf24" icon={<ImageIcon style={{ width: 14, height: 14 }} />} loading={loading} sub={`${draftsWithImages.length} of ${totalDrafts}`} />
+        <div className="db-kpi-grid">
+          <KpiCard label="Campaigns"   value={rows.length}          color="#a78bfa" icon={<Layers style={{ width: 14, height: 14 }} />}       loading={loading} />
+          <KpiCard label="Drafts"      value={totalDrafts}          color="#60a5fa" icon={<Zap style={{ width: 14, height: 14 }} />}          loading={loading} />
+          <KpiCard label="Pending"     value={kpi("PENDING_APPROVAL")} color="#a78bfa" icon={<Clock style={{ width: 14, height: 14 }} />}    loading={loading} sub="needs review" />
+          <KpiCard label="Published"   value={kpi("PUBLISHED")}     color="#34d399" icon={<CheckCircle2 style={{ width: 14, height: 14 }} />} loading={loading} sub="live posts" />
+          <KpiCard label="Failed"      value={kpi("FAILED")}        color="#f87171" icon={<XCircle style={{ width: 14, height: 14 }} />}      loading={loading} />
+          <KpiCard label="With Images" value={`${imageRate}%`}      color="#fbbf24" icon={<ImageIcon style={{ width: 14, height: 14 }} />}    loading={loading} sub={`${draftsWithImages.length}/${totalDrafts}`} />
         </div>
 
         {/* ── Two-column layout ── */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 20, alignItems: "start" }}>
+        <div className="db-two-col">
 
-          {/* LEFT column */}
+          {/* LEFT: images + campaigns */}
           <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
 
             {/* Draft image wall */}
             <div className="db-animate">
-              <SectionHeader
-                icon={<ImageIcon style={{ width: 13, height: 13 }} />}
-                title="Draft Images"
-                count={draftsWithImages.length}
-                href="/dashboard/topic-chats"
-              />
-
+              <SectionHeader icon={<ImageIcon style={{ width: 13, height: 13 }} />} title="Draft Images" count={draftsWithImages.length} href="/dashboard/topic-chats" />
               {loading ? (
                 <div className="db-grid-images">
                   {Array.from({ length: 6 }).map((_, i) => (
@@ -497,7 +516,7 @@ export default function DashboardOverview() {
                   ))}
                 </div>
               ) : draftsWithImages.length === 0 ? (
-                <div style={{ border: "2px dashed rgba(255,255,255,0.07)", borderRadius: 16, padding: "48px 20px", textAlign: "center", color: "rgba(255,255,255,0.15)" }}>
+                <div style={{ border: "2px dashed rgba(255,255,255,0.07)", borderRadius: 16, padding: "40px 20px", textAlign: "center", color: "rgba(255,255,255,0.15)" }}>
                   <ImageIcon style={{ width: 36, height: 36, margin: "0 auto 10px" }} />
                   <p style={{ fontSize: 13, fontWeight: 700 }}>No draft images yet</p>
                   <p style={{ fontSize: 11, marginTop: 4 }}>Generate topics with auto image generation enabled</p>
@@ -513,14 +532,9 @@ export default function DashboardOverview() {
               )}
             </div>
 
-            {/* Recent topic chats */}
+            {/* Recent campaigns */}
             <div className="db-animate" style={{ animationDelay: "0.1s" }}>
-              <SectionHeader
-                icon={<Activity style={{ width: 13, height: 13 }} />}
-                title="Recent Campaigns"
-                count={rows.length}
-                href="/dashboard/topic-chats"
-              />
+              <SectionHeader icon={<Activity style={{ width: 13, height: 13 }} />} title="Recent Campaigns" count={rows.length} href="/dashboard/topic-chats" />
               {loading ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   {Array.from({ length: 4 }).map((_, i) => (
@@ -541,21 +555,10 @@ export default function DashboardOverview() {
             </div>
           </div>
 
-          {/* RIGHT column — needs attention */}
-          <div className="db-animate" style={{ animationDelay: "0.05s", position: "sticky", top: 20 }}>
-            <SectionHeader
-              icon={<AlertTriangle style={{ width: 13, height: 13 }} />}
-              title="Needs Attention"
-              count={needsAttention.length}
-              href="/dashboard/topic-chats"
-            />
-
-            <div style={{
-              background: "rgba(255,255,255,0.02)",
-              border: "1px solid rgba(255,255,255,0.07)",
-              borderRadius: 16, overflow: "hidden",
-              maxHeight: "calc(100vh - 140px)",
-            }}>
+          {/* RIGHT: needs attention */}
+          <div className="db-attention-panel db-animate" style={{ animationDelay: "0.05s" }}>
+            <SectionHeader icon={<AlertTriangle style={{ width: 13, height: 13 }} />} title="Needs Attention" count={needsAttention.length} href="/dashboard/topic-chats" />
+            <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 16, overflow: "hidden" }}>
               {loading ? (
                 <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 6 }}>
                   {Array.from({ length: 5 }).map((_, i) => (
@@ -569,8 +572,7 @@ export default function DashboardOverview() {
                   <p style={{ fontSize: 11, marginTop: 3 }}>Nothing needs attention</p>
                 </div>
               ) : (
-                <div className="db-scrollbar" style={{ overflowY: "auto", maxHeight: "calc(100vh - 180px)", padding: 10, display: "flex", flexDirection: "column", gap: 5 }}>
-                  {/* Failed first */}
+                <div className="db-scrollbar" style={{ overflowY: "auto", maxHeight: 480, padding: 10, display: "flex", flexDirection: "column", gap: 5 }}>
                   {needsAttention.filter(r => r.draft.status?.toUpperCase() === "FAILED").length > 0 && (
                     <>
                       <div style={{ fontSize: 9, fontWeight: 700, color: "#f87171", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "DM Mono, monospace", padding: "4px 4px 2px" }}>
@@ -581,7 +583,6 @@ export default function DashboardOverview() {
                       ))}
                     </>
                   )}
-                  {/* Pending */}
                   {needsAttention.filter(r => r.draft.status?.toUpperCase() === "PENDING_APPROVAL").length > 0 && (
                     <>
                       <div style={{ fontSize: 9, fontWeight: 700, color: "#a78bfa", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "DM Mono, monospace", padding: "8px 4px 2px" }}>
@@ -594,13 +595,10 @@ export default function DashboardOverview() {
                   )}
                 </div>
               )}
-
-              {/* Footer CTA */}
               {!loading && needsAttention.length > 0 && (
                 <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", padding: "10px 12px" }}>
-                  <Link href="/dashboard/topic-chats" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px", borderRadius: 10, background: "rgba(124,58,237,0.12)", border: "1px solid rgba(124,58,237,0.25)", color: "#c4b5fd", fontSize: 11, fontWeight: 700, textDecoration: "none", transition: "background 0.15s" }}>
-                    <Eye style={{ width: 12, height: 12 }} />
-                    Review all drafts
+                  <Link href="/dashboard/topic-chats" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px", borderRadius: 10, background: "rgba(124,58,237,0.12)", border: "1px solid rgba(124,58,237,0.25)", color: "#c4b5fd", fontSize: 11, fontWeight: 700, textDecoration: "none" }}>
+                    <Eye style={{ width: 12, height: 12 }} />Review all drafts
                   </Link>
                 </div>
               )}
@@ -608,26 +606,26 @@ export default function DashboardOverview() {
           </div>
         </div>
 
-        {/* ── Quick actions bar ── */}
-        <div style={{ marginTop: 28, display: "flex", gap: 10, flexWrap: "wrap" }}>
+        {/* ── Quick actions ── */}
+        <div className="db-actions">
           {[
-            { label: "Generate Topics", href: "/dashboard/topics", color: "#7c3aed", icon: <Sparkles style={{ width: 13, height: 13 }} /> },
-            { label: "Upload Media", href: "/dashboard/media-assets", color: "#3b82f6", icon: <ImageIcon style={{ width: 13, height: 13 }} /> },
-            { label: "View All Chats", href: "/dashboard/topic-chats", color: "#10b981", icon: <Layers style={{ width: 13, height: 13 }} /> },
-            { label: "Scheduled Posts", href: "https://publish.buffer.com/all-channels/calendar/week?status=scheduled", color: "#f59e0b", icon: <ExternalLink style={{ width: 13, height: 13 }} />, external: true },
-          ].map(({ label, href, color, icon, external }) => (
+            { label: "Upload Media",     href: "/dashboard/media-assets",  color: "#3b82f6", icon: <ImageIcon style={{ width: 13, height: 13 }} />, external: false },
+            { label: "View All Chats",   href: "/dashboard/topic-chats",   color: "#10b981", icon: <Layers style={{ width: 13, height: 13 }} />,   external: false },
+            { label: "Scheduled Posts",  href: "https://publish.buffer.com/all-channels/calendar/week?status=scheduled", color: "#f59e0b", icon: <ExternalLink style={{ width: 13, height: 13 }} />, external: true },
+          ].map(({ label, href, color, icon, external }) =>
             external
-              ? <a key={label} href={href} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 16px", background: color + "15", border: `1px solid ${color}30`, borderRadius: 11, color, fontSize: 11, fontWeight: 700, textDecoration: "none", fontFamily: "Syne, sans-serif", transition: "background 0.15s" }}
-                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = color + "25"}
-                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = color + "15"}
-              >{icon}{label}</a>
-              : <Link key={label} href={href} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 16px", background: color + "15", border: `1px solid ${color}30`, borderRadius: 11, color, fontSize: 11, fontWeight: 700, textDecoration: "none", fontFamily: "Syne, sans-serif", transition: "background 0.15s" }}
-                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = color + "25"}
-                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = color + "15"}
-              >{icon}{label}</Link>
-          ))}
+              ? <a key={label} href={href} target="_blank" rel="noopener noreferrer" className="db-action-btn"
+                  style={{ background: color + "15", border: `1px solid ${color}30`, color }}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = color + "25"}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = color + "15"}
+                >{icon}{label}</a>
+              : <Link key={label} href={href} className="db-action-btn"
+                  style={{ background: color + "15", border: `1px solid ${color}30`, color }}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = color + "25"}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = color + "15"}
+                >{icon}{label}</Link>
+          )}
         </div>
-
       </div>
     </>
   );

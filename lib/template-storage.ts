@@ -288,9 +288,9 @@ export function updateTemplate(id: string, payload: UpdateTemplatePayload) {
 export async function deleteTemplate(templateId: string): Promise<boolean> {
   try {
     const res = await deleteTemplateInDb(templateId);
-    return !!res.deleted;
+    console.log("Delete response:", res);
+    return !!res.ok;  // ← was res.deleted, backend returns {ok: true}
   } catch (e) {
-    // fallback local delete
     const templates = getTemplatesFromLocal();
     const filtered = templates.filter((t) => t.id !== templateId);
     if (filtered.length === templates.length) return false;
