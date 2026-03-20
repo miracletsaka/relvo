@@ -21,7 +21,6 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
   DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { createTemplate, updateTemplate } from "@/lib/template-storage";
 import { uploadFileToSpaces } from "@/lib/upload-client";
 import { resolveTemplateImages } from "@/lib/resolve-template-images";
@@ -480,12 +479,6 @@ export default function EditorPage() {
     link.href = canvas.toDataURL("image/png"); link.download = `campaign-${Date.now()}.png`; link.click();
   };
 
-  const applyTemplateToEditor = (t: Template) => {
-    setErr(null); setActiveTemplate(t); setBackgroundImage(ensureBgString((t as any).backgroundImage));
-    setShapes(Array.isArray(t.shapes) ? t.shapes : []); setLogoPlacement(t.logoPlacement);
-    setSelectedShapeId(null); setSelectedShapeIds([]); setSaveName(t.name||""); setSaveDesc(t.description||"");
-  };
-
   const openSaveDialog = () => {
     setErr(null); setSaveName(activeTemplate?.name || "New Template"); setSaveDesc(activeTemplate?.description || ""); setSaveOpen(true);
   };
@@ -535,7 +528,7 @@ export default function EditorPage() {
   const selectedShape = shapes.find((s) => s.id === selectedShapeId);
 
   return (
-    <div style={{ minHeight: "100vh", background: T.bg, color: T.text, fontFamily: T.mono, display: "flex", flexDirection: "column" }}>
+    <div style={{ height: "100vh", overflow: "hidden", background: T.bg, color: T.text, fontFamily: T.mono, display: "flex", flexDirection: "column" }}>
 
       {/* ── Top Bar ─────────────────────────────────────────────────────────── */}
       <div style={{
@@ -609,17 +602,19 @@ export default function EditorPage() {
 
         {/* ── Left panel ────────────────────────────────────────────────────── */}
         <div style={{
-          width: 260, flexShrink: 0,
+          width: 400, flexShrink: 0,
           background: "linear-gradient(180deg,#0a0f0a 0%,#080b08 100%)",
           borderRight: `1px solid ${T.border}`,
           display: "flex", flexDirection: "column",
           overflowY: "auto",
         }}>
 
-          {/* Tab nav */}
+          {/* Tab nav — sticky so it stays visible when panel content scrolls */}
           <div style={{
             display: "flex", borderBottom: `1px solid ${T.border}`,
             background: "rgba(0,0,0,0.3)",
+            position: "sticky", top: 0, zIndex: 10,
+            flexShrink: 0,
           }}>
             {(["design","content","templates"] as const).map((tab) => (
               <button
@@ -796,9 +791,9 @@ export default function EditorPage() {
         </div>
 
         {/* ── Canvas area ───────────────────────────────────────────────────── */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: "#060806" }}>
+        <div className="relative" style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: "#060806" }}>
           {/* Canvas toolbar */}
-          <div style={{
+          <div className="absolute z-50 top-10 left-1/2 transform -translate-x-1/2 bg-white" style={{
             height: 36, borderBottom: `1px solid ${T.border}`,
             display: "flex", alignItems: "center", padding: "0 14px", gap: 12,
             background: "rgba(0,0,0,0.3)",
@@ -812,7 +807,7 @@ export default function EditorPage() {
             </span>
             {(selectedShapeId || selectedShapeIds.length > 0) && (
               <>
-                <div style={{ width: 1, height: 14, background: T.border }} />
+                <div style={{ width: 1, height: 40, background: T.border }} />
                 <AdvancedShapeTools
                   selectedShapeIds={selectedShapeIds.length ? selectedShapeIds : selectedShapeId ? [selectedShapeId] : []}
                   onDuplicate={handleDuplicateSelected}
@@ -863,7 +858,7 @@ export default function EditorPage() {
         {/* ── Right panel — Properties ───────────────────────────────────────── */}
         {selectedShape && (
           <div style={{
-            width: 240, flexShrink: 0,
+            width: 400, flexShrink: 0,
             background: "linear-gradient(180deg,#0a0f0a 0%,#080b08 100%)",
             borderLeft: `1px solid ${T.border}`,
             overflowY: "auto", padding: 12,

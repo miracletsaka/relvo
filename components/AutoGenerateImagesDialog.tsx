@@ -42,7 +42,7 @@ export default function AutoGenerateImagesDialog(props: {
   drafts: any[];
   chat: any | null;
   autoStart?: boolean;
-  brandId:string;
+  brandId: string;
   onFinished?: () => Promise<void> | void;
 }) {
   const { open, onOpenChange, drafts, chat, autoStart, brandId, onFinished } = props;
@@ -57,7 +57,6 @@ export default function AutoGenerateImagesDialog(props: {
   const [currentBg, setCurrentBg] = useState<string | null>(null);
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-
   const [backgrounds, setBackgrounds] = useState<string[]>([]);
 
   useEffect(() => {
@@ -83,29 +82,22 @@ export default function AutoGenerateImagesDialog(props: {
 
   useEffect(() => {
     if (!open) return;
-    getTemplates(chat?.brand_id).then((data) => setTemplates(Array.isArray(data) ? data : data || [])).catch((e: any) => setError(e?.message || "Failed to load templates"));
+    getTemplates(chat?.brand_id)
+      .then((data) => setTemplates(Array.isArray(data) ? data : data || []))
+      .catch((e: any) => setError(e?.message || "Failed to load templates"));
   }, [open, chat?.brand_id]);
 
-  // Auto-start: fire runBatch as soon as templates + rows are both ready
   const autoStartFiredRef = useRef(false);
   useEffect(() => {
-    if (!autoStart || !open) return;
-    if (running) return;
-    if (templates.length === 0) return;
-    if (rows.length === 0) return;
-    // Only fire once per open session
+    if (!autoStart || !open || running || templates.length === 0 || rows.length === 0) return;
     if (autoStartFiredRef.current) return;
     autoStartFiredRef.current = true;
-    // Small delay so canvas mounts before we start rendering
     const t = setTimeout(() => runBatch(), 120);
     return () => clearTimeout(t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoStart, open, templates.length, rows.length]);
 
-  // Reset auto-start flag when dialog closes
-  useEffect(() => {
-    if (!open) autoStartFiredRef.current = false;
-  }, [open]);
+  useEffect(() => { if (!open) autoStartFiredRef.current = false; }, [open]);
 
   const queuedCount  = rows.filter((r) => r.status === "queued").length;
   const doneCount    = rows.filter((r) => r.status === "done").length;
@@ -172,56 +164,124 @@ export default function AutoGenerateImagesDialog(props: {
     <>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Mono:wght@400;500&display=swap');
+
+        /* ── Dialog shell ── */
         .auto-dialog {
           background: #111115 !important;
           border: 1px solid rgba(255,255,255,0.08) !important;
           border-radius: 20px !important;
           font-family: 'Syne', sans-serif;
           color: #e4e4e7;
-          min-width: min(90vw, 900px) !important;
+          /* Responsive: fill screen on mobile, capped on desktop */
+          width: min(92vw, 960px) !important;
           max-width: min(92vw, 960px) !important;
-          max-height: 90vh;
+          max-height: 92vh;
           overflow: hidden;
           display: flex;
           flex-direction: column;
         }
+
+        /* ── Two-column body grid ── */
+        .auto-body {
+          flex: 1;
+          overflow: hidden;
+          display: grid;
+          grid-template-columns: 1fr 1.1fr; /* desktop default */
+          gap: 16px;
+          padding: 20px;
+        }
+
+        /* ── Live preview column ── */
+        .auto-preview-col {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          min-height: 0;
+        }
+
+        /* ── Batch progress column ── */
+        .auto-batch-col {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          min-height: 0;
+        }
+
         .auto-start-btn {
           display: inline-flex; align-items: center; gap: 7px;
           background: linear-gradient(135deg, #7c3aed, #4f46e5);
           color: white; border: none; border-radius: 11px;
           padding: 10px 20px; font-family: 'Syne', sans-serif;
           font-size: 12px; font-weight: 700; letter-spacing: 0.04em;
-          cursor: pointer; transition: opacity 0.15s;
+          cursor: pointer; transition: opacity 0.15s; white-space: nowrap;
         }
         .auto-start-btn:hover:not(:disabled) { opacity: 0.85; }
         .auto-start-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
         .progress-bar { height: 3px; background: rgba(255,255,255,0.07); border-radius: 2px; overflow: hidden; }
         .progress-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg, #7c3aed, #4f46e5); transition: width 0.4s ease; }
+
         .row-item { border-radius: 10px; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02); transition: background 0.15s; }
         .row-item.running { background: rgba(139,92,246,0.07); border-color: rgba(139,92,246,0.2); }
-        .row-item.done { background: rgba(52,211,153,0.05); border-color: rgba(52,211,153,0.12); }
-        .row-item.failed { background: rgba(248,113,113,0.05); border-color: rgba(248,113,113,0.12); }
-        .close-btn { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.5); border-radius: 8px; padding: 6px 12px; font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 700; cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 5px; }
+        .row-item.done    { background: rgba(52,211,153,0.05);  border-color: rgba(52,211,153,0.12); }
+        .row-item.failed  { background: rgba(248,113,113,0.05); border-color: rgba(248,113,113,0.12); }
+
+        .close-btn {
+          background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+          color: rgba(255,255,255,0.5); border-radius: 8px; padding: 6px 12px;
+          font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 700;
+          cursor: pointer; transition: all 0.15s;
+          display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+        }
         .close-btn:hover { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.8); }
-        .spinner-sm { width: 12px; height: 12px; border: 2px solid rgba(255,255,255,0.1); border-top-color: #a78bfa; border-radius: 50%; animation: autopulse-spin 0.6s linear infinite; display: inline-block; }
+
+        .spinner-sm {
+          width: 12px; height: 12px; flex-shrink: 0;
+          border: 2px solid rgba(255,255,255,0.1); border-top-color: #a78bfa;
+          border-radius: 50%; animation: autopulse-spin 0.6s linear infinite;
+          display: inline-block;
+        }
+
+        .auto-stats { display: flex; gap: 12px; flex-wrap: wrap; }
+
         @keyframes autopulse-spin { to { transform: rotate(360deg); } }
         @keyframes autopulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+
+        /* ── Mobile: stack to single column, hide live preview ── */
+        @media (max-width: 640px) {
+          .auto-dialog {
+            border-radius: 16px !important;
+            max-height: 96vh;
+          }
+          .auto-body {
+            grid-template-columns: 1fr;   /* single column */
+            overflow-y: auto;
+            padding: 12px;
+            gap: 12px;
+          }
+          /* Hide the live preview panel on mobile — canvas still renders
+             off-screen for image generation, preview just not shown */
+          .auto-preview-col { display: none; }
+          .auto-batch-col { overflow: visible; min-height: unset; }
+          .auto-stats { gap: 8px; }
+          .auto-start-btn { padding: 9px 14px; font-size: 11px; }
+        }
       `}</style>
 
       <Dialog open={open} onOpenChange={(v) => !running && onOpenChange(v)}>
         <DialogContent className="auto-dialog">
-          <DialogHeader style={{ padding: "20px 20px 0", flexShrink: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{ width: 36, height: 36, borderRadius: 11, background: "linear-gradient(135deg, #7c3aed, #4f46e5)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <Sparkles className="w-5 h-5 text-white" />
+          <DialogHeader style={{ padding: "16px 20px 0", flexShrink: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                <div style={{ width: 34, height: 34, borderRadius: 10, background: "linear-gradient(135deg, #7c3aed, #4f46e5)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <Sparkles className="w-4 h-4 text-white" />
                 </div>
-                <div>
-                  <DialogTitle style={{ fontSize: 16, fontWeight: 800, color: "#e4e4e7", fontFamily: "Syne, sans-serif" }}>
+                <div style={{ minWidth: 0 }}>
+                  <DialogTitle style={{ fontSize: 15, fontWeight: 800, color: "#e4e4e7", fontFamily: "Syne, sans-serif" }}>
                     Auto Generate Images
                   </DialogTitle>
-                  <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", marginTop: 2 }}>
-                    Renders each draft using a random template and background
+                  <p style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", marginTop: 1 }}>
+                    Renders each draft with a random template + background
                   </p>
                 </div>
               </div>
@@ -231,14 +291,14 @@ export default function AutoGenerateImagesDialog(props: {
             </div>
           </DialogHeader>
 
-          <div style={{ flex: 1, overflow: "hidden", display: "grid", gridTemplateColumns: "1fr 1.1fr", gap: 16, padding: 20 }}>
-            {/* ── LEFT: Live Preview ── */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 12, minHeight: 0 }}>
+          <div className="auto-body">
+
+            {/* ── LEFT: Live Preview — hidden on mobile via CSS ── */}
+            <div className="auto-preview-col">
               <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.3)" }}>
                 Live Preview
               </div>
-
-              <div style={{ flex: 1, borderRadius: 16, overflow: "hidden", border: "1px solid rgba(255,255,255,0.08)", background: "#0c0c0f", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 320 }}>
+              <div style={{ flex: 1, borderRadius: 16, overflow: "hidden", border: "1px solid rgba(255,255,255,0.08)", background: "#0c0c0f", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 300 }}>
                 {currentTemplate && currentCampaignData ? (
                   <TemplateCanvas
                     ref={canvasRef}
@@ -258,7 +318,6 @@ export default function AutoGenerateImagesDialog(props: {
                   </div>
                 )}
               </div>
-
               {currentDraftId && (
                 <div style={{ fontSize: 10, color: "rgba(255,255,255,0.25)", fontFamily: "DM Mono, monospace", display: "flex", alignItems: "center", gap: 6 }}>
                   <span className="spinner-sm" />
@@ -268,14 +327,15 @@ export default function AutoGenerateImagesDialog(props: {
             </div>
 
             {/* ── RIGHT: Batch Progress ── */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 12, minHeight: 0 }}>
-              {/* Stats + start button */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                <div style={{ display: "flex", gap: 12 }}>
+            <div className="auto-batch-col">
+
+              {/* Stats + start */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+                <div className="auto-stats">
                   {[
-                    { label: "Queued", val: queuedCount, color: "#6b7280" },
-                    { label: "Done", val: doneCount, color: "#34d399" },
-                    { label: "Failed", val: failCount, color: "#f87171" },
+                    { label: "Queued",  val: queuedCount,  color: "#6b7280" },
+                    { label: "Done",    val: doneCount,    color: "#34d399" },
+                    { label: "Failed",  val: failCount,    color: "#f87171" },
                     { label: "Skipped", val: skippedCount, color: "#fbbf24" },
                   ].map(({ label, val, color }) => (
                     <div key={label} style={{ textAlign: "center" }}>
@@ -284,7 +344,6 @@ export default function AutoGenerateImagesDialog(props: {
                     </div>
                   ))}
                 </div>
-
                 <button className="auto-start-btn" onClick={runBatch} disabled={running || !templates.length || queuedCount === 0}>
                   {running ? <><span className="spinner-sm" />Generating…</> : <><Play className="w-3.5 h-3.5 fill-white" />Start</>}
                 </button>
@@ -303,6 +362,14 @@ export default function AutoGenerateImagesDialog(props: {
                 </div>
               )}
 
+              {/* Running status — visible on mobile since preview is hidden */}
+              {currentDraftId && (
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.25)", fontFamily: "DM Mono, monospace", display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", background: "rgba(139,92,246,0.07)", borderRadius: 8, border: "1px solid rgba(139,92,246,0.15)" }}>
+                  <span className="spinner-sm" />
+                  {runningRow?.message || "Processing…"}
+                </div>
+              )}
+
               {error && (
                 <div style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 10, padding: "8px 12px", fontSize: 11, color: "#f87171", display: "flex", alignItems: "center", gap: 6 }}>
                   <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />{error}
@@ -316,25 +383,19 @@ export default function AutoGenerateImagesDialog(props: {
               )}
 
               {/* Draft list */}
-              <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
+              <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6, maxHeight: 360 }}>
                 {rows.map((row) => (
                   <div key={row.draft.id} className={`row-item ${row.status}`} style={{ padding: "10px 12px", display: "flex", alignItems: "center", gap: 10 }}>
-                    {/* Thumbnail or placeholder */}
-                    <div style={{ width: 36, height: 36, borderRadius: 8, overflow: "hidden", background: "rgba(255,255,255,0.05)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <div style={{ width: 34, height: 34, borderRadius: 8, overflow: "hidden", background: "rgba(255,255,255,0.05)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
                       {row.imageUrl
                         ? <img src={row.imageUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                        : row.status === "running"
-                          ? <span className="spinner-sm" />
-                          : row.status === "done"
-                            ? <Check className="w-4 h-4" style={{ color: "#34d399" }} />
-                            : row.status === "failed"
-                              ? <X className="w-4 h-4" style={{ color: "#f87171" }} />
-                              : row.status === "skipped"
-                                ? <SkipForward className="w-4 h-4" style={{ color: "#fbbf24" }} />
-                                : <ImageIcon className="w-4 h-4" style={{ color: "rgba(255,255,255,0.2)" }} />
+                        : row.status === "running"  ? <span className="spinner-sm" />
+                        : row.status === "done"     ? <Check className="w-4 h-4" style={{ color: "#34d399" }} />
+                        : row.status === "failed"   ? <X className="w-4 h-4" style={{ color: "#f87171" }} />
+                        : row.status === "skipped"  ? <SkipForward className="w-4 h-4" style={{ color: "#fbbf24" }} />
+                        : <ImageIcon className="w-4 h-4" style={{ color: "rgba(255,255,255,0.2)" }} />
                       }
                     </div>
-
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                         <span style={{ fontSize: 11, color: "rgba(255,255,255,0.6)", fontFamily: "DM Mono, monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -349,6 +410,24 @@ export default function AutoGenerateImagesDialog(props: {
                   </div>
                 ))}
               </div>
+
+              {/* Off-screen canvas for image generation — always mounted when active */}
+              <div style={{ position: "absolute", left: -9999, top: -9999, pointerEvents: "none", opacity: 0 }}>
+                {currentTemplate && currentCampaignData && (
+                  <TemplateCanvas
+                    ref={canvasRef}
+                    zoom={1} setZoom={() => {}} pan={{ x: 0, y: 0 }} setPan={() => {}}
+                    backgroundImage={currentBg}
+                    logoUrl={currentTemplate?.logoPlacement?.url}
+                    campaignData={currentCampaignData}
+                    selectedShapeId={null} onShapeSelect={() => {}}
+                    shapes={currentShapes}
+                    canvasWidth={PORTRAIT_W} canvasHeight={PORTRAIT_H}
+                    isEditable={false}
+                  />
+                )}
+              </div>
+
             </div>
           </div>
         </DialogContent>
