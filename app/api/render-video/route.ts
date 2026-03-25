@@ -25,6 +25,19 @@ import type { CampaignData } from "@/lib/types";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
+// ── Async job store — returns jobId immediately, render runs in background ───
+type RenderJob = { status: "processing" | "done" | "failed"; url?: string; meta?: any; error?: string; startedAt: number; };
+const _jobs = new Map<string, RenderJob>();
+
+export async function GET(req: NextRequest) {
+  const jobId = req.nextUrl.searchParams.get("jobId");
+  if (!jobId) return NextResponse.json({ error: "Missing jobId" }, { status: 400 });
+  const job = _jobs.get(jobId);
+  if (!job) return NextResponse.json({ error: "Job not found" }, { status: 404 });
+  if (job.status !== "processing" && Date.now() - job.startedAt > 600_000) _jobs.delete(jobId);
+  return NextResponse.json(job);
+}
+
 // ── Bundle cache: built ONCE per process, never per request ──────────────────
 let _bundleCache: string | null = null;
 async function getBundleLocation(): Promise<string> {
@@ -76,11 +89,25 @@ interface StudioScene {
 }
 
 export async function POST(req: NextRequest) {
+  let body: any;
+  try { body = await req.json(); }
+  catch { return NextResponse.json({ ok: false, error: "Invalid JSON" }, { status: 400 }); }
+
+  const jobId = `render-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  _jobs.set(jobId, { status: "processing", startedAt: Date.now() });
+
+  _runRender(jobId, body).catch((err) => {
+    _jobs.set(jobId, { status: "failed", error: err?.message || "Unknown error", startedAt: Date.now() });
+  });
+
+  return NextResponse.json({ ok: true, jobId, status: "processing" });
+}
+
+async function _runRender(jobId: string, body: any): Promise<void> {
   const tempFiles: string[] = [];
 
   try {
-    const body = await req.json();
-
+ 
     const {
       body_text,
       companyName,
@@ -518,10 +545,7 @@ export async function POST(req: NextRequest) {
 
     console.log("[render-video] Done:", url);
 
-    return NextResponse.json({
-      ok: true,
-      url,
-      meta: {
+    _jobs.set(jobId, { status: "done", url, startedAt: _jobs.get(jobId)?.startedAt ?? Date.now(),  meta: {
         segments:      script.segments.length,
         totalSeconds:  totalDuration,
         sceneDurations,
@@ -530,15 +554,11 @@ export async function POST(req: NextRequest) {
         styleDNA:      script.styleDNA,
         markerCounts:  sceneSpeechMarkers.map((m) => m.length),
         captionsMode:  "off",
-      },
-    });
-
+      }, });
   } catch (err: any) {
     console.error("[render-video] Fatal:", err);
-    return NextResponse.json({ ok: false, error: err?.message || "Render failed" }, { status: 500 });
+    _jobs.set(jobId, { status: "failed", error: err?.message || "Render failed", startedAt: _jobs.get(jobId)?.startedAt ?? Date.now() });
   } finally {
-    for (const f of tempFiles) {
-      try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch {}
-    }
+    for (const f of tempFiles) { try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch {} }
   }
 }

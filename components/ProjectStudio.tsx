@@ -802,8 +802,25 @@ export default function ProjectStudio(props: {
         }),
       });
 
-      const json = await res.json().catch(() => ({ ok: false, error: `HTTP ${res.status}` }));
-      if (!json.ok) throw new Error(json.error || "Render failed");
+      const startJson = await res.json().catch(() => ({ ok: false, error: `HTTP ${res.status}` }));
+      if (!startJson.ok) throw new Error(startJson.error || "Render failed to start");
+
+      // ── Poll for completion — immune to nginx/browser timeouts ──
+      const jobId = startJson.jobId;
+      let json: any = null;
+      const POLL_INTERVAL = 3000;
+      const POLL_TIMEOUT  = 600_000;
+      const pollStart = Date.now();
+
+      while (Date.now() - pollStart < POLL_TIMEOUT) {
+        await new Promise(r => setTimeout(r, POLL_INTERVAL));
+        const pollRes = await fetch(`/api/render-video?jobId=${jobId}`);
+        const poll = await pollRes.json().catch(() => ({ status: "failed", error: "Poll error" }));
+        if (poll.status === "done")   { json = poll; break; }
+        if (poll.status === "failed") throw new Error(poll.error || "Render failed");
+      }
+
+      if (!json) throw new Error("Render timed out after 10 minutes");
 
       setRenderUrl(json.url);
       persist(scenes, json.url);
