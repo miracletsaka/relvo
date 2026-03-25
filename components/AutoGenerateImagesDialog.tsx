@@ -64,6 +64,7 @@ export default function AutoGenerateImagesDialog(props: {
     (async () => {
       try {
         const assets = await listMediaAssets({ type: "image", brand_id: brandId });
+        console.log("fetched media assets for brand", brandId, assets);
         setBackgrounds(assets.map(a => a.url).filter(Boolean));
       } catch (e) {
         console.warn("[backgrounds] fetch failed:", e);
@@ -159,6 +160,8 @@ export default function AutoGenerateImagesDialog(props: {
   };
 
   const progress = rows.length > 0 ? Math.round(((doneCount + failCount + skippedCount) / rows.length) * 100) : 0;
+
+  console.log("media assets for backgrounds:",  backgrounds);
 
   return (
     <>
