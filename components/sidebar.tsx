@@ -247,15 +247,6 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
               <span className="sb-logo-text">Neuro<span>Flow</span></span>
             </div>
 
-            {/* Collapsed: show icon only on desktop */}
-            {!isOpen && (
-              <div className="hidden lg:flex items-center">
-                <div className="w-8 h-8 rounded-full bg-white shadow-lg flex items-center justify-center">
-                  <img src="/NeuroFlow_AI_Logo.png" alt="NeuroFlow Logo" className="h-3 w-auto" />
-                </div>
-              </div>
-            )}
-
             {/* Desktop: collapse toggle */}
             <button className="sb-toggle z-50" onClick={onToggle}>
               {isOpen
@@ -341,7 +332,13 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
 
             {isOpen ? (
               <button className="sb-profile-btn" onClick={() => setProfileOpen(v => !v)}>
-                <div className="sb-avatar">N</div>
+                <div className="sb-avatar">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-white shadow-lg flex items-center justify-center">
+                      <img src="/NeuroFlow_AI_Logo.png" alt="NeuroFlow Logo" className="h-4 w-auto" />
+                    </div>
+                  </div>
+                </div>
                 <div className="sb-profile-info">
                   <div className="sb-profile-name">NeuroFlow</div>
                   <div className="sb-profile-role">Admin</div>
@@ -355,7 +352,13 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
                 onClick={onToggle}
                 title="Open menu"
               >
-                <div className="sb-avatar">N</div>
+                <div className="sb-avatar">
+                   <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-white shadow-lg flex items-center justify-center">
+                      <img src="/NeuroFlow_AI_Logo.png" alt="NeuroFlow Logo" className="h-4 w-auto" />
+                    </div>
+                  </div>
+                </div>
               </button>
             )}
           </div>

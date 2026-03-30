@@ -710,11 +710,77 @@ export default function ProjectStudio(props: {
   };
 
   // ── Render ──
+  // ── Render job state — persisted in localStorage so it survives navigation ──
+  const [renderJobId,     setRenderJobId]     = useState<string | null>(() => {
+    try { return localStorage.getItem(`${storageKey}-jobId`) || null; } catch { return null; }
+  });
+  const [renderJobStatus, setRenderJobStatus] = useState<"processing" | "done" | "failed" | null>(() => {
+    try { return (localStorage.getItem(`${storageKey}-jobStatus`) as any) || null; } catch { return null; }
+  });
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Persist job state to localStorage so it survives page navigation
+  const saveJobState = (jobId: string | null, status: string | null, url?: string | null) => {
+    try {
+      if (jobId)   localStorage.setItem(`${storageKey}-jobId`, jobId);
+      else         localStorage.removeItem(`${storageKey}-jobId`);
+      if (status)  localStorage.setItem(`${storageKey}-jobStatus`, status);
+      else         localStorage.removeItem(`${storageKey}-jobStatus`);
+    } catch {}
+  };
+
+  // Poll the render status endpoint every 5s — works even if user navigates away and comes back
+  useEffect(() => {
+    if (!renderJobId || renderJobStatus === "done" || renderJobStatus === "failed") {
+      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+      return;
+    }
+
+    const poll = async () => {
+      try {
+        const res  = await fetch(`/api/render-video?jobId=${renderJobId}`);
+        const data = await res.json();
+
+        if (data.status === "done") {
+          setRenderJobStatus("done");
+          setRenderUrl(data.url);
+          persist(scenes, data.url);
+          saveJobState(renderJobId, "done");
+          setIsRendering(false);
+          // Server already attached to draft — just show success
+          setSuccess(draftId
+            ? "✓ Video rendered and attached to draft automatically."
+            : "✓ Video rendered successfully."
+          );
+          if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+        } else if (data.status === "failed") {
+          setRenderJobStatus("failed");
+          setErr(data.error || "Render failed on server");
+          saveJobState(renderJobId, "failed");
+          setIsRendering(false);
+          if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+        } else if (data.status === "unknown") {
+          // Server restarted — job lost, clear state
+          setRenderJobId(null);
+          setRenderJobStatus(null);
+          setIsRendering(false);
+          saveJobState(null, null);
+          if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+        }
+        // "processing" → keep polling
+      } catch { /* network blip — keep polling */ }
+    };
+
+    pollRef.current = setInterval(poll, 5000);
+    poll(); // immediate first check
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [renderJobId, renderJobStatus]);
+
   const render = async () => {
     if (!scenes.length) return;
     setIsRendering(true); setErr(null); setSuccess(null);
     try {
-      // Step 1: upload all local blob URLs to Spaces so the server has real URLs
+      // Step 1: upload all local blob URLs — this is fast (client-side only)
       const recordedUrls: Record<number, string> = {};
       const uploadedUrls: Record<number, { url: string; type: "video" | "image" }> = {};
       const webcamClips: any[] = [];
@@ -733,7 +799,6 @@ export default function ProjectStudio(props: {
           });
         }
         if (s.uploadedBlobUrl && s.uploadedType) {
-          // Use real MIME type for correct extension — CDNs reject mismatched extensions
           const mimeExtMap: Record<string, string> = {
             "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp",
             "image/gif": "gif", "image/heic": "heic",
@@ -748,7 +813,7 @@ export default function ProjectStudio(props: {
         }
       }
 
-      // Step 2: build storyboardScenes — no blob URLs, only server-accessible URLs
+      // Step 2: build payload
       const storyboardScenes = scenes.map((s) => ({
         mode:          s.mode,
         aiPrompt:      s.aiPrompt      || null,
@@ -761,7 +826,6 @@ export default function ProjectStudio(props: {
         overlays:      s.overlays || null,
       }));
 
-      // Step 3: preGeneratedScript from Studio scenes
       const preGeneratedScript = {
         segments: scenes.map((s) => ({
           screenText:        s.screenText,
@@ -779,66 +843,40 @@ export default function ProjectStudio(props: {
           aiPrompt:          s.aiPrompt || "",
         })),
         fullNarration: scenes.map((s) => s.narration).join(" "),
-        companyName,
-        accentColor,
-        voiceId,
+        companyName, accentColor, voiceId,
         styleDNA: { primaryFont: "Syne", tone: "professional", cinematicMood: "cinematic" },
       };
 
+      // Step 3: POST — returns jobId in < 1s, server renders in background
       const res = await fetch("/api/render-video", {
-        method: "POST",
+        method:  "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          companyName,
-          accentColor,
-          brandId,
-          captionsMode:      "off",
-          useVeo3:           false,
-          voiceId,
-          enableVoice,
-          webcamClips,
-          storyboardScenes,
-          preGeneratedScript,
+          companyName, accentColor, brandId,
+          captionsMode: "off", useVeo3: false,
+          voiceId, enableVoice, webcamClips,
+          storyboardScenes, preGeneratedScript,
+          draftId,   // ← server will auto-attach video to draft when done
         }),
       });
 
       const startJson = await res.json().catch(() => ({ ok: false, error: `HTTP ${res.status}` }));
-      if (!startJson.ok) throw new Error(startJson.error || "Render failed to start");
+      if (!startJson.ok) throw new Error(startJson.error || "Failed to start render");
 
-      // ── Poll for completion — immune to nginx/browser timeouts ──
+      // Step 4: save jobId — polling useEffect picks it up automatically
       const jobId = startJson.jobId;
-      let json: any = null;
-      const POLL_INTERVAL = 3000;
-      const POLL_TIMEOUT  = 600_000;
-      const pollStart = Date.now();
+      setRenderJobId(jobId);
+      setRenderJobStatus("processing");
+      saveJobState(jobId, "processing");
 
-      while (Date.now() - pollStart < POLL_TIMEOUT) {
-        await new Promise(r => setTimeout(r, POLL_INTERVAL));
-        const pollRes = await fetch(`/api/render-video?jobId=${jobId}`);
-        const poll = await pollRes.json().catch(() => ({ status: "failed", error: "Poll error" }));
-        if (poll.status === "done")   { json = poll; break; }
-        if (poll.status === "failed") throw new Error(poll.error || "Render failed");
-      }
+      // Show non-blocking status — user can navigate away
+      setSuccess("⟳ Rendering in background… you can navigate away and come back.");
 
-      if (!json) throw new Error("Render timed out after 10 minutes");
-
-      setRenderUrl(json.url);
-      persist(scenes, json.url);
-
-      if (draftId) {
-        await attachMediaToContentItem(draftId, {
-          media_type: "video", media_url: json.url,
-          media_urls: [json.url], media_provider: "render_pipeline", media_caption: null,
-        });
-        setSuccess("Video rendered and attached to draft.");
-      } else {
-        setSuccess("Video rendered successfully.");
-      }
     } catch (e: any) {
       setErr(e.message);
-    } finally {
       setIsRendering(false);
     }
+    // Note: setIsRendering(false) is called by the polling effect when done/failed
   };
 
   const totalEstDur  = scenes.reduce((a, s) => a + estimateVoiceDur(s.narration), 0);
@@ -1022,7 +1060,9 @@ export default function ProjectStudio(props: {
               <button onClick={render} disabled={isRendering || !scenes.length}
                 style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 18px", background: isRendering ? "rgba(255,255,255,0.06)" : "linear-gradient(135deg,#7c3aed,#4f46e5)", border: "none", borderRadius: 11, color: "#fff", fontSize: 12, fontWeight: 800, cursor: isRendering ? "not-allowed" : "pointer", fontFamily: "Syne, sans-serif" }}>
                 {isRendering ? <span className="stu-spin" /> : <Sparkles style={{ width: 13, height: 13 }} />}
-                {isRendering ? "Rendering…" : draftId ? "Render + Attach" : "Render Video"}
+                {isRendering
+                  ? renderJobStatus === "processing" ? "Rendering…" : "Uploading…"
+                  : draftId ? "Render + Attach" : "Render Video"}
               </button>
             </div>
           </div>
