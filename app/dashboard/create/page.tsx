@@ -23,7 +23,16 @@ import {
 import { getTemplates } from "@/lib/template-storage";
 import DashboardOverview from "@/components/DashboardOverview";
 import AutoGenerateImagesDialog from "@/components/AutoGenerateImagesDialog";
-import Platforms from "@/components/platforms";
+
+// ---- helpers ----
+function postsInMonth(targetMonth: string, postsPerWeek: number) {
+  const [yStr, mStr] = targetMonth.split("-");
+  const y = Number(yStr);
+  const m = Number(mStr);
+  const days = new Date(y, m, 0).getDate();
+  const weeks = Math.ceil(days / 7);
+  return Math.max(1, weeks * Math.max(1, postsPerWeek));
+}
 
 type Draft = {
   id: string;
@@ -47,32 +56,66 @@ type GenerationResult = {
 
 async function safeGenerateWithFallback(
   params: Parameters<typeof createTopicChatAndGenerate>[0],
-  onChatIdKnown: (id: string) => void
+  onChatIdKnown: (id: string) => void,
+  onProgress?: (draftsCount: number) => void,
 ): Promise<{ generated: number; failed: number; topic_chat_id: string | null }> {
-  let topicChatId: string | null = null;
-  try {
-    const res = await createTopicChatAndGenerate(params);
-    topicChatId = (res as any)?.topic_chat_id ?? null;
-    if (topicChatId) onChatIdKnown(topicChatId);
+  // Step 1: POST — returns topic_chat_id instantly (< 1s), generation runs in background
+  const res = await createTopicChatAndGenerate(params);
+  const topicChatId: string | null = (res as any)?.topic_chat_id ?? null;
+  if (!topicChatId) throw new Error("No topic_chat_id returned from server");
+  onChatIdKnown(topicChatId);
+
+  // Step 2: If server already finished synchronously (old behaviour), return immediately
+  const serverStatus = (res as any)?.status;
+  if (serverStatus !== "processing") {
     return {
-      generated: (res as any)?.generated ?? 0,
-      failed: (res as any)?.failed ?? 0,
+      generated:     (res as any)?.generated ?? 0,
+      failed:        (res as any)?.failed    ?? 0,
       topic_chat_id: topicChatId,
     };
-  } catch (networkErr) {
-    if (!topicChatId) throw networkErr;
-    await new Promise((r) => setTimeout(r, 3000));
+  }
+
+  // Step 3: Poll GET /topic-chats/{id}/status every 4s until done/failed
+  const API = (process.env.NEXT_PUBLIC_API_BASE || "").replace(/\/$/, "");
+  const POLL_INTERVAL = 4000;
+  const POLL_TIMEOUT  = 900_000; // 15 minutes max
+  const pollStart     = Date.now();
+
+  while (Date.now() - pollStart < POLL_TIMEOUT) {
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL));
     try {
-      const drafts: Draft[] = await listTopicChatDrafts(topicChatId);
-      const generated = drafts.filter((d) => d.status !== "FAILED").length;
-      const failed    = drafts.filter((d) => d.status === "FAILED").length;
-      return { generated, failed, topic_chat_id: topicChatId };
-    } catch {
-      throw networkErr;
+      const pollRes = await fetch(`${API}/topic-chats/${topicChatId}/status`);
+      const poll    = await pollRes.json();
+
+      // Update live progress counter in UI
+      if (poll.drafts_so_far !== undefined) onProgress?.(poll.drafts_so_far);
+
+      if (poll.status === "done") {
+        return {
+          generated:     poll.generated ?? 0,
+          failed:        poll.failed    ?? 0,
+          topic_chat_id: topicChatId,
+        };
+      }
+      if (poll.status === "failed") {
+        throw new Error(poll.error || "Generation failed on server");
+      }
+    } catch (pollErr: any) {
+      if (pollErr?.message?.includes("Generation failed")) throw pollErr;
+      console.warn("[poll] status check failed, retrying:", pollErr?.message);
     }
   }
+
+  // Timeout — return whatever drafts exist
+  const drafts: Draft[] = await listTopicChatDrafts(topicChatId).catch(() => []);
+  return {
+    generated:     drafts.filter((d) => d.status !== "FAILED").length,
+    failed:        drafts.filter((d) => d.status === "FAILED").length,
+    topic_chat_id: topicChatId,
+  };
 }
 
+// ── PlatformBadge ─────────────────────────────────────────────────────────────
 const PLATFORM_COLORS: Record<string, string> = {
   linkedin:  "#0A66C2",
   facebook:  "#1877F2",
@@ -105,6 +148,7 @@ function StatusDot({ status }: { status: string }) {
   );
 }
 
+// ── DraftCard ─────────────────────────────────────────────────────────────────
 const PLATFORM_ICONS: Record<string, string> = {
   instagram: "M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z",
   facebook:  "M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z",
@@ -175,6 +219,7 @@ function DraftCard({ draft, index, selected, onSelect }: {
       onMouseLeave={() => setHovered(false)}
       onClick={() => setExpanded(v => !v)}
     >
+      {/* ── Checkbox ─────────────────────────────────────────────────── */}
       {onSelect && (
         <div
           style={{ position: "absolute", top: 10, left: 10, zIndex: 20, opacity: hovered || selected ? 1 : 0, transition: "opacity 0.15s", pointerEvents: hovered || selected ? "auto" : "none" }}
@@ -186,39 +231,57 @@ function DraftCard({ draft, index, selected, onSelect }: {
         </div>
       )}
 
+      {/* ── Image area (portrait 4:5 aspect) ─────────────────────────── */}
       <div style={{ position: "relative", width: "100%", aspectRatio: "4/5", background: hasImage ? "#000" : `linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)`, flexShrink: 0, overflow: "hidden" }}>
+
+        {/* Image */}
         {mediaUrl && (
           <img
-            src={mediaUrl} alt=""
+            src={mediaUrl}
+            alt=""
             style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: imgLoaded ? 1 : 0, transition: "opacity 0.3s ease" }}
             onLoad={() => setImgLoaded(true)}
             onError={() => setImgError(true)}
           />
         )}
+
+        {/* Placeholder when no image */}
         {!hasImage && (
           <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10 }}>
+            {/* Subtle grid pattern */}
             <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px)", backgroundSize: "20px 20px" }} />
+            {/* Platform icon big */}
             <div style={{ width: 48, height: 48, borderRadius: 14, background: pColor + "18", border: `1px solid ${pColor}30`, display: "flex", alignItems: "center", justifyContent: "center", color: pColor, position: "relative" }}>
               <PlatformIcon platform={draft.platform} size={22} />
             </div>
             <span style={{ fontSize: 10, fontWeight: 600, color: "rgba(255,255,255,0.2)", fontFamily: "DM Mono, monospace", letterSpacing: "0.08em" }}>NO IMAGE YET</span>
           </div>
         )}
+
+        {/* Loading shimmer */}
         {mediaUrl && !imgLoaded && !imgError && (
           <div style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.07) 50%, rgba(255,255,255,0.03) 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.4s infinite" }} />
         )}
+
+        {/* Bottom gradient overlay on image */}
         {hasImage && imgLoaded && (
           <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.3) 45%, transparent 70%)" }} />
         )}
+
+        {/* Platform badge — top right */}
         <div style={{ position: "absolute", top: 10, right: 10, display: "flex", alignItems: "center", gap: 5, background: "rgba(0,0,0,0.65)", backdropFilter: "blur(12px)", border: `1px solid ${pColor}40`, borderRadius: 20, padding: "4px 8px 4px 6px" }}>
           <span style={{ color: pColor, display: "flex" }}><PlatformIcon platform={draft.platform} size={10} /></span>
           <span style={{ fontSize: 9, fontWeight: 800, color: pColor, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: "Syne, sans-serif" }}>{draft.platform}</span>
         </div>
+
+        {/* Date badge — bottom left on image */}
         {dateStr && (
           <div style={{ position: "absolute", bottom: 10, left: 10, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)", borderRadius: 8, padding: "3px 7px" }}>
             <span style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.7)", fontFamily: "DM Mono, monospace" }}>{dateStr}</span>
           </div>
         )}
+
+        {/* Status pill — bottom right on image */}
         <div style={{ position: "absolute", bottom: 10, right: 10, background: statusColor + "20", border: `1px solid ${statusColor}40`, borderRadius: 20, padding: "3px 8px", display: "flex", alignItems: "center", gap: 4 }}>
           <span style={{ width: 5, height: 5, borderRadius: "50%", background: statusColor, display: "inline-block", ...(draft.status === "PENDING_APPROVAL" ? { animation: "autopulse 1.5s ease-in-out infinite" } : {}) }} />
           <span style={{ fontSize: 9, fontWeight: 700, color: statusColor, letterSpacing: "0.06em", fontFamily: "DM Mono, monospace" }}>
@@ -227,10 +290,15 @@ function DraftCard({ draft, index, selected, onSelect }: {
         </div>
       </div>
 
+      {/* ── Card body ─────────────────────────────────────────────────── */}
       <div style={{ padding: "12px 14px", flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+
+        {/* Hook text */}
         <p style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.85)", lineHeight: 1.45, fontFamily: "Syne, sans-serif", margin: 0, display: "-webkit-box", WebkitLineClamp: expanded ? undefined : 2, WebkitBoxOrient: "vertical", overflow: expanded ? "visible" : "hidden" }}>
           {hook || "(no content)"}
         </p>
+
+        {/* Bullets preview */}
         {Array.isArray(s.bullets) && s.bullets.filter(Boolean).length > 0 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
             {s.bullets.filter(Boolean).slice(0, expanded ? 3 : 2).map((b: string, i: number) => (
@@ -241,13 +309,19 @@ function DraftCard({ draft, index, selected, onSelect }: {
             ))}
           </div>
         )}
+
+        {/* Expanded: full caption */}
         {expanded && caption && (
           <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 10, marginTop: 2 }}>
             <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.2)", marginBottom: 6, fontFamily: "DM Mono, monospace" }}>Full Caption</div>
             <p style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", lineHeight: 1.6, whiteSpace: "pre-wrap", margin: 0 }}>{caption}</p>
-            {draft.hashtags && <p style={{ fontSize: 11, color: "#a78bfa", marginTop: 8, lineHeight: 1.5 }}>{draft.hashtags}</p>}
+            {draft.hashtags && (
+              <p style={{ fontSize: 11, color: "#a78bfa", marginTop: 8, lineHeight: 1.5 }}>{draft.hashtags}</p>
+            )}
           </div>
         )}
+
+        {/* Footer row */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "auto", paddingTop: 4 }}>
           <button
             style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.25)", background: "none", border: "none", cursor: "pointer", padding: 0, letterSpacing: "0.06em", fontFamily: "DM Mono, monospace", textTransform: "uppercase", transition: "color 0.15s" }}
@@ -269,8 +343,13 @@ function DraftCard({ draft, index, selected, onSelect }: {
   );
 }
 
+// ── ResultsPanel ──────────────────────────────────────────────────────────────
 function ResultsPanel({
-  results, onRegenImages, onRegenSelected, selectedDraftIds, onSelectDraft,
+  results,
+  onRegenImages,
+  onRegenSelected,
+  selectedDraftIds,
+  onSelectDraft,
 }: {
   results: GenerationResult[];
   onRegenImages: (topicIdx: number) => void;
@@ -317,8 +396,7 @@ function ResultsPanel({
           <span className="text-white font-bold">{results.length}</span> topic{results.length !== 1 ? "s" : ""}
         </div>
         {active.topic_chat_id && (
-          <a target="___blank" href={`/dashboard/topic-chats/${active.topic_chat_id}`} onClick={e => e.stopPropagation()}
-            style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(124,58,237,0.15)", border: "1px solid rgba(124,58,237,0.3)", color: "#c4b5fd", fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 8, textDecoration: "none", letterSpacing: "0.04em" }}>
+          <a href={`/dashboard/topic-chats/${active.topic_chat_id}`} onClick={e => e.stopPropagation()} style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(124,58,237,0.15)", border: "1px solid rgba(124,58,237,0.3)", color: "#c4b5fd", fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 8, textDecoration: "none", letterSpacing: "0.04em" }}>
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
             View chat
           </a>
@@ -328,8 +406,7 @@ function ResultsPanel({
       {results.length > 1 && (
         <div className="flex gap-1 p-2 border-b border-white/[0.07] overflow-x-auto">
           {results.map((r, i) => (
-            <button key={i} onClick={() => setActiveIdx(i)}
-              className={`flex-shrink-0 text-[11px] px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 ${i === safeIdx ? "bg-violet-600 text-white" : "text-white/40 hover:text-white/70 hover:bg-white/5"}`}>
+            <button key={i} onClick={() => setActiveIdx(i)} className={`flex-shrink-0 text-[11px] px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 ${i === safeIdx ? "bg-violet-600 text-white" : "text-white/40 hover:text-white/70 hover:bg-white/5"}`}>
               {r.topic.length > 20 ? r.topic.slice(0, 20) + "…" : r.topic}
               <span style={{ fontSize: 9, opacity: 0.6, fontFamily: "DM Mono, monospace" }}>{r.drafts.length}</span>
             </button>
@@ -338,15 +415,15 @@ function ResultsPanel({
       )}
 
       <div style={{ overflow: "hidden", maxHeight: hasSelection ? 48 : 0, opacity: hasSelection ? 1 : 0, transition: "max-height 0.2s ease, opacity 0.2s ease", background: "rgba(124,58,237,0.07)", borderBottom: hasSelection ? "1px solid rgba(124,58,237,0.2)" : "none" }}>
-        <div className="flex items-center gap-2 px-3" style={{ height: 48, flexWrap: "wrap" }}>
+        <div className="flex items-center gap-3 px-4" style={{ height: 48 }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: "#a78bfa", fontFamily: "DM Mono, monospace" }}>{activeSelected.length} selected</span>
           <button onClick={toggleSelectAll} style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.4)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>{allSelected ? "Deselect all" : "Select all"}</button>
           <div style={{ flex: 1 }} />
-          <button onClick={() => onRegenSelected(safeIdx, activeSelected)} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(52,211,153,0.12)", border: "1px solid rgba(52,211,153,0.3)", color: "#34d399", fontSize: 11, fontWeight: 700, padding: "6px 10px", borderRadius: 8, cursor: "pointer" }}>
+          <button onClick={() => onRegenSelected(safeIdx, activeSelected)} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(52,211,153,0.12)", border: "1px solid rgba(52,211,153,0.3)", color: "#34d399", fontSize: 11, fontWeight: 700, padding: "6px 14px", borderRadius: 8, cursor: "pointer" }}>
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
-            Regen {activeSelected.length}
+            Regen {activeSelected.length} image{activeSelected.length !== 1 ? "s" : ""}
           </button>
-          <button onClick={bulkApprove} disabled={approving} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: approving ? "rgba(255,255,255,0.04)" : "rgba(167,139,250,0.12)", border: `1px solid ${approving ? "rgba(255,255,255,0.08)" : "rgba(167,139,250,0.3)"}`, color: approving ? "rgba(255,255,255,0.2)" : "#a78bfa", fontSize: 11, fontWeight: 700, padding: "6px 10px", borderRadius: 8, cursor: approving ? "not-allowed" : "pointer" }}>
+          <button onClick={bulkApprove} disabled={approving} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: approving ? "rgba(255,255,255,0.04)" : "rgba(167,139,250,0.12)", border: `1px solid ${approving ? "rgba(255,255,255,0.08)" : "rgba(167,139,250,0.3)"}`, color: approving ? "rgba(255,255,255,0.2)" : "#a78bfa", fontSize: 11, fontWeight: 700, padding: "6px 14px", borderRadius: 8, cursor: approving ? "not-allowed" : "pointer" }}>
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
             Approve ({activeSelected.length})
           </button>
@@ -360,7 +437,7 @@ function ResultsPanel({
         {active.drafts.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-40 text-white/20 text-sm">No drafts loaded</div>
         ) : (
-          <div className="draft-grid">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 14 }}>
             {active.drafts.map((d, i) => (
               <DraftCard key={d.id} draft={d} index={i} selected={selectedDraftIds.has(d.id)} onSelect={(checked) => onSelectDraft(d.id, checked)} />
             ))}
@@ -368,14 +445,14 @@ function ResultsPanel({
         )}
       </div>
 
-      <div className="px-3 py-2.5 border-t border-white/[0.07] flex items-center gap-2 flex-wrap">
+      <div className="px-3 py-2.5 border-t border-white/[0.07] flex items-center gap-2">
         <button onClick={toggleSelectAll} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.4)", fontSize: 11, fontWeight: 600, padding: "5px 11px", borderRadius: 8, cursor: "pointer" }}>
           <div style={{ width: 13, height: 13, borderRadius: 3, flexShrink: 0, border: `1.5px solid ${allSelected ? "#7c3aed" : "rgba(255,255,255,0.3)"}`, background: allSelected ? "#7c3aed" : "transparent", display: "flex", alignItems: "center", justifyContent: "center" }}>
             {allSelected && <svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5"><polyline points="20 6 9 17 4 12"/></svg>}
           </div>
           {allSelected ? "Deselect all" : "Select all"}
         </button>
-        {active.topic_chat_id && <a target="__blank" href={`/dashboard/topic-chats/${active.topic_chat_id}`} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color: "#a78bfa", fontWeight: 600, textDecoration: "none" }}>Open full chat →</a>}
+        {active.topic_chat_id && <a href={`/dashboard/topic-chats/${active.topic_chat_id}`} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color: "#a78bfa", fontWeight: 600, textDecoration: "none" }}>Open full chat →</a>}
         <div style={{ flex: 1 }} />
         {active.drafts.length > 0 && (
           <button onClick={() => onRegenImages(safeIdx)} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(52,211,153,0.12)", border: "1px solid rgba(52,211,153,0.25)", color: "#34d399", fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 9, cursor: "pointer" }}>
@@ -390,33 +467,34 @@ function ResultsPanel({
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function TopicsPage() {
-  const [topicsText, setTopicsText]   = useState("");
-  const [brands, setBrands]           = useState<Brand[]>([]);
-  const [brandId, setBrandId]         = useState<string>("");
-  const [p, setP]                     = useState<BrandProfile | null>(null);
+  const [topicsText, setTopicsText] = useState("");
+  const [brands, setBrands]         = useState<Brand[]>([]);
+  const [brandId, setBrandId]       = useState<string>("");
+  const [p, setP]                   = useState<BrandProfile | null>(null);
 
-  const [monthlyMode, setMonthlyMode] = useState(true);
-  const [targetMonth, setTargetMonth] = useState(() => {
+  const [monthlyMode, setMonthlyMode]   = useState(true);
+  const [targetMonth, setTargetMonth]   = useState(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   });
   const [postsPerWeek, setPostsPerWeek] = useState(3);
   const [skipImages, setSkipImages]     = useState(false);
 
-  const [loading, setLoading]               = useState(false);
-  const [reviewOpen, setReviewOpen]         = useState(false);
-  const [statusMsg, setStatusMsg]           = useState<{ type: "ok" | "warn" | "err"; text: string } | null>(null);
-  const [results, setResults]               = useState<GenerationResult[]>([]);
-  const [generating, setGenerating]         = useState(false);
-  const [generatingTopic, setGeneratingTopic] = useState<string | null>(null);
-  const [selectedDraftIds, setSelectedDraftIds] = useState<Set<string>>(new Set());
-  const [autoGenOpen, setAutoGenOpen]       = useState(false);
-  const [autoGenDrafts, setAutoGenDrafts]   = useState<Draft[]>([]);
-  const [autoStart, setAutoStart]           = useState(false);
-  const [templates, setTemplates]           = useState<any[]>([]);
+  const [loading, setLoading]             = useState(false);
+  const [reviewOpen, setReviewOpen]       = useState(false);
+  const [statusMsg, setStatusMsg]         = useState<{ type: "ok" | "warn" | "err"; text: string } | null>(null);
 
-  // Mobile: which panel is visible ("left" | "right")
-  const [mobilePanel, setMobilePanel] = useState<"left" | "right">("left");
+  const [results, setResults]             = useState<GenerationResult[]>([]);
+  const [generating, setGenerating]       = useState(false);
+  const [generatingTopic, setGeneratingTopic] = useState<string | null>(null);
+
+  const [selectedDraftIds, setSelectedDraftIds] = useState<Set<string>>(new Set());
+
+  const [autoGenOpen, setAutoGenOpen]   = useState(false);
+  const [autoGenDrafts, setAutoGenDrafts] = useState<Draft[]>([]);
+  const [autoStart, setAutoStart]       = useState(false);
+  const [templates, setTemplates]       = useState<any[]>([]);
+  const [draftsProgress, setDraftsProgress] = useState(0); // live draft count during polling
 
   useEffect(() => {
     (async () => {
@@ -442,10 +520,17 @@ export default function TopicsPage() {
     [topicsText]
   );
 
+  const plannedPerTopic = useMemo(() => {
+    if (!monthlyMode) return 1;
+    return postsInMonth(targetMonth, postsPerWeek);
+  }, [monthlyMode, targetMonth, postsPerWeek]);
+
+  const totalGenerate = topics.length * plannedPerTopic;
+
   const validate = (): string | null => {
-    if (!brandId)            return "Please select a brand.";
+    if (!brandId)           return "Please select a brand.";
     if (topics.length === 0) return "Enter at least 1 topic (one per line).";
-    if (monthlyMode && !targetMonth)      return "Please select a target month.";
+    if (monthlyMode && !targetMonth)    return "Please select a target month.";
     if (monthlyMode && postsPerWeek <= 0) return "Choose posts per week.";
     return null;
   };
@@ -484,6 +569,7 @@ export default function TopicsPage() {
     openImageDialog(draftsToRegen, false);
   };
 
+  // ── Main generation flow ──────────────────────────────────────────────────
   const confirmGenerate = async () => {
     setLoading(true);
     setGenerating(true);
@@ -491,6 +577,7 @@ export default function TopicsPage() {
     setStatusMsg(null);
     setResults([]);
     setSelectedDraftIds(new Set());
+    setDraftsProgress(0);
 
     const clientNow = new Date().toISOString();
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/London";
@@ -498,23 +585,36 @@ export default function TopicsPage() {
     let totalOk = 0, totalFail = 0;
     const completedResults: GenerationResult[] = [];
 
+    // ── Phase 1: Generate ALL drafts for ALL topics first ─────────────────
+    // We do NOT open the image dialog until every topic is done.
+    // This prevents the image generation from starting on partial data.
     for (const topic of topics) {
       setGeneratingTopic(topic);
 
       const result: GenerationResult = {
-        topic, topic_chat_id: null, status: "failed", generated: 0, failed: 0, drafts: [],
+        topic,
+        topic_chat_id: null,
+        status: "failed",
+        generated: 0,
+        failed: 0,
+        drafts: [],
       };
 
       try {
         const res = await safeGenerateWithFallback(
           {
-            brand_id: brandId, topic, mode: "monthly",
-            target_month: targetMonth, posts_per_week: postsPerWeek,
+            brand_id:             brandId,
+            topic,
+            mode:                 "monthly",
+            target_month:         targetMonth,
+            posts_per_week:       postsPerWeek,
             brand_profile_summary: p?.profile_summary ?? undefined,
-            brand_profile_json: p?.profile_json ?? undefined,
-            client_now: clientNow, posting_hour_local: 9,
+            brand_profile_json:   p?.profile_json ?? undefined,
+            client_now:           clientNow,
+            posting_hour_local:   9,
           },
-          (id) => { result.topic_chat_id = id; }
+          (id) => { result.topic_chat_id = id; },
+          setDraftsProgress,
         );
 
         result.topic_chat_id = res.topic_chat_id;
@@ -529,10 +629,13 @@ export default function TopicsPage() {
         }
       } catch (e: any) {
         result.status = "failed";
+        result.failed = plannedPerTopic;
+        totalFail    += plannedPerTopic;
         setStatusMsg({ type: "err", text: `"${topic}": ${e?.message ?? "generation failed"}` });
       }
 
       completedResults.push(result);
+      // Update UI as each topic finishes so user can see progress
       setResults([...completedResults]);
     }
 
@@ -541,20 +644,26 @@ export default function TopicsPage() {
     setLoading(false);
     setTopicsText("");
 
+    // ── Status summary ────────────────────────────────────────────────────
     if (totalOk > 0) {
       setStatusMsg({
         type: totalFail > 0 ? "warn" : "ok",
         text: `Generated ${totalOk} draft(s) across ${topics.length} topic(s).${totalFail ? ` ${totalFail} failed.` : ""}${!skipImages && templates.length > 0 ? " Starting image generation…" : ""}`,
       });
-      // Switch to results panel on mobile after generation
-      setMobilePanel("right");
     } else if (!statusMsg) {
       setStatusMsg({ type: "err", text: "0 drafts generated. Check backend logs." });
     }
 
-    const allDrafts    = completedResults.flatMap(r => r.drafts);
+    // ── Phase 2: Open image dialog with ALL drafts, autoStart=true ────────
+    // Only fires AFTER the full loop above has completed.
+    // The dialog receives autoStart=true and fires runBatch() automatically
+    // as soon as templates are loaded — no waiting, no user click needed.
+    const allDrafts = completedResults.flatMap(r => r.drafts);
     const canGenImages = !skipImages && templates.length > 0 && allDrafts.length > 0;
-    if (canGenImages) openImageDialog(allDrafts, true);
+
+    if (canGenImages) {
+      openImageDialog(allDrafts, true); // autoStart=true: dialog fires immediately on open
+    }
   };
 
   const showPanel = results.length > 0 || generating;
@@ -563,7 +672,6 @@ export default function TopicsPage() {
     <>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap');
-
         .topics-root { font-family: 'Syne', sans-serif; background: #0c0c0f; min-height: 100vh; color: #e4e4e7; }
         .topics-input { background: rgba(255,255,255,0.04) !important; border: 1px solid rgba(255,255,255,0.08) !important; color: #e4e4e7 !important; font-family: 'DM Mono', monospace; font-size: 12px; resize: none; transition: border-color 0.2s; }
         .topics-input:focus { border-color: rgba(139,92,246,0.5) !important; outline: none; box-shadow: 0 0 0 3px rgba(139,92,246,0.12); }
@@ -577,6 +685,8 @@ export default function TopicsPage() {
         .generate-btn:active:not(:disabled) { transform: scale(0.98); }
         .generate-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .generate-btn::before { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(255,255,255,0.15), transparent); pointer-events: none; }
+        .panel-left { width: 380px; min-width: 320px; flex-shrink: 0; border-right: 1px solid rgba(255,255,255,0.06); display: flex; flex-direction: column; height: 100vh; overflow-y: auto; }
+        .panel-right { flex: 1; min-width: 0; display: flex; flex-direction: column; height: 100vh; }
         .month-input { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #e4e4e7; font-family: 'DM Mono', monospace; font-size: 12px; border-radius: 10px; padding: 8px 12px; width: 100%; color-scheme: dark; }
         .month-input:focus { outline: none; border-color: rgba(139,92,246,0.5); }
         .checkbox-custom { width: 16px; height: 16px; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; background: rgba(255,255,255,0.04); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.15s, border-color 0.15s; }
@@ -586,275 +696,161 @@ export default function TopicsPage() {
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
         @keyframes autopulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:0.4; transform:scale(0.85); } }
+        @keyframes cardIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
         .dialog-dark { background: #141418 !important; border: 1px solid rgba(255,255,255,0.1) !important; color: #e4e4e7 !important; }
         .msg-ok   { color: #34d399; font-size: 12px; font-weight: 600; }
         .msg-warn { color: #fbbf24; font-size: 12px; font-weight: 600; }
         .msg-err  { color: #f87171; font-size: 12px; font-weight: 600; }
         .img-toggle-box { background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.07); border-radius: 12px; padding: 12px 14px; }
-
-        /* ── Layout ── */
-        .topics-layout { display: flex; height: 100vh; overflow: hidden; }
-
-        /* Desktop: side-by-side */
-        .panel-left {
-          width: 380px; min-width: 320px; flex-shrink: 0;
-          border-right: 1px solid rgba(255,255,255,0.06);
-          display: flex; flex-direction: column;
-          height: 100vh; overflow-y: auto;
-        }
-        .panel-right {
-          flex: 1; min-width: 0;
-          display: flex; flex-direction: column;
-          height: 100vh;
-        }
-
-        /* Draft grid — 3 cols on large, 2 on medium, 1 on small */
-        .draft-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-          gap: 14px;
-        }
-
-        /* ── Mobile tab bar ── */
-        .mobile-tabs {
-          display: none;
-          position: sticky; top: 0;
-          background: #0c0c0f;
-          border-bottom: 1px solid rgba(255,255,255,0.06);
-          padding: 0;
-        }
-        .mobile-tab-btn {
-          flex: 1; padding: 12px 8px;
-          font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 700;
-          border: none; background: none; cursor: pointer;
-          color: rgba(255,255,255,0.35);
-          border-bottom: 2px solid transparent;
-          transition: all 0.15s;
-          display: flex; align-items: center; justify-content: center; gap: 6px;
-        }
-        .mobile-tab-btn.active {
-          color: #e4e4e7;
-          border-bottom-color: #7c3aed;
-        }
-
-        /* ── Responsive breakpoints ── */
-
-        /* Tablet: shrink left panel */
-        @media (max-width: 900px) {
-          .panel-left { width: 300px; min-width: 260px; }
-          .draft-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
-        }
-
-        /* Mobile: stacked, tab-switched panels */
-        @media (max-width: 640px) {
-          .topics-layout { flex-direction: column; height: auto; overflow: visible; }
-
-          .mobile-tabs { display: flex; }
-
-          .panel-left {
-            width: 100%; min-width: unset;
-            height: auto; max-height: none;
-            border-right: none;
-            border-bottom: 1px solid rgba(255,255,255,0.06);
-            overflow-y: visible;
-          }
-          .panel-left.mobile-hidden { display: none; }
-
-          .panel-right {
-            height: auto; min-height: 60vh;
-          }
-          .panel-right.mobile-hidden { display: none; }
-
-          .draft-grid {
-            grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
-          }
-
-          /* Make generate button sticky on mobile */
-          .mobile-sticky-footer {
-            position: sticky;
-            bottom: 0;
-            background: #0c0c0f;
-            padding-bottom: env(safe-area-inset-bottom, 0px);
-            border-top: 1px solid rgba(255,255,255,0.06);
-            z-index: 40;
-          }
-        }
-
-        /* Very small phones */
-        @media (max-width: 380px) {
-          .draft-grid { grid-template-columns: 1fr; }
-        }
       `}</style>
 
-      <div className="topics-root">
-
-        {/* ── Mobile tab bar ── */}
-        <div className="mobile-tabs">
-          <button
-            className={`mobile-tab-btn ${mobilePanel === "left" ? "active" : ""}`}
-            onClick={() => setMobilePanel("left")}
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-            Generator
-          </button>
-          <button
-            className={`mobile-tab-btn ${mobilePanel === "right" ? "active" : ""}`}
-            onClick={() => setMobilePanel("right")}
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-            Drafts
-            {results.length > 0 && (
-              <span style={{ background: "#7c3aed", color: "white", fontSize: 9, fontWeight: 800, padding: "1px 5px", borderRadius: 10, fontFamily: "DM Mono, monospace" }}>
-                {results.reduce((s, r) => s + r.drafts.length, 0)}
-              </span>
-            )}
-          </button>
-        </div>
-
-        <div className="topics-layout">
-          {/* ── LEFT PANEL ── */}
-          <div className={`panel-left ${mobilePanel === "right" ? "mobile-hidden" : ""}`}>
-            <div className="px-5 pt-6 pb-4 border-b border-white/[0.06]">
-              <div className="flex items-center gap-2 mb-1">
-                <div className="w-6 h-6 rounded-md bg-violet-600 flex items-center justify-center">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
-                    <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-                  </svg>
-                </div>
-                <h1 className="text-[15px] font-bold tracking-tight">Content Generator</h1>
+      <div className="topics-root flex">
+        {/* ── LEFT PANEL ── */}
+        <div className="panel-left">
+          <div className="px-5 pt-6 pb-4 border-b border-white/[0.06]">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-6 h-6 rounded-md bg-violet-600 flex items-center justify-center">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
+                  <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                </svg>
               </div>
-              <p className="text-[11px] text-white/30 leading-relaxed">
-                Generate AI-powered drafts + images for your social channels.
-              </p>
+              <h1 className="text-[15px] font-bold tracking-tight">Content Generator</h1>
+            </div>
+            <p className="text-[11px] text-white/30 leading-relaxed">
+              Generate AI-powered drafts + images for your social channels.
+            </p>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+            {/* Brand */}
+            <div>
+              <span className="field-label">Brand / Page</span>
+              <select className="topics-select" value={brandId} onChange={(e) => setBrandId(e.target.value)}>
+                {brands.map((b) => <option key={b.id} value={b.id}>{b.display_name}</option>)}
+              </select>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
-              {/* Brand */}
-              <div>
-                <span className="field-label">Brand / Page</span>
-                <select className="topics-select" value={brandId} onChange={(e) => setBrandId(e.target.value)}>
-                  {brands.map((b) => <option key={b.id} value={b.id}>{b.display_name}</option>)}
-                </select>
-              </div>
-
-              {/* Topics */}
-              <div>
-                <span className="field-label">Topics — one per line</span>
-                <textarea
-                  className="topics-input w-full rounded-xl p-3"
-                  rows={8}
-                  value={topicsText}
-                  onChange={(e) => setTopicsText(e.target.value)}
-                  placeholder={"AI receptionist reduces missed calls\nWhatsApp blog automation case study\nHow we 3× our client's leads"}
-                />
-                <div className="mt-1.5 flex items-center gap-2">
+            {/* Topics */}
+            <div>
+              <span className="field-label">Topics — one per line</span>
+              <textarea
+                className="topics-input w-full rounded-xl p-3"
+                rows={8}
+                value={topicsText}
+                onChange={(e) => setTopicsText(e.target.value)}
+                placeholder={"AI receptionist reduces missed calls\nWhatsApp blog automation case study\nHow we 3× our client's leads"}
+              />
+              <div className="mt-1.5 flex items-center gap-2">
+                <span className="stat-chip">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2M9 5h6"/></svg>
+                  {topics.length} topic{topics.length !== 1 ? "s" : ""}
+                </span>
+                {topics.length > 0 && monthlyMode && (
                   <span className="stat-chip">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2M9 5h6"/></svg>
-                    {topics.length} topic{topics.length !== 1 ? "s" : ""}
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    {totalGenerate} drafts
                   </span>
-                </div>
-              </div>
-
-              {/* Monthly planner */}
-              <div>
-                <span className="field-label">Monthly Bulk Generation</span>
-                <label className="flex items-center gap-2.5 text-xs font-semibold text-white/60 cursor-pointer mb-3" onClick={() => setMonthlyMode((v) => !v)}>
-                  <span className={`checkbox-custom ${monthlyMode ? "checked" : ""}`}>
-                    {monthlyMode && <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5"><polyline points="20 6 9 17 4 12"/></svg>}
-                  </span>
-                  Generate a full month calendar
-                </label>
-                {monthlyMode && (
-                  <div className="space-y-3">
-                    <div>
-                      <span className="field-label">Target month</span>
-                      <input type="month" value={targetMonth} onChange={(e) => setTargetMonth(e.target.value)} className="month-input" />
-                    </div>
-                    <div>
-                      <span className="field-label">Posts per week</span>
-                      <select value={postsPerWeek} onChange={(e) => setPostsPerWeek(Number(e.target.value))} className="topics-select">
-                        {[1,2,3,4,5].map((n) => <option key={n} value={n}>{n} / week</option>)}
-                      </select>
-                    </div>
-                    <p className="text-[11px] text-white/25 leading-relaxed">It is recommended to select one social media per each generation for faster generation.</p>
-                  </div>
                 )}
               </div>
-
-              <Platforms />
-
-              {/* Image toggle */}
-              <div className="img-toggle-box">
-                <div className="flex items-center gap-2 mb-2">
-                  <ImageIcon style={{ width: 13, height: 13, color: "#a78bfa" }} />
-                  <span className="text-[12px] font-bold">Auto Image Generation</span>
-                  {templates.length > 0
-                    ? <span className="text-[10px] ml-auto" style={{ color: "#34d399", fontFamily: "DM Mono, monospace" }}>{templates.length} template{templates.length !== 1 ? "s" : ""} ready</span>
-                    : <span className="text-[10px] ml-auto" style={{ color: "#f87171", fontFamily: "DM Mono, monospace" }}>no templates</span>
-                  }
-                </div>
-                <p className="text-[10px] text-white/25 leading-relaxed mb-3">
-                  Opens automatically after <strong style={{ color: "rgba(255,255,255,0.4)" }}>all drafts</strong> are saved — starts rendering immediately.
-                </p>
-                <label className="flex items-center gap-2.5 text-xs font-semibold text-white/50 cursor-pointer" onClick={() => setSkipImages((v) => !v)}>
-                  <span className={`checkbox-custom ${skipImages ? "checked" : ""}`}>
-                    {skipImages && <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5"><polyline points="20 6 9 17 4 12"/></svg>}
-                  </span>
-                  Skip image generation
-                </label>
-              </div>
             </div>
 
-            {/* Footer — sticky on mobile */}
-            <div className="px-5 pb-5 pt-3 border-t border-white/[0.06] space-y-3 mobile-sticky-footer">
-              {statusMsg && <p className={`msg-${statusMsg.type}`}>{statusMsg.text}</p>}
-              <button className="generate-btn" onClick={openReview} disabled={loading}>
-                {loading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <span className="spinner" />
-                    {generatingTopic ? `Writing "${generatingTopic.slice(0, 18)}…"` : "Working…"}
-                  </span>
-                ) : "Generate Drafts + Images →"}
-              </button>
+            {/* Monthly planner */}
+            <div>
+              <span className="field-label">Monthly Bulk Generation</span>
+              <label className="flex items-center gap-2.5 text-xs font-semibold text-white/60 cursor-pointer mb-3" onClick={() => setMonthlyMode((v) => !v)}>
+                <span className={`checkbox-custom ${monthlyMode ? "checked" : ""}`}>
+                  {monthlyMode && <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5"><polyline points="20 6 9 17 4 12"/></svg>}
+                </span>
+                Generate a full month calendar
+              </label>
+              {monthlyMode && (
+                <div className="space-y-3">
+                  <div>
+                    <span className="field-label">Target month</span>
+                    <input type="month" value={targetMonth} onChange={(e) => setTargetMonth(e.target.value)} className="month-input" />
+                  </div>
+                  <div>
+                    <span className="field-label">Posts per week</span>
+                    <select value={postsPerWeek} onChange={(e) => setPostsPerWeek(Number(e.target.value))} className="topics-select">
+                      {[1,2,3,4,5].map((n) => <option key={n} value={n}>{n} / week</option>)}
+                    </select>
+                  </div>
+                  <p className="text-[11px] text-white/25 leading-relaxed">Platforms detected from your active page connections.</p>
+                </div>
+              )}
+            </div>
+
+            {/* Image toggle */}
+            <div className="img-toggle-box">
+              <div className="flex items-center gap-2 mb-2">
+                <ImageIcon style={{ width: 13, height: 13, color: "#a78bfa" }} />
+                <span className="text-[12px] font-bold">Auto Image Generation</span>
+                {templates.length > 0
+                  ? <span className="text-[10px] ml-auto" style={{ color: "#34d399", fontFamily: "DM Mono, monospace" }}>{templates.length} template{templates.length !== 1 ? "s" : ""} ready</span>
+                  : <span className="text-[10px] ml-auto" style={{ color: "#f87171", fontFamily: "DM Mono, monospace" }}>no templates</span>
+                }
+              </div>
+              <p className="text-[10px] text-white/25 leading-relaxed mb-3">
+                Opens automatically after <strong style={{ color: "rgba(255,255,255,0.4)" }}>all drafts</strong> are saved — starts rendering immediately.
+              </p>
+              <label className="flex items-center gap-2.5 text-xs font-semibold text-white/50 cursor-pointer" onClick={() => setSkipImages((v) => !v)}>
+                <span className={`checkbox-custom ${skipImages ? "checked" : ""}`}>
+                  {skipImages && <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5"><polyline points="20 6 9 17 4 12"/></svg>}
+                </span>
+                Skip image generation
+              </label>
             </div>
           </div>
 
-          {/* ── RIGHT PANEL ── */}
-          <div className={`panel-right overflow-y-auto ${mobilePanel === "left" ? "mobile-hidden" : ""}`}>
-            <div className="px-5 pt-6 pb-4 border-b border-white/[0.06] flex items-center gap-3 flex-wrap">
-              <h2 className="text-[13px] font-bold text-white/70">Generated Drafts</h2>
-              {generating && (
-                <div className="flex items-center gap-2">
+          <div className="px-5 pb-5 pt-3 border-t border-white/[0.06] space-y-3">
+            {statusMsg && <p className={`msg-${statusMsg.type}`}>{statusMsg.text}</p>}
+            <button className="generate-btn" onClick={openReview} disabled={loading}>
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
                   <span className="spinner" />
-                  <span className="text-[11px] text-violet-400">
-                    {generatingTopic ? `Writing "${generatingTopic.slice(0, 28)}…"` : "Starting…"}
-                  </span>
-                </div>
-              )}
-              {results.length > 0 && results.some(r => r.drafts.length > 0) && !generating && (
-                <button
-                  onClick={() => { const idx = results.findIndex(r => r.drafts.length > 0); if (idx !== -1) regenImagesForTopic(idx); }}
-                  style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 7, background: "rgba(52,211,153,0.1)", border: "1px solid rgba(52,211,153,0.3)", color: "#34d399", fontSize: 12, fontWeight: 700, padding: "8px 16px", borderRadius: 10, cursor: "pointer", letterSpacing: "0.03em" }}
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
-                  Regenerate Images
-                </button>
-              )}
-            </div>
+                  {generatingTopic ? `Writing "${generatingTopic.slice(0, 18)}…"` : "Working…"}
+                </span>
+              ) : "Generate Drafts + Images →"}
+            </button>
+          </div>
+        </div>
 
-            {showPanel ? (
-              <ResultsPanel
-                results={results}
-                onRegenImages={regenImagesForTopic}
-                onRegenSelected={regenImagesForSelected}
-                selectedDraftIds={selectedDraftIds}
-                onSelectDraft={handleSelectDraft}
-              />
-            ) : (
-              <DashboardOverview />
+        {/* ── RIGHT PANEL ── */}
+        <div className="panel-right overflow-y-auto">
+          <div className="px-5 pt-6 pb-4 border-b border-white/[0.06] flex items-center gap-3">
+            <h2 className="text-[13px] font-bold text-white/70">Generated Drafts</h2>
+            {generating && (
+              <div className="flex items-center gap-2">
+                <span className="spinner" />
+                <span className="text-[11px] text-violet-400">
+                  {generatingTopic
+                    ? `"${generatingTopic.slice(0, 22)}…" ${draftsProgress > 0 ? `· ${draftsProgress} drafts` : ""}`
+                    : "Starting…"}
+                </span>
+              </div>
+            )}
+            {results.length > 0 && results.some(r => r.drafts.length > 0) && !generating && (
+              <button
+                onClick={() => { const idx = results.findIndex(r => r.drafts.length > 0); if (idx !== -1) regenImagesForTopic(idx); }}
+                style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 7, background: "rgba(52,211,153,0.1)", border: "1px solid rgba(52,211,153,0.3)", color: "#34d399", fontSize: 12, fontWeight: 700, padding: "8px 16px", borderRadius: 10, cursor: "pointer", letterSpacing: "0.03em" }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+                Regenerate Images
+              </button>
             )}
           </div>
+
+          {showPanel ? (
+            <ResultsPanel
+              results={results}
+              onRegenImages={regenImagesForTopic}
+              onRegenSelected={regenImagesForSelected}
+              selectedDraftIds={selectedDraftIds}
+              onSelectDraft={handleSelectDraft}
+            />
+          ) : (
+            <DashboardOverview />
+          )}
         </div>
       </div>
 
@@ -869,11 +865,12 @@ export default function TopicsPage() {
           </DialogHeader>
           <div className="space-y-1 text-xs" style={{ color: "rgba(255,255,255,0.6)" }}>
             {[
-              ["Brand",        brandId],
-              ["Topics",       topics.length],
-              ["Target month", targetMonth],
-              ["Posts / week", postsPerWeek],
-              ["Images",       skipImages ? "Skipped" : templates.length > 0 ? `Auto — ${templates.length} template${templates.length !== 1 ? "s" : ""} — starts after all drafts saved` : "No templates — will skip"],
+              ["Brand",          brandId],
+              ["Topics",         topics.length],
+              ["Target month",   targetMonth],
+              ["Posts / week",   postsPerWeek],
+              ["Planned drafts", `${totalGenerate} (${plannedPerTopic} per topic)`],
+              ["Images",         skipImages ? "Skipped" : templates.length > 0 ? `Auto — ${templates.length} template${templates.length !== 1 ? "s" : ""} — starts after all drafts saved` : "No templates — will skip"],
             ].map(([k, v]) => (
               <div key={String(k)} className="flex gap-2">
                 <span style={{ color: "rgba(255,255,255,0.3)", width: 110, flexShrink: 0 }}>{k}</span>
@@ -894,7 +891,7 @@ export default function TopicsPage() {
                 {topics.map((t) => (
                   <tr key={t} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
                     <td className="p-2.5" style={{ color: "rgba(255,255,255,0.7)" }}>{t}</td>
-                    <td className="p-2.5" style={{ color: "rgba(255,255,255,0.5)" }}>—</td>
+                    <td className="p-2.5" style={{ color: "rgba(255,255,255,0.5)" }}>{plannedPerTopic}</td>
                     <td className="p-2.5">
                       {skipImages || !templates.length
                         ? <span style={{ color: "rgba(255,255,255,0.3)", fontSize: 11 }}>—</span>
@@ -905,7 +902,7 @@ export default function TopicsPage() {
               </tbody>
             </table>
           </div>
-          <DialogFooter className="gap-2 flex-wrap">
+          <DialogFooter className="gap-2">
             <button onClick={() => setReviewOpen(false)} style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.6)", fontFamily: "Syne, sans-serif", fontWeight: 600, fontSize: 13, padding: "9px 20px", borderRadius: 10, cursor: "pointer" }}>Cancel</button>
             <button className="generate-btn" style={{ width: "auto", padding: "9px 24px" }} onClick={confirmGenerate} disabled={loading}>Confirm & Generate</button>
           </DialogFooter>
@@ -926,6 +923,8 @@ export default function TopicsPage() {
           setAutoGenOpen(false);
           setAutoGenDrafts([]);
           setAutoStart(false);
+          // Re-fetch all drafts so media_url values are loaded into state
+          // This makes the cards update immediately without a page refresh
           try {
             const updated = await Promise.all(
               results.map(async (r) => {
