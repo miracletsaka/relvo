@@ -53,7 +53,7 @@ export default function WelcomeScreen({ onStart }: Props) {
           {/* Replace /videos/neuroflow-demo.mp4 with your actual video path */}
           <video
             ref={videoRef}
-            src="/videos/onboarding.mp4"
+            src="https://neuroflow.lon1.digitaloceanspaces.com/videos/cinematic-onboarding-visuals-for-a-social-content-_1.mp4"
             poster="/images/video-poster.jpg"
             playsInline
             onEnded={() => setVideoEnded(true)}
