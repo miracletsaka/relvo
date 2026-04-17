@@ -26,7 +26,7 @@ export function createNewProject(
   return {
     id: uid(),
     createdAt: Date.now(),
-    companyName: input?.companyName || "NeuroFlow",
+    companyName: input?.companyName || "Relvō",
     accentColor: input?.accentColor || "#7c3aed",
     scenes,
   };

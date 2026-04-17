@@ -7,6 +7,8 @@ export interface MediaAsset {
   id:          string
   url:         string
   filename:    string
+  price?: number;
+  price_currency?: string;
   type:        MediaAssetType
   brand_id?:   string | null
   brand_name?: string | null
@@ -42,7 +44,7 @@ export async function listMediaAssets(filters?: {
   if (filters?.type)     params.set('type',     filters.type)
   if (filters?.brand_id) params.set('brand_id', filters.brand_id)
   const qs = params.toString()
-  const res = await fetch(`${BASE}/media-assets/${qs ? `?${qs}` : ''}`)
+  const res = await fetch(`${BASE}/media-assets/${qs ? `?${qs}` : ''}`, { credentials: 'include' })
   if (!res.ok) throw new Error(`Failed to fetch media assets (${res.status})`)
   return res.json()
 }
@@ -50,6 +52,7 @@ export async function listMediaAssets(filters?: {
 export async function createMediaAsset(payload: CreateMediaAssetPayload): Promise<MediaAsset> {
   const res = await fetch(`${BASE}/media-assets/`, {
     method:  'POST',
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify(payload),
   })
@@ -63,6 +66,7 @@ export async function updateMediaAsset(
 ): Promise<MediaAsset> {
   const res = await fetch(`${BASE}/media-assets/${id}`, {
     method:  'PATCH',
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify(payload),
   })
@@ -71,7 +75,7 @@ export async function updateMediaAsset(
 }
 
 export async function deleteMediaAsset(id: string): Promise<void> {
-  const res = await fetch(`${BASE}/media-assets/${id}`, { method: 'DELETE' })
+  const res = await fetch(`${BASE}/media-assets/${id}`, { credentials: 'include', method: 'DELETE' })
   if (!res.ok) throw new Error(`Failed to delete media asset (${res.status})`)
 }
 

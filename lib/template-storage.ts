@@ -10,9 +10,43 @@ const MIGRATED_KEY = "campaign_templates_v1_migrated_to_db";
 import { api } from "@/lib/api";
 import { uploadFileToSpaces } from "./upload-client";
 
-async function listTemplatesFromDb(brandId?: string): Promise<Template[]> {
-  const q = brandId ? `?brand_id=${encodeURIComponent(brandId)}` : "";
-  return api<Template[]>(`/templates`);
+async function listTemplatesFromDb(
+  brandId?: string,
+  opts?: {
+    toneId?: string;
+    orientation?: "portrait" | "landscape";
+  }
+): Promise<Template[]> {
+  const params = new URLSearchParams();
+
+  if (brandId) params.set("brand_id", brandId);
+  if (opts?.toneId) params.set("tone_id", opts.toneId);
+  if (opts?.orientation) params.set("orientation", opts.orientation);
+
+  const q = params.toString() ? `?${params.toString()}` : "";
+  return api<Template[]>(`/templates${q}`);
+}
+
+export async function getRandomTemplate(
+  brandId?: string,
+  opts?: {
+    toneId?: string;
+    orientation?: "portrait" | "landscape";
+  }
+): Promise<Template | null> {
+  const params = new URLSearchParams();
+
+  if (brandId) params.set("brand_id", brandId);
+  if (opts?.toneId) params.set("tone_id", opts.toneId);
+  if (opts?.orientation) params.set("orientation", opts.orientation);
+
+  const q = params.toString() ? `?${params.toString()}` : "";
+
+  try {
+    return await api<Template>(`/templates/random${q}`);
+  } catch {
+    return null;
+  }
 }
 
 async function createTemplateInDb(t: Omit<Template, "id" | "createdAt" | "updatedAt"> & { brand_id?: string }) {
@@ -207,12 +241,18 @@ async function migrateLocalToDbOnce(brandId?: string) {
 // tell me and I’ll give you a non-breaking adapter.
 // --------------------
 
-export async function getTemplates(brandId?: string): Promise<Template[]> {
+export async function getTemplates(
+  brandId?: string,
+  opts?: {
+    toneId?: string;
+    orientation?: "portrait" | "landscape";
+  }
+): Promise<Template[]> {
   await migrateLocalToDbOnce(brandId);
+
   try {
-    return await listTemplatesFromDb(brandId);
+    return await listTemplatesFromDb(brandId, opts);
   } catch (e) {
-    // fallback (so app doesn't break during backend outages)
     return getTemplatesFromLocal();
   }
 }

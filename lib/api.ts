@@ -225,6 +225,7 @@ export function synthesizeAndSaveTemplate(payload?: {
 export async function deleteBrand(brandId: string): Promise<void> {
   const res = await fetch(`${API_BASE}/brands/${brandId}`, {
     method: "DELETE",
+    credentials: "include",  // ← add this
   });
   if (!res.ok) {
     let msg = `Failed to delete brand (${res.status})`;
@@ -232,7 +233,7 @@ export async function deleteBrand(brandId: string): Promise<void> {
     throw new Error(msg);
   }
 }
- 
+
 export function synthesizeTemplate() {
   return api<{ ok: boolean; template?: any; error?: string; used_templates?: string[] }>(
     "/templates/synthesize",
@@ -329,6 +330,7 @@ export async function getChatBackgrounds(topicChatId: string) {
 export async function getTopicChat(id: string) {
   const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE}/topic-chats/${id}`, {
     method: "GET",
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
     },
@@ -358,6 +360,7 @@ export async function listTopicChatsAll() {
 export async function listTopicChatDrafts(topicChatId: string) {
   const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE}/topic-chats/${topicChatId}/drafts`, {
     method: "GET",
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
     },
@@ -406,17 +409,17 @@ export async function updateDraft(draftId: string, payload: Partial<{
   );
 }
 
-export type TopicChatCreatePayload = {
+type TopicChatCreatePayload = {
   brand_id: string;
+  tone_id?: string | null;
   topic: string;
-  mode?: "monthly";           // V2 is basically monthly planner
-  target_month: string;       // "YYYY-MM"
+  mode: string;
+  target_month: string;
   posts_per_week: number;
   brand_profile_summary?: string;
-  brand_profile_json?: any;
-  client_now?: string;        // ISO from browser
-  posting_hour_local?: number; // 9
-  // Optional: if you allow user to choose which platform pages are active later (Option A doesn’t need it)
+  brand_profile_json?: Record<string, any>;
+  client_now?: string;
+  posting_hour_local?: number;
 };
 
 export type TopicChatCreateResponse = {
@@ -432,6 +435,7 @@ export function createTopicChatAndGenerate(payload: TopicChatCreatePayload) {
   // this route should hit your new router: POST /topic-chats
   return api<TopicChatCreateResponse>("/topic-chats", {
     method: "POST",
+    credentials: "include",
     body: JSON.stringify(payload),
   });
 }
@@ -806,6 +810,7 @@ export function bulkApprove(ids: string[]) {
 export function bulkReject(ids: string[], reason?: string) {
   return api<{ rejected: number }>("/drafts/bulk-reject", {
     method: "POST",
+    credentials: "include",
     body: JSON.stringify({ content_item_ids: ids, reason }),
   });
 }

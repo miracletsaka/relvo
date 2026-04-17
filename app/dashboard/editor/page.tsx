@@ -31,21 +31,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { createTemplate, updateTemplate } from "@/lib/template-storage";
 import { uploadFileToSpaces } from "@/lib/upload-client";
+import { DEFAULT_CAMPAIGN_DATA } from "@/lib/campaign-context";
 
 const CANVAS_WIDTH  = 1080;
 const CANVAS_HEIGHT = 1350;
-
-const DEFAULT_CAMPAIGN_DATA: CampaignData = {
-  hook:        "Unlock the Power of AI",
-  subheading:  "Streamline Your Content Creation",
-  bullets:     ["Save time with AI automation", "Engage your audience effortlessly", "Transform your approach"],
-  proof:       "Businesses using AI create 60% more content",
-  cta:         "Get Started Today",
-  hashtags:    "#AI #Innovation #Automation",
-  companyName: "NEUROFLOW",
-  location:    "MARKETING",
-  ctaLink:     "https://example.com",
-};
 
 function isString(x: any): x is string { return typeof x === "string"; }
 function ensureBgString(bg: any): string | null {
@@ -55,35 +44,6 @@ function ensureBgString(bg: any): string | null {
 }
 
 const PREMIUM_COMPONENTS: { key: PremiumComponentKey; label: string }[] = [
-  { key: "offer",              label: "Offer / Discount"   },
-  { key: "hero",               label: "Hero Product"       },
-  { key: "skincare",           label: "Skincare Split"     },
-  { key: "boldBrand",          label: "Bold Brand"         },
-  { key: "flashSale",          label: "Flash Sale"         },
-  { key: "testimonial",        label: "Testimonial"        },
-  { key: "editorial",          label: "Editorial Blog"     },
-  { key: "luxuryDark",         label: "Luxury Dark"        },
-  { key: "splitColor",         label: "Split Color"        },
-  { key: "instagramStory",     label: "IG Story"           },
-  { key: "communityEvent",     label: "Community Event"    },
-  { key: "albumCover",         label: "Album Cover"        },
-  { key: "boldStatement",      label: "Bold Statement"     },
-  { key: "fullBleedHero",      label: "Full Bleed Hero"    },
-  { key: "massiveTypography",  label: "Massive Type"       },
-  { key: "comparison",         label: "Old vs New"         },
-  { key: "collageGrid",        label: "Collage Grid"       },
-  { key: "singleHeroPhoto",    label: "Hero Photo"         },
-  { key: "splitPhotoContent",  label: "Split Photo"        },
-  { key: "magazinePhotoGrid",  label: "Magazine Grid"      },
-  { key: "thoughtLeader",      label: "Thought Leader"     },
-  { key: "lifestyleShowcase",  label: "Lifestyle Showcase" },
-  { key: "darkEditorial",      label: "Dark Editorial"     },
-  { key: "cdProductFloat",     label: "Product Float"      },
-  { key: "cdStatsShowcase",    label: "Stats Showcase"     },
-  { key: "cdBrandVs",          label: "Brand Vs"           },
-  { key: "lifestyleHero",      label: "Lifestyle Hero"     },
-  { key: "productAbstract",    label: "Product Abstract"   },
-  { key: "saasAd",             label: "SaaS Ad"            },
   { key: "characterDashboard", label: "3D Character"       },
 ];
 

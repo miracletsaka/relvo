@@ -41,7 +41,7 @@ type Bundle = { chat: TopicChatRow; drafts: DraftRow[]; counts: Record<string, n
 
 /* ─── Helpers ───────────────────────────────────────────────── */
 async function fetchJson(url: string) {
-  const r = await fetch(url);
+  const r = await fetch(url, { headers: { "Content-Type": "application/json" }, credentials: "include" });
   if (!r.ok) {
     let msg = `HTTP ${r.status}`;
     try { const j = await r.json(); msg = j?.detail || j?.message || msg; } catch {}
@@ -463,7 +463,7 @@ export default function DashboardOverview() {
         <div className="db-header">
           <div>
             <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(124,58,237,0.7)", marginBottom: 4, fontFamily: "DM Mono, monospace" }}>
-              NeuroFlow · Command Center
+              Relvō · Command Center
             </div>
             <h1 style={{ fontSize: 24, fontWeight: 800, color: "#e4e4e7", lineHeight: 1.1, margin: 0 }}>
               Content Dashboard

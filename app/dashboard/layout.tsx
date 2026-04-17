@@ -66,7 +66,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <button className="dash-hamburger" onClick={() => setSidebarOpen(v => !v)} aria-label="Open menu">
               <Menu style={{ width: 16, height: 16 }} />
             </button>
-            <Link href="/dashboard" className="dash-mobile-logo">
+            <Link href="/dashboard/create" className="dash-mobile-logo">
               <div style={{ width: 26, height: 26, borderRadius: "50%", background: "white", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 <img src="/NeuroFlow_AI_Logo.png" alt="Logo" style={{ height: 14, width: "auto" }} />
               </div>

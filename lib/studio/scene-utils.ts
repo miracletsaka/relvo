@@ -146,7 +146,7 @@ export async function fetchVideoAssets(
   try {
     const url = `${apiBase}/media-assets?type=video&brand_id=${encodeURIComponent(brandId)}`;
     console.log(`[scene-utils] API base: "${apiBase}" | fetching: ${url}`);
-    const res = await fetch(url);
+    const res = await fetch(url, { credentials: "include", method: "GET"});
     console.log(`[scene-utils] Response status: ${res.status} ${res.statusText}`);
     if (!res.ok) { console.warn(`[scene-utils] fetch failed: ${res.status}`); return []; }
     const raw  = await res.json();

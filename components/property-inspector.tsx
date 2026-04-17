@@ -545,13 +545,77 @@ export default function PropertyInspector({
                 value={shape.dataField}
                 onValueChange={(v) => handleChange({ dataField: v })}
               >
+                {/* Core */}
                 <SelectItem value="hook">Hook</SelectItem>
                 <SelectItem value="subheading">Subheading</SelectItem>
-                <SelectItem value="proof">Proof</SelectItem>
+                <SelectItem value="proof">Proof / Price</SelectItem>
                 <SelectItem value="cta">CTA</SelectItem>
+                <SelectItem value="ctaLink">CTA Link</SelectItem>
                 <SelectItem value="hashtags">Hashtags</SelectItem>
                 <SelectItem value="companyName">Company Name</SelectItem>
                 <SelectItem value="location">Location</SelectItem>
+
+                {/* Review / offer helpers */}
+                <SelectItem value="review_text">Review Text</SelectItem>
+                <SelectItem value="review_author">Review Author</SelectItem>
+                <SelectItem value="offer_title">Offer Title</SelectItem>
+                <SelectItem value="offer_cta">Offer CTA</SelectItem>
+
+                {/* Existing planner helper fields */}
+                <SelectItem value="hook_tag">Hook Tag</SelectItem>
+                <SelectItem value="hook_pre">Hook Prefix</SelectItem>
+                <SelectItem value="hook_number">Hook Number</SelectItem>
+                <SelectItem value="hook_label">Hook Label</SelectItem>
+                <SelectItem value="hook_desc">Hook Description</SelectItem>
+
+                <SelectItem value="bullet_1">Bullet 1</SelectItem>
+                <SelectItem value="bullet_2">Bullet 2</SelectItem>
+                <SelectItem value="bullet_3">Bullet 3</SelectItem>
+
+                <SelectItem value="price_label">Price Label</SelectItem>
+                <SelectItem value="fine_print">Fine Print</SelectItem>
+                <SelectItem value="enroll_note">Enroll Note</SelectItem>
+                <SelectItem value="badge_icon">Badge Icon</SelectItem>
+                <SelectItem value="deco_icon">Decorative Icon</SelectItem>
+
+                {/* Business info - nested-friendly resolved helpers */}
+                <SelectItem value="business_tagline">Business Tagline</SelectItem>
+                <SelectItem value="business_description">Business Description</SelectItem>
+                <SelectItem value="business_type">Business Type</SelectItem>
+                <SelectItem value="business_website">Business Website</SelectItem>
+
+                {/* New flattened business fields */}
+                <SelectItem value="website">Website</SelectItem>
+                <SelectItem value="address">Address</SelectItem>
+                <SelectItem value="phone">Phone</SelectItem>
+                <SelectItem value="email">Email</SelectItem>
+                <SelectItem value="whatsapp">WhatsApp</SelectItem>
+
+                <SelectItem value="city">City</SelectItem>
+                <SelectItem value="country">Country</SelectItem>
+                <SelectItem value="fullAddress">Full Address</SelectItem>
+
+                <SelectItem value="registration_no">Registration No.</SelectItem>
+                <SelectItem value="vat_number">VAT Number</SelectItem>
+
+                {/* Social / map */}
+                <SelectItem value="facebook_url">Facebook URL</SelectItem>
+                <SelectItem value="instagram_url">Instagram URL</SelectItem>
+                <SelectItem value="linkedin_url">LinkedIn URL</SelectItem>
+                <SelectItem value="twitter_url">Twitter URL</SelectItem>
+                <SelectItem value="tiktok_url">TikTok URL</SelectItem>
+                <SelectItem value="youtube_url">YouTube URL</SelectItem>
+                <SelectItem value="map_url">Map URL</SelectItem>
+
+                {/* Links / metadata */}
+                <SelectItem value="link_1_label">Link 1 Label</SelectItem>
+                <SelectItem value="link_1_url">Link 1 URL</SelectItem>
+                <SelectItem value="link_2_label">Link 2 Label</SelectItem>
+                <SelectItem value="link_2_url">Link 2 URL</SelectItem>
+                <SelectItem value="meta_1_key">Meta 1 Key</SelectItem>
+                <SelectItem value="meta_1_value">Meta 1 Value</SelectItem>
+                <SelectItem value="meta_2_key">Meta 2 Key</SelectItem>
+                <SelectItem value="meta_2_value">Meta 2 Value</SelectItem>
               </StyledSelect>
             </FieldRow>
           )}
@@ -632,6 +696,56 @@ export default function PropertyInspector({
       {isImage && (
         <div className="flex flex-col gap-2">
           <SectionLabel icon={<Image size={10} />}>Image</SectionLabel>
+
+          <FieldRow label="ROLE">
+            <StyledSelect
+              value={shape.slotKey || "custom"}
+              onValueChange={(v) => {
+                if (v === "custom") {
+                  handleChange({
+                    slotKey: undefined,
+                    slotLabel: undefined,
+                    slotType: "image",
+                  } as any);
+                  return;
+                }
+
+                const labelMap: Record<string, string> = {
+                  hero_person: "Hero Image",
+                  logo: "Logo",
+                  dashboard_image: "Secondary Image",
+                  sponsor_1: "Sponsor Logo 1",
+                  sponsor_2: "Sponsor Logo 2",
+                  sponsor_3: "Sponsor Logo 3",
+                  accreditation_1: "Accreditation Logo 1",
+                  accreditation_2: "Accreditation Logo 2",
+                  review_avatar_1: "Review Avatar 1",
+                };
+
+                handleChange({
+                  slotKey: v,
+                  slotLabel: labelMap[v] || v,
+                  slotType:
+                    v.startsWith("sponsor") ? "sponsor" :
+                    v.startsWith("accreditation") ? "accreditation" :
+                    v.startsWith("review_avatar") ? "review" :
+                    "image",
+                } as any);
+              }}
+            >
+              <SelectItem value="custom">Custom</SelectItem>
+              <SelectItem value="hero_person">Hero Image</SelectItem>
+              <SelectItem value="logo">Logo</SelectItem>
+              <SelectItem value="dashboard_image">Secondary Image</SelectItem>
+              <SelectItem value="sponsor_1">Sponsor 1</SelectItem>
+              <SelectItem value="sponsor_2">Sponsor 2</SelectItem>
+              <SelectItem value="sponsor_3">Sponsor 3</SelectItem>
+              <SelectItem value="accreditation_1">Accreditation 1</SelectItem>
+              <SelectItem value="accreditation_2">Accreditation 2</SelectItem>
+              <SelectItem value="review_avatar_1">Review Avatar</SelectItem>
+            </StyledSelect>
+          </FieldRow>
+
           <FieldRow label="SRC">
             <StyledInput
               value={(shape as any).src || ""}
@@ -641,6 +755,7 @@ export default function PropertyInspector({
               placeholder="https://..."
             />
           </FieldRow>
+
           <FieldRow label="FIT">
             <StyledSelect
               value={(shape as any).fit || "cover"}
@@ -650,6 +765,7 @@ export default function PropertyInspector({
               <SelectItem value="contain">Contain</SelectItem>
             </StyledSelect>
           </FieldRow>
+
           <FieldRow label="RADIUS">
             <StyledInput
               type="number"

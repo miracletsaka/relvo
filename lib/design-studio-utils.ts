@@ -38,7 +38,7 @@ export function buildCampaignDataFromDraft(draft: any): CampaignData {
     cta: (s.cta ?? "").toString(),
     ctaLink: (s.ctaLink ?? "").toString(),
     hashtags: safeHashtags(draft?.hashtags ?? s.hashtags ?? ""),
-    companyName: (s.companyName ?? "NEUROFLOW").toString(),
+    companyName: (s.companyName ?? "Relvō").toString(),
     location: (s.location ?? "MARKETING").toString(),
     links: [],
   } as CampaignData;

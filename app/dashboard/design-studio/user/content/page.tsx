@@ -8,25 +8,12 @@ import TemplateManagerV2 from '@/components/template-manager-v2'
 import { Template, CampaignData } from '@/lib/types'
 import { ArrowRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { DEFAULT_CAMPAIGN_DATA } from '@/lib/campaign-context'
 
 export default function ContentUploadPage() {
   const router = useRouter()
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null)
-  const [campaignData, setCampaignData] = useState<CampaignData>({
-    hook: 'Unlock the Power of AI: Automate Your Blog with WhatsApp!',
-    subheading: 'Streamline Your Content Creation Process',
-    bullets: [
-      'Save time by automating blog posts with AI technology.',
-      'Engage with your audience through effortless WhatsApp updates.',
-      'Transform your blogging approach - innovate with simplicity!'
-    ],
-    proof: 'Businesses using AI tools for content create 60% more posts than their competitors.',
-    cta: 'Embrace automation and revolutionize your blogging experience today!',
-    ctaLink: 'https://example.com',
-    hashtags: '#AI #Blogging #WhatsApp #ContentCreation #Automation',
-    companyName: 'NEUROFLOW',
-    location: 'MARKETING'
-  })
+  const [campaignData, setCampaignData] = useState<CampaignData>(DEFAULT_CAMPAIGN_DATA)
 
   const handleSelectTemplate = (template: Template) => {
     setSelectedTemplate(template)

@@ -5,7 +5,7 @@ export default function HomePage() {
   return (
     <main>
       <SpaceAndTimeHero />
-      <AdCampaign />
+      {/* <AdCampaign /> */}
     </main>
   );
 }

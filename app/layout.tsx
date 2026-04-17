@@ -9,7 +9,7 @@ const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-serif"
 const firaCode = Fira_Code({ subsets: ["latin"], variable: "--font-mono" })
 
 export const metadata: Metadata = {
-  title: "NeuroFlow Admin Dashboard",
+  title: "Relvō Admin Dashboard",
   description: "AI Marketing Automation System - Admin Dashboard",
   generator: "v0.app",
   icons: ['https://neuroflowai.co.uk/NeuroFlow_AI_Logo.png']

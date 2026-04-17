@@ -6,23 +6,11 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import ImageUploader from '@/components/image-uploader'
+import { DEFAULT_CAMPAIGN_DATA } from '@/lib/campaign-context'
 
 export default function GenerateImage({ campaignInfo}:{ campaignInfo: any }) {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null)
-   const [campaignData, setCampaignData] = useState({
-    hook: 'Unlock the Power of AI: Automate Your Blog with WhatsApp!',
-    subheading: 'Streamline Your Content Creation Process',
-    bullets: [
-      'Save time by automating blog posts with AI technology.',
-      'Engage with your audience through effortless WhatsApp updates.',
-      'Transform your blogging approach - innovate with simplicity!'
-    ],
-    proof: 'Businesses using AI tools for content create 60% more posts than their competitors.',
-    cta: 'Embrace automation and revolutionize your blogging experience today!',
-    hashtags: '#AI #Blogging #WhatsApp #ContentCreation #Automation',
-    companyName: 'NEUROFLOW',
-    location: 'MARKETING'
-  })
+   const [campaignData, setCampaignData] = useState(DEFAULT_CAMPAIGN_DATA)
   const [generatedBanner, setGeneratedBanner] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [templateId] = useState('y1vwRJZeql3jZKNjxg')  // Your Bannerbear template ID

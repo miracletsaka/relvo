@@ -23,6 +23,8 @@ import {
 import { getTemplates } from "@/lib/template-storage";
 import DashboardOverview from "@/components/DashboardOverview";
 import AutoGenerateImagesDialog from "@/components/AutoGenerateImagesDialog";
+import { Tone } from "@/lib/types";
+import { apiFetch } from "@/lib/tone";
 
 // ---- helpers ----
 function postsInMonth(targetMonth: string, postsPerWeek: number) {
@@ -40,6 +42,7 @@ type Draft = {
   status: string;
   body_text?: string;
   hashtags?: string;
+  org_slug?: string;
   scheduled_at?: string;
   structured?: Record<string, any>;
   media_url?: string;
@@ -84,7 +87,7 @@ async function safeGenerateWithFallback(
   while (Date.now() - pollStart < POLL_TIMEOUT) {
     await new Promise((r) => setTimeout(r, POLL_INTERVAL));
     try {
-      const pollRes = await fetch(`${API}/topic-chats/${topicChatId}/status`);
+      const pollRes = await fetch(`${API}/topic-chats/${topicChatId}/status`,{credentials: "include"});
       const poll    = await pollRes.json();
 
       // Update live progress counter in UI
@@ -167,23 +170,82 @@ function PlatformIcon({ platform, size = 11 }: { platform: string; size?: number
   );
 }
 
-function DraftCard({ draft, index, selected, onSelect }: {
+function DraftCard({ draft, index, selected, onSelect, orgSlug }: {
   draft: Draft;
   index: number;
   selected?: boolean;
   onSelect?: (checked: boolean) => void;
+  orgSlug?: string;
 }) {
   const [imgLoaded, setImgLoaded] = useState(false);
   const [imgError, setImgError]   = useState(false);
   const [expanded, setExpanded]   = useState(false);
   const [hovered, setHovered]     = useState(false);
+  const [copied,   setCopied]     = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+const [shareCopied, setShareCopied] = useState(false);
 
-  const s        = draft.structured ?? {};
-  const hook     = s.hook || draft.body_text?.slice(0, 72) || "";
-  const caption  = draft.body_text || "";
-  const mediaUrl = draft.media_url || null;
-  const hasImage = !!mediaUrl && !imgError;
+const s        = draft.structured ?? {};
+const hook     = s.hook || draft.body_text?.slice(0, 72) || "";
+const caption  = draft.body_text || "";
+const mediaUrl = draft.media_url || null;
+const hasImage = !!mediaUrl && !imgError;
 
+
+const shareUrl =
+  typeof window !== "undefined" && orgSlug
+    ? `${window.location.origin}/business/${orgSlug}?draftId=${draft.id}`
+    : "";
+
+const shareText = [hook, caption, draft.hashtags].filter(Boolean).join("\n\n");
+
+const handleCopyShareLink = async (e: React.MouseEvent) => {
+  e.stopPropagation();
+  if (!shareUrl) return;
+
+  try {
+    await navigator.clipboard.writeText(shareUrl);
+    setShareCopied(true);
+    setTimeout(() => setShareCopied(false), 2200);
+  } catch {
+    const ta = document.createElement("textarea");
+    ta.value = shareUrl;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+    setShareCopied(true);
+    setTimeout(() => setShareCopied(false), 2200);
+  }
+};
+
+const openShareWindow = (url: string, e: React.MouseEvent) => {
+  e.stopPropagation();
+  window.open(url, "_blank", "width=720,height=640,noopener,noreferrer");
+};
+
+const handleNativeShare = async (e: React.MouseEvent) => {
+  e.stopPropagation();
+  if (!shareUrl) return;
+
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: hook || draft.platform || "Draft",
+        text: caption || hook || "",
+        url: shareUrl,
+      });
+    } catch {}
+    return;
+  }
+
+  setShareOpen((v) => !v);
+};
+
+  
   const PLATFORM_COLORS: Record<string, string> = {
     instagram: "#E1306C", facebook: "#1877F2", linkedin: "#0A66C2",
     twitter: "#1DA1F2", tiktok: "#69C9D0",
@@ -199,6 +261,83 @@ function DraftCard({ draft, index, selected, onSelect }: {
     draft.status === "PUBLISHED"        ? "#34d399" : "#6b7280";
 
   useEffect(() => { setImgLoaded(false); setImgError(false); }, [mediaUrl]);
+
+  // ── Copy caption to clipboard ─────────────────────────────────────────────
+  const handleCopyCaption = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const fullText = [caption, draft.hashtags].filter(Boolean).join("\n\n");
+    if (!fullText) return;
+    try {
+      await navigator.clipboard.writeText(fullText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2200);
+    } catch {
+      // Fallback for browsers that block clipboard API
+      const ta = document.createElement("textarea");
+      ta.value = fullText;
+      ta.style.position = "fixed";
+      ta.style.opacity  = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2200);
+    }
+  };
+
+  // ── Download draft image ──────────────────────────────────────────────────
+  const handleDownloadImage = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!mediaUrl || downloading) return;
+    setDownloading(true);
+    try {
+      // Fetch as blob so it triggers a real download (works cross-origin)
+      const res  = await fetch(mediaUrl);
+      const blob = await res.blob();
+      const ext  = blob.type.includes("png") ? "png" : blob.type.includes("webp") ? "webp" : "jpg";
+      const filename = `draft-${draft.platform}-${draft.id?.slice(0, 8) ?? index}.${ext}`;
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
+      a.href     = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      // If CORS blocks the fetch, fall back to opening in new tab
+      window.open(mediaUrl, "_blank");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const encodedUrl = encodeURIComponent(shareUrl);
+const encodedText = encodeURIComponent(shareText || hook || "Check this out");
+
+const shareTargets = {
+  facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
+  linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`,
+  twitter: `https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`,
+  whatsapp: `https://wa.me/?text=${encodeURIComponent(`${shareText}\n\n${shareUrl}`)}`,
+  telegram: `https://t.me/share/url?url=${encodedUrl}&text=${encodedText}`,
+  email: `mailto:?subject=${encodeURIComponent(hook || "Shared Draft")}&body=${encodeURIComponent(`${shareText}\n\n${shareUrl}`)}`,
+};
+
+const shareItemStyle: React.CSSProperties = {
+  width: "100%",
+  textAlign: "left",
+  padding: "8px 10px",
+  borderRadius: 8,
+  background: "rgba(255,255,255,0.04)",
+  border: "1px solid rgba(255,255,255,0.06)",
+  color: "rgba(255,255,255,0.8)",
+  fontSize: 11,
+  fontWeight: 700,
+  fontFamily: "Syne, sans-serif",
+  cursor: "pointer",
+};
 
   return (
     <div
@@ -248,9 +387,7 @@ function DraftCard({ draft, index, selected, onSelect }: {
         {/* Placeholder when no image */}
         {!hasImage && (
           <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10 }}>
-            {/* Subtle grid pattern */}
             <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px)", backgroundSize: "20px 20px" }} />
-            {/* Platform icon big */}
             <div style={{ width: 48, height: 48, borderRadius: 14, background: pColor + "18", border: `1px solid ${pColor}30`, display: "flex", alignItems: "center", justifyContent: "center", color: pColor, position: "relative" }}>
               <PlatformIcon platform={draft.platform} size={22} />
             </div>
@@ -273,6 +410,70 @@ function DraftCard({ draft, index, selected, onSelect }: {
           <span style={{ color: pColor, display: "flex" }}><PlatformIcon platform={draft.platform} size={10} /></span>
           <span style={{ fontSize: 9, fontWeight: 800, color: pColor, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: "Syne, sans-serif" }}>{draft.platform}</span>
         </div>
+
+        {/* Download button — appears on hover over image, only when image exists */}
+        {hasImage && imgLoaded && (
+          <button
+            onClick={handleDownloadImage}
+            disabled={downloading}
+            title="Download image"
+            style={{
+              position: "absolute", top: 10, left: onSelect ? 38 : 10,
+              width: 30, height: 30, borderRadius: 8,
+              background: "rgba(0,0,0,0.65)", backdropFilter: "blur(12px)",
+              border: "1px solid rgba(255,255,255,0.15)",
+              color: downloading ? "#6b7280" : "#ffffff",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: downloading ? "not-allowed" : "pointer",
+              opacity: hovered ? 1 : 0,
+              transition: "opacity 0.15s, background 0.15s",
+              zIndex: 15,
+            }}
+            onMouseEnter={e => { if (!downloading) (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.9)"; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.65)"; }}
+          >
+            {downloading ? (
+              <span style={{ width: 12, height: 12, border: "2px solid rgba(255,255,255,0.2)", borderTopColor: "#fff", borderRadius: "50%", display: "inline-block", animation: "dcspin 0.7s linear infinite" }} />
+            ) : (
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+            )}
+          </button>
+        )}
+
+        <button
+          onClick={handleNativeShare}
+          title="Share draft"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+            padding: "4px 9px",
+            borderRadius: 7,
+            background: shareOpen ? "rgba(124,58,237,0.12)" : "rgba(255,255,255,0.05)",
+            border: `1px solid ${shareOpen ? "rgba(124,58,237,0.25)" : "rgba(255,255,255,0.08)"}`,
+            color: shareOpen ? "#c4b5fd" : "rgba(255,255,255,0.35)",
+            fontSize: 9,
+            fontWeight: 700,
+            cursor: "pointer",
+            fontFamily: "DM Mono, monospace",
+            letterSpacing: "0.06em",
+            transition: "all 0.2s",
+            position: "relative",
+          }}
+        >
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+            <circle cx="18" cy="5" r="3" />
+            <circle cx="6" cy="12" r="3" />
+            <circle cx="18" cy="19" r="3" />
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+          </svg>
+          SHARE
+        </button>
 
         {/* Date badge — bottom left on image */}
         {dateStr && (
@@ -321,8 +522,10 @@ function DraftCard({ draft, index, selected, onSelect }: {
           </div>
         )}
 
-        {/* Footer row */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "auto", paddingTop: 4 }}>
+        {/* ── Footer row ─────────────────────────────────────────────── */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: "auto", paddingTop: 6, borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+
+          {/* Expand/collapse */}
           <button
             style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.25)", background: "none", border: "none", cursor: "pointer", padding: 0, letterSpacing: "0.06em", fontFamily: "DM Mono, monospace", textTransform: "uppercase", transition: "color 0.15s" }}
             onMouseEnter={e => (e.currentTarget.style.color = "rgba(255,255,255,0.6)")}
@@ -331,18 +534,146 @@ function DraftCard({ draft, index, selected, onSelect }: {
           >
             {expanded ? "↑ Less" : "↓ More"}
           </button>
-          {hasImage && (
-            <span style={{ fontSize: 9, fontWeight: 700, color: "#34d399", fontFamily: "DM Mono, monospace", letterSpacing: "0.06em", display: "flex", alignItems: "center", gap: 4 }}>
-              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-              IMAGE READY
-            </span>
+
+          <div style={{ flex: 1 }} />
+
+          {/* Copy caption button */}
+          {caption && (
+            <button
+              onClick={handleCopyCaption}
+              title="Copy caption to clipboard"
+              style={{
+                display: "flex", alignItems: "center", gap: 4,
+                padding: "4px 9px", borderRadius: 7,
+                background: copied ? "rgba(52,211,153,0.15)" : "rgba(255,255,255,0.05)",
+                border: `1px solid ${copied ? "rgba(52,211,153,0.3)" : "rgba(255,255,255,0.08)"}`,
+                color: copied ? "#34d399" : "rgba(255,255,255,0.35)",
+                fontSize: 9, fontWeight: 700, cursor: "pointer",
+                fontFamily: "DM Mono, monospace", letterSpacing: "0.06em",
+                transition: "all 0.2s",
+              }}
+              onMouseEnter={e => { if (!copied) { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.09)"; (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.7)"; } }}
+              onMouseLeave={e => { if (!copied) { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.05)"; (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.35)"; } }}
+            >
+              {copied ? (
+                <>
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                  COPIED
+                </>
+              ) : (
+                <>
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                  </svg>
+                  COPY
+                </>
+              )}
+            </button>
           )}
+
+          {/* Download image button */}
+          {hasImage && (
+            <button
+              onClick={handleDownloadImage}
+              disabled={downloading}
+              title="Download image"
+              style={{
+                display: "flex", alignItems: "center", gap: 4,
+                padding: "4px 9px", borderRadius: 7,
+                background: "rgba(255,255,255,0.05)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                color: downloading ? "rgba(255,255,255,0.2)" : "#34d399",
+                fontSize: 9, fontWeight: 700,
+                cursor: downloading ? "not-allowed" : "pointer",
+                fontFamily: "DM Mono, monospace", letterSpacing: "0.06em",
+                transition: "all 0.2s",
+              }}
+              onMouseEnter={e => { if (!downloading) { (e.currentTarget as HTMLElement).style.background = "rgba(52,211,153,0.1)"; (e.currentTarget as HTMLElement).style.borderColor = "rgba(52,211,153,0.25)"; } }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.05)"; (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.08)"; }}
+            >
+              {downloading ? (
+                <span style={{ width: 9, height: 9, border: "1.5px solid rgba(255,255,255,0.15)", borderTopColor: "#34d399", borderRadius: "50%", display: "inline-block", animation: "dcspin 0.7s linear infinite" }} />
+              ) : (
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+              )}
+              {downloading ? "…" : "IMG"}
+            </button>
+          )}
+
         </div>
       </div>
+
+      {shareOpen && shareUrl && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: "absolute",
+            right: 12,
+            bottom: 52,
+            width: 220,
+            background: "rgba(12,12,15,0.96)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: 12,
+            boxShadow: "0 12px 40px rgba(0,0,0,0.45)",
+            padding: 10,
+            zIndex: 40,
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+            backdropFilter: "blur(14px)",
+          }}
+        >
+          <button
+            onClick={handleCopyShareLink}
+            style={shareItemStyle}
+          >
+            {shareCopied ? "✓ Copied Link" : "Copy Share Link"}
+          </button>
+
+          <button onClick={(e) => openShareWindow(shareTargets.facebook, e)} style={shareItemStyle}>
+            Facebook
+          </button>
+          <button onClick={(e) => openShareWindow(shareTargets.linkedin, e)} style={shareItemStyle}>
+            LinkedIn
+          </button>
+          <button onClick={(e) => openShareWindow(shareTargets.twitter, e)} style={shareItemStyle}>
+            X / Twitter
+          </button>
+          <button onClick={(e) => openShareWindow(shareTargets.whatsapp, e)} style={shareItemStyle}>
+            WhatsApp
+          </button>
+          <button onClick={(e) => openShareWindow(shareTargets.telegram, e)} style={shareItemStyle}>
+            Telegram
+          </button>
+          <button onClick={(e) => openShareWindow(shareTargets.email, e)} style={shareItemStyle}>
+            Email
+          </button>
+
+          <a
+            href={shareUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              ...shareItemStyle,
+              textDecoration: "none",
+              display: "block",
+            }}
+          >
+            Open Shared View
+          </a>
+        </div>
+      )}
+
+      {/* ── Keyframes (injected once via global style) ────────────────── */}
+      <style>{`@keyframes dcspin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
-
 // ── ResultsPanel ──────────────────────────────────────────────────────────────
 function ResultsPanel({
   results,
@@ -439,7 +770,7 @@ function ResultsPanel({
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 14 }}>
             {active.drafts.map((d, i) => (
-              <DraftCard key={d.id} draft={d} index={i} selected={selectedDraftIds.has(d.id)} onSelect={(checked) => onSelectDraft(d.id, checked)} />
+              <DraftCard key={d.id} draft={d} index={i} selected={selectedDraftIds.has(d.id)} onSelect={(checked) => onSelectDraft(d.id, checked)} orgSlug={d?.org_slug} />
             ))}
           </div>
         )}
@@ -470,6 +801,9 @@ export default function TopicsPage() {
   const [topicsText, setTopicsText] = useState("");
   const [brands, setBrands]         = useState<Brand[]>([]);
   const [brandId, setBrandId]       = useState<string>("");
+
+  const [tones, setTones] = useState<Tone[]>([]);
+  const [toneId, setToneId] = useState<string>("");
   const [p, setP]                   = useState<BrandProfile | null>(null);
 
   const [monthlyMode, setMonthlyMode]   = useState(true);
@@ -497,7 +831,25 @@ export default function TopicsPage() {
   const [draftsProgress, setDraftsProgress] = useState(0); // live draft count during polling
 
   useEffect(() => {
+  (async () => {
+    try {
+      
+    } catch {
+      setTones([]);
+    }
+  })();
+}, []);
+  useEffect(() => {
     (async () => {
+      try {
+        const toneData = await apiFetch<Tone[]>(`/tones?active_only=false`);
+        setTones(Array.isArray(toneData) ? toneData : []);
+        if (!toneId && Array.isArray(toneData) && toneData.length > 0) {
+          setToneId(toneData[0].id);
+        }
+        } catch {
+        setTones([]);
+      }
       const data = await listBrands(true);
       setBrands(data);
       if (data.length > 0) setBrandId(data[0].id);
@@ -604,6 +956,7 @@ export default function TopicsPage() {
         const res = await safeGenerateWithFallback(
           {
             brand_id:             brandId,
+            tone_id: toneId || null,
             topic,
             mode:                 "monthly",
             target_month:         targetMonth,
@@ -730,6 +1083,18 @@ export default function TopicsPage() {
               </select>
             </div>
 
+            <div>
+              <span className="field-label">Tone</span>
+              <select className="topics-select" value={toneId} onChange={(e) => setToneId(e.target.value)}>
+                <option value="">Select tone</option>
+                {tones.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.emoji ? `${t.emoji} ` : ""}{t.label || t.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* Topics */}
             <div>
               <span className="field-label">Topics — one per line</span>
@@ -757,27 +1122,19 @@ export default function TopicsPage() {
             {/* Monthly planner */}
             <div>
               <span className="field-label">Monthly Bulk Generation</span>
-              <label className="flex items-center gap-2.5 text-xs font-semibold text-white/60 cursor-pointer mb-3" onClick={() => setMonthlyMode((v) => !v)}>
-                <span className={`checkbox-custom ${monthlyMode ? "checked" : ""}`}>
-                  {monthlyMode && <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5"><polyline points="20 6 9 17 4 12"/></svg>}
-                </span>
-                Generate a full month calendar
-              </label>
-              {monthlyMode && (
-                <div className="space-y-3">
-                  <div>
-                    <span className="field-label">Target month</span>
-                    <input type="month" value={targetMonth} onChange={(e) => setTargetMonth(e.target.value)} className="month-input" />
-                  </div>
-                  <div>
-                    <span className="field-label">Posts per week</span>
-                    <select value={postsPerWeek} onChange={(e) => setPostsPerWeek(Number(e.target.value))} className="topics-select">
-                      {[1,2,3,4,5].map((n) => <option key={n} value={n}>{n} / week</option>)}
-                    </select>
-                  </div>
-                  <p className="text-[11px] text-white/25 leading-relaxed">Platforms detected from your active page connections.</p>
+             <div className="space-y-3">
+                <div>
+                  <span className="field-label">Target month</span>
+                  <input type="month" value={targetMonth} onChange={(e) => setTargetMonth(e.target.value)} className="month-input" />
                 </div>
-              )}
+                <div>
+                  <span className="field-label">Posts per week</span>
+                  <select value={postsPerWeek} onChange={(e) => setPostsPerWeek(Number(e.target.value))} className="topics-select">
+                    {[1,2,3,4,5].map((n) => <option key={n} value={n}>{n} / week</option>)}
+                  </select>
+                </div>
+                <p className="text-[11px] text-white/25 leading-relaxed">Platforms detected from your active page connections.</p>
+              </div>
             </div>
 
             {/* Image toggle */}
@@ -786,19 +1143,14 @@ export default function TopicsPage() {
                 <ImageIcon style={{ width: 13, height: 13, color: "#a78bfa" }} />
                 <span className="text-[12px] font-bold">Auto Image Generation</span>
                 {templates.length > 0
-                  ? <span className="text-[10px] ml-auto" style={{ color: "#34d399", fontFamily: "DM Mono, monospace" }}>{templates.length} template{templates.length !== 1 ? "s" : ""} ready</span>
-                  : <span className="text-[10px] ml-auto" style={{ color: "#f87171", fontFamily: "DM Mono, monospace" }}>no templates</span>
+                  ? <span className="text-[10px] ml-auto" style={{ color: "#34d399", fontFamily: "DM Mono, monospace" }}>{templates.length} Design{templates.length !== 1 ? "s" : ""} ready</span>
+                  : <span className="text-[10px] ml-auto" style={{ color: "#f87171", fontFamily: "DM Mono, monospace" }}>no Design</span>
                 }
               </div>
               <p className="text-[10px] text-white/25 leading-relaxed mb-3">
                 Opens automatically after <strong style={{ color: "rgba(255,255,255,0.4)" }}>all drafts</strong> are saved — starts rendering immediately.
               </p>
-              <label className="flex items-center gap-2.5 text-xs font-semibold text-white/50 cursor-pointer" onClick={() => setSkipImages((v) => !v)}>
-                <span className={`checkbox-custom ${skipImages ? "checked" : ""}`}>
-                  {skipImages && <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5"><polyline points="20 6 9 17 4 12"/></svg>}
-                </span>
-                Skip image generation
-              </label>
+             
             </div>
           </div>
 
@@ -913,11 +1265,12 @@ export default function TopicsPage() {
       <AutoGenerateImagesDialog
         open={autoGenOpen}
         brandId={brandId}
+        toneId={toneId}
         onOpenChange={(o) => {
           if (!o) { setAutoGenOpen(false); setAutoGenDrafts([]); setAutoStart(false); }
         }}
         drafts={autoGenDrafts}
-        chat={{ brand_id: brandId, background_images: [] }}
+        chat={{ brand_id: brandId, tone_id: toneId, background_images: [] }}
         autoStart={autoStart}
         onFinished={async () => {
           setAutoGenOpen(false);

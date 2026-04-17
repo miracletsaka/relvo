@@ -15,6 +15,8 @@ export interface MediaAsset {
   tags:        string[]
   size_bytes?: number
   mime_type?:  string
+  price?: number;
+  price_currency?: string;
   width?:      number
   height?:     number
   created_at:  string
@@ -47,7 +49,7 @@ export async function listMediaAssets(filters?: {
   const params = new URLSearchParams()
   if (filters?.type)     params.set('type',     filters.type)
   if (filters?.brand_id) params.set('brand_id', filters.brand_id)
-  const res = await fetch(`${API_BASE}/media-assets?${params}`)
+  const res = await fetch(`${API_BASE}/media-assets?${params}`, { credentials: 'include' })
   if (!res.ok) throw new Error('Failed to fetch media assets')
   return res.json()
 }
@@ -55,6 +57,7 @@ export async function listMediaAssets(filters?: {
 export async function createMediaAsset(payload: CreateMediaAssetPayload): Promise<MediaAsset> {
   const res = await fetch(`${API_BASE}/media-assets`, {
     method: 'POST',
+    credentials: "include", 
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   })
@@ -63,7 +66,10 @@ export async function createMediaAsset(payload: CreateMediaAssetPayload): Promis
 }
 
 export async function deleteMediaAsset(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/media-assets/${id}`, { method: 'DELETE' })
+  const res = await fetch(`${API_BASE}/media-assets/${id}`, {
+    method: 'DELETE',
+    credentials: "include",
+  })
   if (!res.ok) throw new Error('Failed to delete media asset')
 }
 

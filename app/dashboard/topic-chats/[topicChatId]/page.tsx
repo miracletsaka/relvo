@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { FileText, Image as ImageIcon, Video as VideoIcon, Sparkles, Upload, RefreshCw, Check, X, ChevronRight, Search, Wand2, Trash2 } from "lucide-react";
+import { FileText, Image as ImageIcon, Video as VideoIcon, Sparkles, Upload, RefreshCw, Check, X, ChevronRight, Search, Wand2, Trash2, Share2, Copy, ExternalLink, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import StructuredPost from "@/components/StructuredPost";
@@ -83,6 +83,15 @@ const PLATFORM_ACCENT: Record<string, string> = {
   twitter: "#1DA1F2", tiktok: "#69C9D0",
 };
 
+const SHARE_PLATFORM_META: Record<string, { label: string; bg: string; border: string; color: string }> = {
+  facebook: { label: "Facebook", bg: "rgba(24,119,242,0.12)", border: "rgba(24,119,242,0.28)", color: "#60a5fa" },
+  linkedin: { label: "LinkedIn", bg: "rgba(10,102,194,0.12)", border: "rgba(10,102,194,0.28)", color: "#60a5fa" },
+  twitter: { label: "X / Twitter", bg: "rgba(29,161,242,0.12)", border: "rgba(29,161,242,0.28)", color: "#7dd3fc" },
+  whatsapp: { label: "WhatsApp", bg: "rgba(34,197,94,0.12)", border: "rgba(34,197,94,0.28)", color: "#4ade80" },
+  telegram: { label: "Telegram", bg: "rgba(56,189,248,0.12)", border: "rgba(56,189,248,0.28)", color: "#67e8f9" },
+  email: { label: "Email", bg: "rgba(168,85,247,0.12)", border: "rgba(168,85,247,0.28)", color: "#c4b5fd" },
+};
+
 /* ─── Sub-components ────────────────────────────────────── */
 function PlatformPill({ platform }: { platform: string }) {
   const color = PLATFORM_ACCENT[platform.toLowerCase()] ?? "#6b7280";
@@ -124,7 +133,6 @@ function DraftCard({ it, chat, selected, onSelect, onOpen, showCheckbox }: {
   const pf = String(it.platform || "").toLowerCase();
   const type = draftType(it);
   const media = firstMediaUrl(it);
-
   return (
     <div
       onClick={onOpen}
@@ -177,9 +185,20 @@ function DraftCard({ it, chat, selected, onSelect, onOpen, showCheckbox }: {
           {(it.body_text || it.hashtags || it.last_error || "No content").slice(0, 100)}
         </p>
 
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <span className="text-[10px] text-white/25 font-mono">{fmtDate(it.scheduled_at)}</span>
-          <ChevronRight className="w-3.5 h-3.5 text-white/20 group-hover:text-white/50 transition-colors" />
+          <div className="flex items-center gap-2">
+            {chat && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(`${(typeof window !== "undefined" ? window.location.origin : "")}/business/${chat?.org_slug}?draftId=${it.id}`); }}
+                className="text-[10px] font-semibold px-2 py-1 rounded-full border border-white/10 bg-white/[0.04] text-white/45 hover:text-white/75 hover:bg-white/[0.08]"
+              >
+                Link
+              </button>
+            )}
+            <ChevronRight className="w-3.5 h-3.5 text-white/20 group-hover:text-white/50 transition-colors" />
+          </div>
         </div>
       </div>
     </div>
@@ -219,12 +238,74 @@ export default function TopicChatDetailPage() {
   const [draft, setDraft] = useState<any | null>(null);
   const [saving, setSaving] = useState(false);
   const [q, setQ] = useState("");
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shareDraft, setShareDraft] = useState<any | null>(null);
+  const [copiedShareId, setCopiedShareId] = useState<string | null>(null);
+  const [copiedCaptionId, setCopiedCaptionId] = useState<string | null>(null);
+const [downloadingMediaId, setDownloadingMediaId] = useState<string | null>(null);
+
+async function copyDraftCaptionForSocial(draftItem: any) {
+  const fullText = [draftItem?.body_text, draftItem?.hashtags].filter(Boolean).join("\n\n");
+  if (!fullText) return;
+
+  try {
+    await navigator.clipboard.writeText(fullText);
+    setCopiedCaptionId(draftItem.id);
+    setTimeout(() => setCopiedCaptionId(null), 2200);
+  } catch {
+    const ta = document.createElement("textarea");
+    ta.value = fullText;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+    setCopiedCaptionId(draftItem.id);
+    setTimeout(() => setCopiedCaptionId(null), 2200);
+  }
+}
+
+async function downloadDraftMedia(draftItem: any) {
+  const mediaUrl = draftItem?.media_url;
+  if (!mediaUrl || downloadingMediaId === draftItem.id) return;
+
+  setDownloadingMediaId(draftItem.id);
+
+  try {
+    const res = await fetch(mediaUrl);
+    const blob = await res.blob();
+
+    const ext =
+      blob.type.includes("png") ? "png" :
+      blob.type.includes("webp") ? "webp" :
+      blob.type.includes("mp4") ? "mp4" :
+      blob.type.includes("gif") ? "gif" :
+      "jpg";
+
+    const filename = `draft-${draftItem?.platform || "media"}-${String(draftItem?.id || "").slice(0, 8)}.${ext}`;
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch {
+    window.open(mediaUrl, "_blank");
+  } finally {
+    setDownloadingMediaId(null);
+  }
+}
 
   const refresh = async () => {
     setLoading(true); setErr(null);
     try {
       const [c, ds] = await Promise.all([getTopicChat(topicChatId), listTopicChatDrafts(topicChatId)]);
       setChat(c); setDrafts(ds); setSelected({}); setActive(null);
+      
     } catch (e: any) { setErr(e?.message || "Failed to load"); }
     finally { setLoading(false); }
   };
@@ -308,7 +389,7 @@ export default function TopicChatDetailPage() {
     setSaving(true); setErr(null);
     try {
       const bullets = (draft.bullets || []).filter(Boolean).slice(0, 3);
-      await updateDraft(active.id, {
+      await updateDraft(active?.id, {
         body_text: draft.body_text || null, hashtags: draft.hashtags || null,
         structured: { ...(active.structured || {}), hook: draft.hook || null, subheading: draft.subheading || null, bullets: bullets.length ? bullets : null, proof: draft.proof || null, cta: draft.cta || null },
         scheduled_at: draft.scheduled_at ? new Date(draft.scheduled_at).toISOString() : undefined,
@@ -323,7 +404,7 @@ export default function TopicChatDetailPage() {
     setUploading(true); setErr(null);
     try {
       const url = await uploadFileToSpaces(file);
-      await attachMediaToContentItem(active.id, { media_type: file.type.startsWith("video/") ? "video" : "image", media_url: url, media_urls: [url], media_provider: "do_spaces" });
+      await attachMediaToContentItem(active?.id, { media_type: file.type.startsWith("video/") ? "video" : "image", media_url: url, media_urls: [url], media_provider: "do_spaces" });
       await refresh();
     } catch (e: any) { setErr(e?.message || "Upload failed"); }
     finally { setUploading(false); }
@@ -366,6 +447,102 @@ export default function TopicChatDetailPage() {
       setBgUploading(false);
     }
   }
+
+  const getSiteUrl = () => {
+    if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "");
+    if (typeof window !== "undefined") return window.location.origin.replace(/\/$/, "");
+    return "http://localhost:3000";
+  };
+
+  const getShareSlug = () => {
+    return (
+      chat?.org_slug
+    )
+  };
+
+  const buildDraftShareUrl = (draftId: string) => {
+    const slug = getShareSlug();
+    if (!slug) return "";
+    return `${getSiteUrl()}/business/${slug}?draftId=${encodeURIComponent(draftId)}`;
+  };
+
+  const buildDraftShareText = (item: any) => {
+    const hook = item?.structured?.hook || item?.title || item?.body_text || "Check out this post";
+    const shortBody = String(item?.body_text || "").replace(/\s+/g, " ").trim().slice(0, 120);
+    return [hook, shortBody].filter(Boolean).join(" — ");
+  };
+
+  const openShareDialogForDraft = (item: any) => {
+    setShareDraft(item);
+    setShareDialogOpen(true);
+  };
+
+  const copyDraftShareLink = async (draftId: string) => {
+    try {
+      const url = buildDraftShareUrl(draftId);
+      if (!url) throw new Error("Missing business slug for share link");
+      await navigator.clipboard.writeText(url);
+      setCopiedShareId(draftId);
+      setTimeout(() => setCopiedShareId((current) => (current === draftId ? null : current)), 2000);
+    } catch (e: any) {
+      setErr(e?.message || "Failed to copy share link");
+    }
+  };
+
+  const openPlatformShare = (platform: "facebook" | "linkedin" | "twitter" | "whatsapp" | "telegram" | "email", item: any) => {
+    const url = buildDraftShareUrl(item.id);
+    if (!url) {
+      setErr("Missing business slug for share link");
+      return;
+    }
+
+    const text = buildDraftShareText(item);
+    const encodedUrl = encodeURIComponent(url);
+    const encodedText = encodeURIComponent(text);
+    const encodedSubject = encodeURIComponent(item?.structured?.hook || item?.title || "Shared draft");
+
+    const shareMap: Record<string, string> = {
+      facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
+      linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`,
+      twitter: `https://twitter.com/intent/tweet?url=${encodedUrl}&text=${encodedText}`,
+      whatsapp: `https://wa.me/?text=${encodeURIComponent(`${text} ${url}`.trim())}`,
+      telegram: `https://t.me/share/url?url=${encodedUrl}&text=${encodedText}`,
+      email: `mailto:?subject=${encodedSubject}&body=${encodeURIComponent(`${text}
+
+${url}`)}`,
+    };
+
+    const target = shareMap[platform];
+    if (!target) return;
+
+    if (platform === "email") {
+      window.location.href = target;
+      return;
+    }
+
+    window.open(target, "_blank", "noopener,noreferrer,width=720,height=760");
+  };
+
+  const shareDraftNatively = async (item: any) => {
+    const url = buildDraftShareUrl(item.id);
+    if (!url) {
+      setErr("Missing business slug for share link");
+      return;
+    }
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: item?.structured?.hook || item?.title || "Shared draft",
+          text: buildDraftShareText(item),
+          url,
+        });
+      } catch {}
+      return;
+    }
+
+    await copyDraftShareLink(item.id);
+  };
 
   const TAB_CONFIG: { key: TabKey; label: string; count: number }[] = [
     { key: "pending", label: "Pending", count: counts.pending },
@@ -696,6 +873,10 @@ export default function TopicChatDetailPage() {
                 </div>
               </div>
               <div className="flex gap-2">
+                <button className="action-btn action-btn-outline" onClick={() => active && openShareDialogForDraft(active)}>
+                  <Share2 className="w-3.5 h-3.5" />
+                  Share
+                </button>
                 <button className="action-btn action-btn-primary" onClick={saveActive} disabled={saving}>
                   {saving ? <span className="spinner" /> : <Check className="w-3.5 h-3.5" />}
                   {saving ? "Saving…" : "Save"}
@@ -712,15 +893,15 @@ export default function TopicChatDetailPage() {
                 <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14, padding: 16 }}>
                   <span className="drawer-field-label">Media</span>
 
-                  {active.media_url ? (
+                  {active?.media_url ? (
                     <div className="space-y-3">
                       <div style={{ borderRadius: 10, overflow: "hidden", border: "1px solid rgba(255,255,255,0.08)" }}>
-                        {String(active.media_type || "").toLowerCase() === "video" || String(active.media_url).toLowerCase().endsWith(".mp4")
-                          ? <video src={active.media_url} controls className="w-full max-h-52" />
-                          : <img src={active.media_url} className="w-full object-contain max-h-52" />
+                        {String(active.media_type || "").toLowerCase() === "video" || String(active?.media_url).toLowerCase().endsWith(".mp4")
+                          ? <video src={active?.media_url} controls className="w-full max-h-52" />
+                          : <img src={active?.media_url} className="w-full object-contain max-h-52" />
                         }
                       </div>
-                      <p style={{ fontSize: 10, color: "rgba(255,255,255,0.25)", fontFamily: "DM Mono, monospace", wordBreak: "break-all" }}>{active.media_url}</p>
+                      <p style={{ fontSize: 10, color: "rgba(255,255,255,0.25)", fontFamily: "DM Mono, monospace", wordBreak: "break-all" }}>{active?.media_url}</p>
                     </div>
                   ) : (
                     <div className="upload-zone">
@@ -731,7 +912,7 @@ export default function TopicChatDetailPage() {
                     </div>
                   )}
 
-                  {active.media_url && (
+                  {active?.media_url && (
                     <div className="mt-3">
                       <label className="upload-zone" style={{ display: "block", cursor: "pointer" }}>
                         <input type="file" accept="image/*,video/*" style={{ position: "absolute", opacity: 0, width: 1, height: 1 }} onChange={(e) => { const f = e.target.files?.[0]; if (f) onUploadMedia(f); }} />
@@ -742,13 +923,39 @@ export default function TopicChatDetailPage() {
                     </div>
                   )}
 
-                  <div className="mt-3">
+                  <div className="mt-3 space-y-2">
                     <Link href={`/studio/${topicChatId}?draftId=${active?.id}`}
                       className="action-btn action-btn-outline w-full justify-center"
                       style={{ display: "flex", textDecoration: "none" }}>
                       <VideoIcon className="w-3.5 h-3.5" />
                       Generate Video in Studio
                     </Link>
+
+                    <div style={{ background: "rgba(124,58,237,0.08)", border: "1px solid rgba(124,58,237,0.2)", borderRadius: 12, padding: 12 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(196,181,253,0.8)", marginBottom: 8 }}>
+                        Share Draft
+                      </div>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <button className="action-btn action-btn-primary" type="button" onClick={() => openShareDialogForDraft(active)}>
+                          <Share2 className="w-3.5 h-3.5" />
+                          Share
+                        </button>
+                        <button className="action-btn action-btn-outline" type="button" onClick={() => copyDraftShareLink(active?.id)}>
+                          <Copy className="w-3.5 h-3.5" />
+                          {copiedShareId === active?.id ? "Copied" : "Copy Link"}
+                        </button>
+                        <a
+                          href={buildDraftShareUrl(active?.id) || "#"}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="action-btn action-btn-outline"
+                          style={{ textDecoration: "none" }}
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          Open Shared View
+                        </a>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -808,7 +1015,7 @@ export default function TopicChatDetailPage() {
                     <ContentUploadPage
                       background_images={chat?.background_images || []}
                       topicId={topicChatId}
-                      activeId={active.id}
+                      activeId={active?.id}
                       structured={active.structured}
                     />
                   </div>
@@ -818,6 +1025,128 @@ export default function TopicChatDetailPage() {
           </div>
         </SheetContent>
       </Sheet>
+
+      <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
+        <DialogContent style={{ background: "#141418", border: "1px solid rgba(255,255,255,0.1)", fontFamily: "Syne, sans-serif", maxWidth: 520 }}>
+          <DialogHeader>
+            <DialogTitle style={{ color: "#e4e4e7", fontSize: 16, fontWeight: 700 }}>Share Draft</DialogTitle>
+          </DialogHeader>
+
+          {shareDraft && (
+            <div className="space-y-4">
+              <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14, padding: 14 }}>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(139,92,246,0.7)", marginBottom: 6 }}>Draft Destination</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#e4e4e7", marginBottom: 6 }}>
+                      /biz/{getShareSlug() || "missing-slug"}?draftId={shareDraft.id}
+                    </div>
+                    <p style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", lineHeight: 1.6 }}>
+                      Social platforms will share the business page URL with the draft panel opened automatically for this draft.
+                    </p>
+                  </div>
+                  <button className="action-btn action-btn-outline" type="button" onClick={() => shareDraftNatively(shareDraft)}>
+                    <Share2 className="w-3.5 h-3.5" />
+                    Native
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button
+                  className="action-btn action-btn-primary"
+                  type="button"
+                  onClick={() => openShareDialogForDraft(active)}
+                >
+                  <Share2 className="w-3.5 h-3.5" />
+                  Share
+                </button>
+
+                <button
+                  className="action-btn action-btn-outline"
+                  type="button"
+                  onClick={() => copyDraftShareLink(active?.id)}
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  {copiedShareId === active?.id ? "Copied" : "Copy Link"}
+                </button>
+
+                <button
+                  className="action-btn action-btn-outline"
+                  type="button"
+                  onClick={() => copyDraftCaptionForSocial(active)}
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  {copiedCaptionId === active?.id ? "Caption Copied" : "Copy Text"}
+                </button>
+
+                {active?.media_url && (
+                  <button
+                    className="action-btn action-btn-outline"
+                    type="button"
+                    onClick={() => downloadDraftMedia(active)}
+                    disabled={downloadingMediaId === active?.id}
+                  >
+                    {downloadingMediaId === active?.id ? (
+                      <span className="spinner" />
+                    ) : (
+                      <Download className="w-3.5 h-3.5" />
+                    )}
+                    {downloadingMediaId === active?.id ? "Downloading…" : "Download Image"}
+                  </button>
+                )}
+
+                <a
+                  href={buildDraftShareUrl(active?.id) || "#"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="action-btn action-btn-outline"
+                  style={{ textDecoration: "none" }}
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  Open Shared View
+                </a>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
+                {(["facebook", "linkedin", "twitter", "whatsapp", "telegram", "email"] as const).map((platform) => {
+                  const meta = SHARE_PLATFORM_META[platform];
+                  return (
+                    <button
+                      key={platform}
+                      type="button"
+                      onClick={() => openPlatformShare(platform, shareDraft)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 10,
+                        padding: "12px 14px",
+                        borderRadius: 12,
+                        border: `1px solid ${meta.border}`,
+                        background: meta.bg,
+                        color: meta.color,
+                        cursor: "pointer",
+                        fontSize: 12,
+                        fontWeight: 700,
+                      }}
+                    >
+                      <span>{meta.label}</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: 12 }}>
+                <p style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", lineHeight: 1.6 }}>
+                  Feed-style sharing works for the platforms above using their share dialogs. Instagram and TikTok usually still need manual app posting, so copy link is the fallback for those.
+                </p>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* ── BACKGROUND UPLOAD DIALOG ── */}
       <Dialog open={bgDialogOpen} onOpenChange={setBgDialogOpen}>

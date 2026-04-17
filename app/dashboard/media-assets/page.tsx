@@ -14,6 +14,7 @@ import {
   type MediaAsset,
   type MediaAssetType,
 } from '@/lib/studio/media-asset-api'
+import AssetCard from '@/components/asset-card'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -326,102 +327,6 @@ function QueueCard({ item, brands, onRemove, onTagsChange, onBrandChange }: {
         {item.error && (
           <p style={{ fontSize: 10, color: '#f87171', fontFamily: 'DM Mono, monospace' }}>{item.error}</p>
         )}
-      </div>
-    </div>
-  )
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// AssetCard
-// ─────────────────────────────────────────────────────────────────────────────
-function AssetCard({ asset, onDelete }: { asset: MediaAsset; onDelete: () => void }) {
-  const [confirming, setConfirming] = useState(false)
-  const [deleting,   setDeleting]   = useState(false)
-
-  const handleDelete = async () => {
-    setDeleting(true)
-    try { await deleteMediaAsset(asset.id); onDelete() }
-    finally { setDeleting(false); setConfirming(false) }
-  }
-
-  return (
-    <div style={{
-      background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)',
-      borderRadius: 14, overflow: 'hidden', transition: 'border-color 0.15s',
-    }}
-      onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)')}
-      onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)')}
-    >
-      {/* Thumbnail */}
-      <div style={{ height: 120, background: 'rgba(0,0,0,0.3)', position: 'relative', overflow: 'hidden' }}>
-        {asset.type === 'image' ? (
-          <img src={asset.url} alt={asset.filename}
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        ) : (
-          <video src={asset.url} muted playsInline
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        )}
-
-        {/* Delete */}
-        <div style={{ position: 'absolute', top: 6, right: 6 }}>
-          {!confirming ? (
-            <button onClick={() => setConfirming(true)} style={{
-              width: 26, height: 26, borderRadius: 8, background: 'rgba(0,0,0,0.6)',
-              border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)',
-              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.3)'; (e.currentTarget as HTMLElement).style.color = '#f87171' }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(0,0,0,0.6)'; (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.5)' }}
-            >
-              <Trash2 style={{ width: 12, height: 12 }} />
-            </button>
-          ) : (
-            <div style={{ display: 'flex', gap: 4 }}>
-              <button onClick={handleDelete} disabled={deleting} style={{
-                width: 26, height: 26, borderRadius: 8, background: 'rgba(239,68,68,0.3)',
-                border: '1px solid rgba(239,68,68,0.4)', color: '#f87171',
-                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                {deleting
-                  ? <div style={{ width: 10, height: 10, border: '1.5px solid rgba(255,255,255,0.2)', borderTopColor: '#f87171', borderRadius: '50%', animation: 'maspin 0.6s linear infinite' }} />
-                  : <Check style={{ width: 11, height: 11 }} />}
-              </button>
-              <button onClick={() => setConfirming(false)} style={{
-                width: 26, height: 26, borderRadius: 8, background: 'rgba(0,0,0,0.6)',
-                border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)',
-                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                <X style={{ width: 11, height: 11 }} />
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Brand badge */}
-        <div style={{ position: 'absolute', bottom: 6, left: 6 }}>
-          <BrandBadge name={asset.brand_name} size="xs" />
-        </div>
-      </div>
-
-      <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
-        <p style={{ fontSize: 10, fontFamily: 'DM Mono, monospace', color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {asset.filename}
-        </p>
-        {asset.tags && asset.tags.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-            {asset.tags.slice(0, 4).map((t) => (
-              <span key={t} style={{ fontSize: 8, fontFamily: 'DM Mono, monospace', color: 'rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.05)', padding: '1px 5px', borderRadius: 4 }}>
-                #{t}
-              </span>
-            ))}
-            {asset.tags.length > 4 && (
-              <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.2)' }}>+{asset.tags.length - 4}</span>
-            )}
-          </div>
-        )}
-        <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', fontFamily: 'DM Mono, monospace' }}>
-          {fmtDate(asset.created_at)}
-        </p>
       </div>
     </div>
   )
@@ -893,7 +798,7 @@ export default function MediaAssetsPage() {
                   </p>
                 </div>
               ) : (
-                <div className="ma-asset-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
+                <div className="ma-asset-grid z-50" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
                   {filteredAssets.map((asset) => (
                     <AssetCard key={asset.id} asset={asset} onDelete={refresh} />
                   ))}
