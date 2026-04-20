@@ -176,7 +176,7 @@ export default function OnboardingPage() {
 
         <header style={{ padding: "22px 40px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0, position: "relative", zIndex: 10 }}>
           <div className="">
-            <img src="/logo.png" alt="Relvō AI" style={{ width: 50, height: "auto" }} />
+            <img src="/logo.png" alt="Relvo AI" style={{ width: 50, height: "auto" }} />
           </div>
           <span style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", fontFamily: "DM Mono, monospace", letterSpacing: "0.06em" }}>
             SETUP · {stepIndex + 1} of {ONBOARDING_STEPS.length}

@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const {
       concept        = "",
-      companyName    = "Relvō",
+      companyName    = "Relvo",
       accentColor    = "#7c3aed",
       brandId        = "",
       existingScenes = [] as any[],

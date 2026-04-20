@@ -134,6 +134,16 @@ export default function StepBranding({ orgName, onNext, onBack, stepIndex }: Pro
         finalLogoUrl = await uploadFileToSpaces(logoFile);
       }
 
+
+      // 2b. Save logo to organisation (source of truth for review cards)
+      if (finalLogoUrl) {
+        setProgress("Saving organisation logo...");
+        await apiFetch("/organisations/me", {
+          method: "PATCH",
+          body: JSON.stringify({ logo_url: finalLogoUrl }),
+        }).catch(() => {});
+      }
+
       // 2. Create brand — exact fields the backend expects
       setProgress("Creating brand…");
       await apiFetch("/brands", {
@@ -167,7 +177,7 @@ export default function StepBranding({ orgName, onNext, onBack, stepIndex }: Pro
           tab.document.write(
             `<html><body style="font-family:sans-serif;display:flex;align-items:center;` +
             `justify-content:center;height:100vh;background:#0b0b0f;color:white;margin:0">` +
-            `<div style="text-align:center"><div style="opacity:.4;font-size:11px;letter-spacing:.1em;margin-bottom:10px">Relvō</div>` +
+            `<div style="text-align:center"><div style="opacity:.4;font-size:11px;letter-spacing:.1em;margin-bottom:10px">NEUROFLOW</div>` +
             `<div>Generating ${label} template…</div></div></body></html>`
           );
           if (i === 0) tab.focus();
@@ -360,7 +370,7 @@ export default function StepBranding({ orgName, onNext, onBack, stepIndex }: Pro
             <div style={{ padding: "13px 16px", background: "rgba(124,58,237,0.07)", border: "1px solid rgba(124,58,237,0.18)", borderRadius: 11, display: "flex", gap: 11, alignItems: "flex-start" }}>
               <span style={{ fontSize: 16, flexShrink: 0 }}>⚡</span>
               <p style={{ fontSize: 12, color: "rgba(255,255,255,0.32)", lineHeight: 1.65, margin: 0, fontFamily: "'DM Sans', sans-serif" }}>
-                We'll auto-generate <strong style={{ color: "rgba(167,139,250,0.75)" }}>{activeTones.length} design{activeTones.length > 1 ? "s" : ""}</strong> and open each in a new tab for you to review.
+                We'll auto-generate <strong style={{ color: "rgba(167,139,250,0.75)" }}>{activeTones.length} template{activeTones.length > 1 ? "s" : ""}</strong> and open each in a new tab for you to review.
               </p>
             </div>
           )}
@@ -386,7 +396,6 @@ export default function StepBranding({ orgName, onNext, onBack, stepIndex }: Pro
     </>
   );
 }
-
 
 const L: React.CSSProperties = { display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.3)", fontFamily: "DM Mono, monospace", marginBottom: 10 };
 const I: React.CSSProperties = { width: "100%", boxSizing: "border-box", padding: "12px 13px", background: "rgba(255,255,255,0.04)", border: "1.5px solid rgba(255,255,255,0.08)", borderRadius: 11, color: "#f1f5f9", fontSize: 13, fontFamily: "'DM Sans', sans-serif", outline: "none", transition: "border-color 0.2s" };

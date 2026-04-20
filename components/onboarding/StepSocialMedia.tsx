@@ -74,7 +74,7 @@ export default function StepSocialMedia({ initial = {}, onNext, onBack, stepInde
       stepIndex={stepIndex}
       eyebrow="Step 5 of 6"
       headline="Where are you active online?"
-      sub="Select the platforms you post on. Relvō will tailor content formats and scheduling for each."
+      sub="Select the platforms you post on. Relvo will tailor content formats and scheduling for each."
       onNext={handleNext}
       onBack={onBack}
       nextLabel={loading ? "Saving…" : selected.size === 0 ? "Skip for now →" : `Continue with ${selected.size} platform${selected.size > 1 ? "s" : ""} →`}

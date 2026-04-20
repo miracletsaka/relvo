@@ -1021,6 +1021,12 @@ export default function TopicsPage() {
 
   const showPanel = results.length > 0 || generating;
 
+  console.log("Available templates:", templates, "Looking for toneId:", toneId, "and brandId:", brandId);
+
+  // lets find template with the similar tone and brand, if now found disable the generate button and tell to go to the template editor for one
+  const similarTemplate = templates.find(t => t.
+tone_id === toneId && t.brand_id === brandId);
+
   return (
     <>
       <style>{`
@@ -1062,15 +1068,10 @@ export default function TopicsPage() {
         <div className="panel-left">
           <div className="px-5 pt-6 pb-4 border-b border-white/[0.06]">
             <div className="flex items-center gap-2 mb-1">
-              <div className="w-6 h-6 rounded-md bg-violet-600 flex items-center justify-center">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
-                  <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-                </svg>
-              </div>
               <h1 className="text-[15px] font-bold tracking-tight">Content Generator</h1>
             </div>
             <p className="text-[11px] text-white/30 leading-relaxed">
-              Generate AI-powered drafts + images for your social channels.
+              Generate AI-powered content for your social channels.
             </p>
           </div>
 
@@ -1138,25 +1139,27 @@ export default function TopicsPage() {
             </div>
 
             {/* Image toggle */}
-            <div className="img-toggle-box">
+            {!similarTemplate && <div className="img-toggle-box">
+              {/* inform them to go to the template editor with the link to that page */}
               <div className="flex items-center gap-2 mb-2">
-                <ImageIcon style={{ width: 13, height: 13, color: "#a78bfa" }} />
-                <span className="text-[12px] font-bold">Auto Image Generation</span>
-                {templates.length > 0
-                  ? <span className="text-[10px] ml-auto" style={{ color: "#34d399", fontFamily: "DM Mono, monospace" }}>{templates.length} Design{templates.length !== 1 ? "s" : ""} ready</span>
-                  : <span className="text-[10px] ml-auto" style={{ color: "#f87171", fontFamily: "DM Mono, monospace" }}>no Design</span>
-                }
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="2.5"><path d="M12 9v2m0 4h.01M5.64 17l-.707-.707a1 1 0 0 0-1.414 0l-.707.707a1 1 0 0 0 1.414 1.414L4.93 18a1 1 0 0 0 .707-.293zM18.364 17l.707-.707a1 1 0 0 1 1.414 0l.707.707a1 1 0 0 1-1.414 1.414L19.07 18a1 1 0 0 1-.707-.293zM5.64 7l-.707-.707a1 1 0 0 0-1.414 0L2.12 7a1 1 0 0 0 .293.707A1 1 0 0 0 4.34 6zM18.364 7l.707-.707a1 1 0 0 1 1.414 0L22.88 7a1 1 0 0 1-.293.707A1 1 0 0 119.6666z"/></svg>
+                <p>You cannot generate without templates that match the selected tone. Please create templates with the selected tone to enable image generation by clicking this link : <a className="text-blue-500" href="/dashboard/design-studio/admin/template" target="_blank" rel="noopener noreferrer">Create Templates</a></p>
               </div>
-              <p className="text-[10px] text-white/25 leading-relaxed mb-3">
-                Opens automatically after <strong style={{ color: "rgba(255,255,255,0.4)" }}>all drafts</strong> are saved — starts rendering immediately.
-              </p>
-             
-            </div>
+                         
+            </div>}
+            {/* Also alert if there are no brand to visit and create one with the link */}
+            {brands.length === 0 && <div className="img-toggle-box">
+              <div className="flex items-center gap-2 mb-2">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="2.5"><path d="M12 9v2m0 4h.01M5.64 17l-.707-.707a1 1 0 0 0-1.414 0l-.707.707a1 1 0 0 0 1.414 1.414L4.93 18a1 1 0 0 0 .707-.293zM18.364 17l.707-.707a1 1 0 0 1 1.414 0l.707.707a1 1 0 0 1-1.414 1.414L19.07 18a
+                1 1 0 0 1-.707-.293zM5.64 7l-.707-.707a1 1 0 0 0-1.414 0L2.12 7a1 1 0 0 0 .293.707A1 1 0 0 0 4.34 6zM18.364 7l.707-.707a1 1 0 0 1 1.414 0L22.88 7a1 1 0 0 1-.293.707A1 1 0 0 119.6666z"/></svg> 
+                <p>You need to create at least one brand to use the generator. Please create a brand by clicking this link : <a className="text-blue-500" href="/dashboard/brands" target="_blank" rel="noopener noreferrer">Create Brand</a></p>
+              </div>
+              </div>}
           </div>
 
           <div className="px-5 pb-5 pt-3 border-t border-white/[0.06] space-y-3">
             {statusMsg && <p className={`msg-${statusMsg.type}`}>{statusMsg.text}</p>}
-            <button className="generate-btn" onClick={openReview} disabled={loading}>
+            <button className="generate-btn" onClick={openReview} disabled={loading || templates.length === 0 || !similarTemplate}>
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
                   <span className="spinner" />

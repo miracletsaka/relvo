@@ -1,7 +1,7 @@
 "use client";
 /**
  * app/page.tsx  (or app/(landing)/page.tsx)
- * Relvō AI — Marketing SaaS landing page
+ * Relvo AI — Marketing SaaS landing page
  *
  * Design direction: Dark editorial luxury.
  * Think: Vercel meets a premium creative agency.
@@ -308,7 +308,7 @@ export default function LandingPage() {
       }}>
         {/* logo image */}
         <div className="">
-          <img src="/logo.png" alt="Relvō AI" style={{ width: 80, height: "auto" }} />
+          <img src="/logo.png" alt="Relvo AI" style={{ width: 80, height: "auto" }} />
         </div>
 
         <div className="hide-mobile" style={{ display: "flex", alignItems: "center", gap: 32 }}>
@@ -385,7 +385,7 @@ export default function LandingPage() {
               fontFamily: "DM Mono, monospace", fontWeight: 400,
               animationDelay: "0.2s",
             }}>
-              Relvō generates a full month of social content, schedules it
+              Relvo generates a full month of social content, schedules it
               across every platform, and renders cinematic videos — all from a
               single topic.
             </p>
@@ -514,11 +514,11 @@ export default function LandingPage() {
                 From topic to published in minutes
               </h2>
               <p style={{ fontSize: 14, color: "rgba(255,255,255,0.4)", fontFamily: "DM Mono, monospace", lineHeight: 1.8, marginBottom: 40 }}>
-                Relvō handles everything from ideation to publishing. You stay focused on strategy, not execution.
+                Relvo handles everything from ideation to publishing. You stay focused on strategy, not execution.
               </p>
 
               {[
-                { n: "01", title: "Set your topic", body: "Enter a campaign topic and select your target month. Relvō calculates the optimal posting frequency." },
+                { n: "01", title: "Set your topic", body: "Enter a campaign topic and select your target month. Relvo calculates the optimal posting frequency." },
                 { n: "02", title: "AI generates all content", body: "GPT-4 creates platform-specific posts for every slot — LinkedIn articles, Instagram captions, Facebook ads — each in your brand voice." },
                 { n: "03", title: "Add visuals", body: "Upload media, generate AI backgrounds, or use the video studio to render a cinematic short-form video for each post." },
                 { n: "04", title: "Review & approve", body: "Your team reviews drafts in the approval queue. Edit inline, approve in bulk, or reject with a reason." },
@@ -555,11 +555,11 @@ export default function LandingPage() {
                 <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#f87171" }} />
                 <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#fbbf24" }} />
                 <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#34d399" }} />
-                <span style={{ marginLeft: 8, fontSize: 11, color: "rgba(255,255,255,0.2)", fontFamily: "DM Mono, monospace" }}>Relvō — content studio</span>
+                <span style={{ marginLeft: 8, fontSize: 11, color: "rgba(255,255,255,0.2)", fontFamily: "DM Mono, monospace" }}>Relvo — content studio</span>
               </div>
               <div style={{ padding: 20 }}>
                 {[
-                  { t: "brand",   c: "#a78bfa", v: "Relvō  Agency · LinkedIn + Instagram" },
+                  { t: "brand",   c: "#a78bfa", v: "Relvo  Agency · LinkedIn + Instagram" },
                   { t: "topic",   c: "#60a5fa", v: "Q1 Product Launch Campaign" },
                   { t: "posts",   c: "#34d399", v: "16 posts generated across 4 weeks" },
                   { t: "video",   c: "#fbbf24", v: "3 × 30s videos rendered" },
@@ -734,7 +734,7 @@ export default function LandingPage() {
           </div>
           <div className="three-col" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14 }}>
             <TestimonialCard
-              quote="We went from posting 3 times a week to 30. Relvō generates a month of content in the time it used to take us to write one post."
+              quote="We went from posting 3 times a week to 30. Relvo generates a month of content in the time it used to take us to write one post."
               name="Sarah M."
               role="Head of Marketing"
               company="TechCo"
@@ -802,9 +802,9 @@ export default function LandingPage() {
             <div style={{ maxWidth: 280 }}>
               <a href="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none", marginBottom: 14 }}>
                 <div className="">
-                  <img src="/logo.png" alt="Relvō" style={{ width: 80, height: "auto" }} />
+                  <img src="/logo.png" alt="Relvo" style={{ width: 80, height: "auto" }} />
                 </div>
-                <span style={{ fontSize: 16, fontWeight: 800, color: "#e4e4e7" }}>Relvō</span>
+                <span style={{ fontSize: 16, fontWeight: 800, color: "#e4e4e7" }}>Relvo</span>
               </a>
               <p style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", lineHeight: 1.7, fontFamily: "DM Mono, monospace" }}>
                 AI-powered Full month content creator for modern businesses and agencies.
@@ -833,7 +833,7 @@ export default function LandingPage() {
 
           <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 24, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
             <p style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", fontFamily: "DM Mono, monospace" }}>
-              © {new Date().getFullYear()} Relvō AI Ltd. All rights reserved.
+              © {new Date().getFullYear()} Relvo AI Ltd. All rights reserved.
             </p>
             <p style={{ fontSize: 11, color: "rgba(255,255,255,0.15)", fontFamily: "DM Mono, monospace" }}>
               Built for ambitious brands.

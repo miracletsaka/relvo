@@ -150,6 +150,7 @@ function PriceEditor({
         </select>
         {/* Amount */}
         <input
+        className="w-20"
           autoFocus
           type="number"
           min="0"

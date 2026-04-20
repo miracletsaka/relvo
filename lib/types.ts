@@ -62,7 +62,7 @@ export type TemplateShape = {
   // ── Image / slot ─────────────────────────────────────────────────────────
   src?: string;
   slotKey?: string;
-  slotType?: "logo" | "image" | "sponsor" | "accreditation";
+  slotType?: "logo" | "image" | "contact"|"sponsor" | "accreditation";
   slotRole?:
     | "hero"
     | "secondary"
@@ -71,6 +71,8 @@ export type TemplateShape = {
     | "mockup"            // left phone mockup (showcase template)
     | "mockup_primary"    // right phone mockup (showcase template)
     | "sponsor"           // sponsor logo strip
+    | "testimonial"       // identity photo on testimonial card
+    | "badge"              // badge icon (e.g. "Top Rated" badge on review card)
     | "accreditation"     // accreditation badge
     | "logo";             // brand/org logo
   slotVisibleWhenEmpty?: boolean;

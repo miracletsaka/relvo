@@ -682,7 +682,7 @@ export default function SettingsPage() {
             {activeSection === "preferences" && (
               <div className="settings-card">
                 <div className="section-title">Preferences</div>
-                <div className="section-desc">Customize how Relvō works for you.</div>
+                <div className="section-desc">Customize how Relvo works for you.</div>
 
                 <div style={{ marginBottom: 24 }}>
                   <div className="toggle-row">
@@ -754,7 +754,7 @@ export default function SettingsPage() {
             {activeSection === "api" && (
               <div className="settings-card">
                 <div className="section-title">API Access</div>
-                <div className="section-desc">Use your API key to integrate Relvō into your own tools.</div>
+                <div className="section-desc">Use your API key to integrate Relvo into your own tools.</div>
 
                 <div>
                   <label className="field-label">Your API Key</label>

@@ -98,7 +98,7 @@ const DEFAULT_CAMPAIGN_DATA: CampaignData = {
   proof: "Trusted by modern service businesses",
   cta: "Book Your Free Demo",
   hashtags: "#AI #Automation #LeadGeneration #BusinessGrowth",
-  companyName: "Relvō AI",
+  companyName: "Relvo AI",
   location: "London, UK",
   ctaLink: "https://neuroflowai.co.uk",
   logo: "https://neuroflowai.co.uk/logo.png",
@@ -173,7 +173,7 @@ const DEFAULT_CAMPAIGN_DATA: CampaignData = {
   accreditations: [
     {
       name: "Certified AI Solutions Partner",
-      issuer: "Relvō Academy",
+      issuer: "Relvo Academy",
       year: 2025,
       logo_url: "https://upload.wikimedia.org/wikipedia/commons/8/89/HD_transparent_picture.png",
     },
@@ -621,7 +621,7 @@ export default function EditorPage() {
 
   const [generatingAuto, setGeneratingAuto] = useState(false);
   const [generateMode, setGenerateMode] = useState<GenerateMode>("product");
-  const [orientation, setOrientation] = useState<Orientation>("portrait");
+  const [orientation, setOrientation] = useState<Orientation>("landscape");
   const [selectedBrandId, setSelectedBrandId] = useState("");
   const [selectedToneId, setSelectedToneId] = useState("");
   const [brands, setBrands] = useState<BrandOption[]>([]);
@@ -657,6 +657,8 @@ export default function EditorPage() {
     setSelectedShapeId(null);
     setSelectedShapeIds([]);
   }, []);
+
+  console.log("active template", activeTemplate);
 
   const syncFromTemplate = useCallback(
     (template: Template) => {
@@ -1012,6 +1014,8 @@ export default function EditorPage() {
     setErr(null);
     setGeneratingAuto(true);
 
+    const org = await apiFetch<{ logo_url?: string; name: string }>("/organisations/me");
+
     try {
       const res = await fetch("/api/generate-template-to-canvas", {
         method: "POST",
@@ -1022,6 +1026,7 @@ export default function EditorPage() {
           canvasWidth: CANVAS_WIDTH,
           canvasHeight: CANVAS_HEIGHT,
           includeDebug: true,
+          logoUrl: org.logo_url || null,
         }),
       });
 

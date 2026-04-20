@@ -33,7 +33,7 @@ export default function WelcomeScreen({ onStart }: Props) {
 
         {/* Logo mark */}
         <div className="">
-              <img src="/logo.png" alt="Relvō AI" style={{ width: 50, height: "auto" }} />
+              <img src="/logo.png" alt="Relvo AI" style={{ width: 50, height: "auto" }} />
             </div>
 
         {/* Headline */}

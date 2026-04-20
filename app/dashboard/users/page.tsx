@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { registerUser, listUsers, deleteUser, type UserRow } from "@/lib/api";
 import { RefreshCcw, Plus, Users, Check, AlertTriangle, Mail, ShieldCheck, ShieldOff, X, UserCircle2, Trash2 } from "lucide-react";
+import { AdminGuard } from "@/components/AdminGuard";
 
 function fmtDate(iso?: string | null) {
   if (!iso) return "—";
@@ -80,7 +81,7 @@ export default function UsersPage() {
   const unverified = users.filter(u => !u.is_email_verified);
 
   return (
-    <>
+    <AdminGuard>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Mono:wght@400;500&display=swap');
         .usr-root { font-family: 'Syne', sans-serif; background: #0c0c0f; min-height: 100vh; color: #e4e4e7; padding: 28px 24px; }
@@ -115,7 +116,7 @@ export default function UsersPage() {
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
           <div>
             <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(124,58,237,0.7)", marginBottom: 4, fontFamily: "DM Mono, monospace" }}>
-              Relvō · Config
+              Relvo · Config
             </div>
             <h1 style={{ fontSize: 26, fontWeight: 800, color: "#e4e4e7", margin: 0, lineHeight: 1.1 }}>Users</h1>
             <p style={{ fontSize: 11, color: "rgba(255,255,255,0.28)", marginTop: 5 }}>
@@ -209,7 +210,7 @@ export default function UsersPage() {
           </>
         )}
       </div>
-    </>
+    </AdminGuard>
   );
 }
 

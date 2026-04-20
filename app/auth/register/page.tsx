@@ -2,7 +2,7 @@
 /**
  * app/auth/register/page.tsx
  * ───────────────────────────
- * Signup page — same Relvō dark studio aesthetic.
+ * Signup page — same Relvo dark studio aesthetic.
  * Updated to:
  * - first name + last name + email
  * - no password fields
@@ -239,10 +239,10 @@ export default function SignUpPage() {
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div className="">
-              <img src="/logo.png" alt="Relvō" style={{ width: 50, height: "auto" }} />
+              <img src="/logo.png" alt="Relvo" style={{ width: 50, height: "auto" }} />
             </div>
           <span style={{ fontSize: 18, fontWeight: 800, color: "#e4e4e7", letterSpacing: "-0.02em" }}>
-            Relvō
+            Relvo
           </span>
         </div>
 
@@ -311,7 +311,7 @@ export default function SignUpPage() {
           }}
         >
           <div style={{ fontSize: 13, color: "rgba(255,255,255,0.6)", lineHeight: 1.6, marginBottom: 12, fontStyle: "italic" }}>
-            "Relvō cut our content production time by 80%. We went from 3 posts a week to 30."
+            "Relvo cut our content production time by 80%. We went from 3 posts a week to 30."
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div

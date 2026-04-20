@@ -12,10 +12,12 @@ export async function POST(req: NextRequest) {
       canvasHeight = 1350,
       previousLayout = null,
       includeDebug = true,
+      logoUrl = null,
     }: {
       campaignData?: Partial<CampaignData>;
       canvasWidth?: number;
       canvasHeight?: number;
+      logoUrl?: string | null;
       previousLayout?: LayoutVariant | null;
       includeDebug?: boolean;
     } = body || {};
@@ -33,6 +35,7 @@ export async function POST(req: NextRequest) {
       canvasWidth: safeCanvasWidth,
       canvasHeight: safeCanvasHeight,
       previousLayout,
+      logoUrl,
     });
 
     return NextResponse.json({

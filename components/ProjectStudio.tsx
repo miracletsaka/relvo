@@ -1,6 +1,6 @@
 "use client";
 
-// ProjectStudio — Relvō Video Studio
+// ProjectStudio — Relvo Video Studio
 // Features:
 //   - Scene types: AI video (media_asset), Webcam, B-Roll upload
 //   - Webcam recording via TeleprompterModal
@@ -908,7 +908,7 @@ export default function ProjectStudio(props: {
         <style>{css}</style>
         <div className="stu" style={{ padding: "32px 24px" }}>
           <div style={{ maxWidth: 620, margin: "0 auto" }}>
-            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(124,58,237,0.7)", marginBottom: 6, fontFamily: "DM Mono, monospace" }}>Relvō · Studio</div>
+            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(124,58,237,0.7)", marginBottom: 6, fontFamily: "DM Mono, monospace" }}>Relvo · Studio</div>
             <h1 style={{ fontSize: 28, fontWeight: 800, margin: "0 0 6px", lineHeight: 1.1 }}>Video Studio</h1>
             <p style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", marginBottom: 28 }}>
               Describe your video concept. Gemini writes the script — then record yourself, upload clips, or let AI generate the visuals.

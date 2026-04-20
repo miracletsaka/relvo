@@ -42,7 +42,7 @@ export default function StepDescribeBusiness({ initial = {}, onNext, onBack, ste
       stepIndex={stepIndex}
       eyebrow="Step 2 of 6"
       headline="Tell us about your business"
-      sub="Help Relvō understand your brand so it generates content that sounds like you."
+      sub="Help Relvo understand your brand so it generates content that sounds like you."
       onNext={handleNext}
       onBack={onBack}
       nextDisabled={description.trim().length < 20}
@@ -69,7 +69,7 @@ export default function StepDescribeBusiness({ initial = {}, onNext, onBack, ste
           <textarea
             value={description}
             onChange={e => { setDescription(e.target.value); setError(""); }}
-            placeholder="What does your business do? Who are your customers? What makes you different? The more detail you give, the better Relvō will understand your brand voice."
+            placeholder="What does your business do? Who are your customers? What makes you different? The more detail you give, the better Relvo will understand your brand voice."
             rows={5}
             maxLength={800}
             style={{ ...inputStyle, resize: "vertical", lineHeight: 1.65 }}

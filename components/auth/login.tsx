@@ -2,7 +2,7 @@
 /**
  * app/auth/login/page.tsx
  * ───────────────────────
- * Login page — matches Relvō register page aesthetic.
+ * Login page — matches Relvo register page aesthetic.
  */
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -214,10 +214,10 @@ export default function LoginPage() {
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
            <div className="">
-              <img src="/logo.png" alt="Relvō AI" style={{ width: 50, height: "auto" }} />
+              <img src="/logo.png" alt="Relvo AI" style={{ width: 50, height: "auto" }} />
             </div>
           <span style={{ fontSize: 18, fontWeight: 800, color: "#e4e4e7", letterSpacing: "-0.02em" }}>
-            Relvō
+            Relvo
           </span>
         </div>
 
@@ -233,7 +233,7 @@ export default function LoginPage() {
               marginBottom: 20,
             }}
           >
-            Why teams use Relvō
+            Why teams use Relvo
           </div>
 
           {[
@@ -286,7 +286,7 @@ export default function LoginPage() {
           }}
         >
           <div style={{ fontSize: 13, color: "rgba(255,255,255,0.6)", lineHeight: 1.6, marginBottom: 12, fontStyle: "italic" }}>
-            "Relvō gives us a much cleaner workflow for content, assets, drafts, and team collaboration."
+            "Relvo gives us a much cleaner workflow for content, assets, drafts, and team collaboration."
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div

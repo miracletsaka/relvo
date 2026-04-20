@@ -25,9 +25,9 @@ function ytEmbed(id: string) {
 export default function TopicsTutorialHeroSingle({
   heading = "Ready to generate content faster?",
   body =
-    "Watch the short tutorial showing the full flow: Topics → Drafts → Media → Approval, inside Relvō Marketing.",
+    "Watch the short tutorial showing the full flow: Topics → Drafts → Media → Approval, inside Relvo Marketing.",
   youtubeId,
-  tutorialTitle = "Relvō Marketing — Tutorial",
+  tutorialTitle = "Relvo Marketing — Tutorial",
   primaryCta = { label: "Get Started", href: "/dashboard/create" },
   secondaryCta = { label: "View Scheduled", href: "/dashboard/scheduled" },
 }: Props) {

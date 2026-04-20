@@ -1,5 +1,5 @@
 const INDUSTRY_QUERY_MAP: Record<string, string[]> = {
-  // Relvō core
+  // Relvo core
   ai: ["AI business professional technology", "artificial intelligence business team", "machine learning digital office"],
   neuroflow: ["business automation technology professional", "AI digital transformation team", "smart business solutions office"],
   automation: ["business automation workflow professional", "digital process automation team", "smart technology office people"],
@@ -72,7 +72,7 @@ const INDUSTRY_QUERY_MAP: Record<string, string[]> = {
   finance: ["finance business team professionals", "investment team working office", "financial professionals modern office"],
   consulting: ["consulting team professionals meeting", "business consulting team office", "strategy professionals working"],
 
-  // Default — always Relvō relevant
+  // Default — always Relvo relevant
   default: [
     "AI business automation professionals working",
     "digital transformation business team office",
@@ -194,7 +194,7 @@ export function buildUnsplashQueries(
     .join(" ");
 
   // Final priority order:
-  // hook → matched keywords → Relvō base → default
+  // hook → matched keywords → Relvo base → default
   const allQueries = [
     ...(hookQuery ? [`${hookQuery} business professionals`] : []),
     ...matchedQueries,

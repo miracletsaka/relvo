@@ -56,7 +56,7 @@ export default function StepOrgName({ initialValue = "", onNext, onBack, stepInd
           value={name}
           onChange={e => setName(e.target.value)}
           onKeyDown={e => e.key === "Enter" && handleNext()}
-          placeholder="e.g. Relvō  Marketing Co."
+          placeholder="e.g. Relvo  Marketing Co."
           style={{ ...inputStyle, ...(error ? { borderColor: "#f87171" } : {}) }}
           onFocus={e => { e.target.style.borderColor = "rgba(167,139,250,0.7)"; e.target.style.boxShadow = "0 0 0 3px rgba(124,58,237,0.12)"; }}
           onBlur={e => { e.target.style.borderColor = "rgba(255,255,255,0.08)"; e.target.style.boxShadow = "none"; }}

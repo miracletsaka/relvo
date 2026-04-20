@@ -132,11 +132,18 @@ export const TONE_TEMPLATES: Record<string, ToneTemplate> = {
 };
 
 // ── Canvas sizes ───────────────────────────────────────────────────────────────
+// ── Recommended canvas sizes ─────────────────────────────────────────────────
+// DEFAULT is square 1080×1080 — ideal for social media ads
+// Portrait 1080×1350 for Instagram stories / feed
+// Landscape 1200×628 for Facebook/LinkedIn banners
 export const CANVAS_SIZES: Record<Orientation, { width: number; height: number }> = {
   portrait:  { width: 1080, height: 1350 },
-  landscape: { width: 1920, height: 1080 },
-  square:    { width: 1080, height: 1080 },
+  landscape: { width: 1200, height: 628  },   // compact landscape card
+  square:    { width: 1080, height: 1080 },   // ← RECOMMENDED default
 };
+
+// Best canvas for the compact card format (social-ready, no voids)
+export const RECOMMENDED_CANVAS = { width: 1080, height: 1080 } as const;
 
 export const LAYOUTS_BY_ORIENTATION: Record<Orientation, LayoutVariant[]> = {
   portrait: [

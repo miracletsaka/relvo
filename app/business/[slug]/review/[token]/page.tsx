@@ -23,7 +23,6 @@ type TokenData = {
   org: { name: string; slug: string };
   business_info: { tagline?: string; primary_color?: string } | null;
   profile_image: { url: string } | null;
-  org_logo_url?: string | null;   // company logo for card
 };
 
 const STAR_LABELS = ["", "Poor", "Fair", "Good", "Very Good", "Excellent"];
@@ -143,7 +142,6 @@ export default function ReviewPage() {
         reviewerPhotoUrl: reviewerPhotoUrl ?? undefined,
         productImageUrl:  productImageUrl  ?? undefined,
         orgName:          tokenData?.org.name,
-        orgLogoUrl:       tokenData?.org_logo_url ?? null,
         primaryColor:     tokenData?.business_info?.primary_color || "#1a2f4e",
       });
 
@@ -290,7 +288,7 @@ export default function ReviewPage() {
                   </button>
                 </form>
               </div>
-              <p style={{ textAlign: "center", marginTop: 20, fontSize: 11, color: "#d1d5db", fontFamily: "DM Mono,monospace" }}>Powered by Relvō · Verified Reviews</p>
+              <p style={{ textAlign: "center", marginTop: 20, fontSize: 11, color: "#d1d5db", fontFamily: "DM Mono,monospace" }}>Powered by NeuroFlow AI · Verified Reviews</p>
             </div>
           </div>
         )}

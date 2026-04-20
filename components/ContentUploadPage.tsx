@@ -240,7 +240,7 @@ export default function ContentUploadPage(props: {
   const [bgLoading, setBgLoading] = useState(false)
   const [bgErr, setBgErr] = useState<string | null>(null)
   const [selectedBg, setSelectedBg] = useState<string>('')
-  const [activeTab, setActiveTab] = useState<'template' | 'content'>('template')
+  const [activeTab, setActiveTab] = useState<'template' | 'content'>('content')
 
   const [campaignData, setCampaignData] = useState<CampaignData>(DEFAULT_CAMPAIGN_DATA)
 
@@ -364,9 +364,9 @@ export default function ContentUploadPage(props: {
 
           {/* Tab bar */}
           <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: 4 }}>
-            <button className={`cup-tab ${activeTab === 'template' ? 'cup-tab-active' : 'cup-tab-inactive'}`} style={{ flex: 1 }} onClick={() => setActiveTab('template')}>
+            {/* <button className={`cup-tab ${activeTab === 'template' ? 'cup-tab-active' : 'cup-tab-inactive'}`} style={{ flex: 1 }} onClick={() => setActiveTab('template')}>
               <Layers style={{ width: 13, height: 13 }} />Template & Background
-            </button>
+            </button> */}
             <button className={`cup-tab ${activeTab === 'content' ? 'cup-tab-active' : 'cup-tab-inactive'}`} style={{ flex: 1 }} onClick={() => setActiveTab('content')}>
               <PenLine style={{ width: 13, height: 13 }} />Content
             </button>

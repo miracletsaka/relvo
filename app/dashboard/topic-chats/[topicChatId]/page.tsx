@@ -668,15 +668,15 @@ ${url}`)}`,
                   {loading ? "Loading" : "Refresh"}
                 </button>
 
-                <button className="action-btn action-btn-outline" onClick={() => setBgDialogOpen(true)}>
+                {/* <button className="action-btn action-btn-outline" onClick={() => setBgDialogOpen(true)}>
                   <Upload className="w-3.5 h-3.5" />
                   Backgrounds
-                </button>
+                </button> */}
 
-                <button className="action-btn action-btn-outline" onClick={generateBackgroundsHandler} disabled={generatingBg || !drafts.length}>
+                {/* <button className="action-btn action-btn-outline" onClick={generateBackgroundsHandler} disabled={generatingBg || !drafts.length}>
                   {generatingBg ? <span className="spinner" /> : <Wand2 className="w-3.5 h-3.5" />}
                   {generatingBg ? "Generating…" : "AI Backgrounds"}
-                </button>
+                </button> */}
 
                 {/* ── Image generation group ── */}
                 <div style={{ display: "flex", gap: 4, background: "rgba(124,58,237,0.08)", border: "1px solid rgba(124,58,237,0.2)", borderRadius: 12, padding: "3px 4px", alignItems: "center" }}>

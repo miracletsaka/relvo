@@ -1,53 +1,37 @@
 /**
- * layout-planner/template-styles.ts
- * ────────────────────────────────────
- * 12 completely distinct template styles.
+ * layout-planner/template-styles.ts  (v6 — compact card, no duplication)
+ * ──────────────────────────────────────────────────────────────────────────
+ * Target canvas: 1080×1080 square (best for social media)
  *
- * PHILOSOPHY:
- *   - Each style shows AT MOST 2 text elements (+ contact strip)
- *   - Each style has its OWN hardcoded font that defines its character
- *   - No style looks like another
- *   - Contact strip is assembled separately by buildContactStrip()
+ * KEY FIXES in this version:
+ *  1. No CONTACT() helper inside template body — contacts ONLY in strip
+ *  2. Logo slot properly mapped — slotKey="logo" + src from campaignData.logo
+ *  3. Contact strip font sizes doubled (22px row1, 17px row2)
+ *  4. Layouts restructured to fill canvas without voids
+ *  5. Templates are now compact and horizontally balanced
  *
- * STYLES:
- *   1.  headline-only      BEBAS_NEUE  — full-canvas huge type, nothing else
- *   2.  cta-dominant       OSWALD      — monster CTA button is the whole ad
- *   3.  stat-callout       BARLOW      — one giant number + short label
- *   4.  editorial          PLAYFAIR    — headline + italic subheading, white space
- *   5.  proof-forward      PLAYFAIR    — quote fills canvas, attribution below
- *   6.  offer-card         BEBAS_NEUE  — offer title + price + CTA only
- *   7.  bullet-list        OSWALD      — 3 numbered bullets, no headline needed
- *   8.  side-by-side       BARLOW      — image left / headline right, clean split
- *   9.  full-bleed-image   BEBAS_NEUE  — photo covers all, text overlaid minimal
- *  10.  contact-showcase   SYNE        — contact details ARE the content
- *  11.  announcement       OSWALD      — bold event / news announcement
- *  12.  minimal-logo       SYNE        — logo + one line + CTA, brand awareness
+ * All text shapes: text="" + dataField — editor fills from CampaignData
  */
 
 import type {
   NormalizedCampaignData, BrandFingerprint, Palette,
   Orientation, TemplateShape, GradientStop,
 } from "./types";
-import { seededRng, clamp, isNonEmpty, getAvailableBullets, hexToRgba, makeId } from "./utils";
+import {
+  seededRng, clamp, isNonEmpty, getAvailableBullets,
+  hexToRgba, makeId,
+} from "./utils";
 import {
   BEBAS_NEUE, SYNE, PLAYFAIR, BARLOW, OSWALD,
-  Z_TEXT, Z_CTA, Z_DECOR, Z_BG, Z_HERO,
+  Z_TEXT, Z_CTA, Z_DECOR, Z_HERO, Z_LOGO,
 } from "./constants";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 export type TemplateStyleName =
-  | "headline-only"
-  | "cta-dominant"
-  | "stat-callout"
-  | "editorial"
-  | "proof-forward"
-  | "offer-card"
-  | "bullet-list"
-  | "side-by-side"
-  | "full-bleed-image"
-  | "contact-showcase"
-  | "announcement"
-  | "minimal-logo";
+  | "headline-only"    | "cta-dominant"    | "stat-callout"
+  | "editorial"        | "proof-forward"   | "offer-card"
+  | "bullet-list"      | "side-by-side"    | "full-bleed-image"
+  | "contact-showcase" | "announcement"    | "minimal-logo";
 
 export const ALL_STYLE_NAMES: TemplateStyleName[] = [
   "headline-only", "cta-dominant", "stat-callout", "editorial",
@@ -63,25 +47,23 @@ export function pickTemplateStyle(
 ): TemplateStyleName {
   const rng = seededRng(brand.seed ^ 0xAB12CD34);
   let pool  = [...ALL_STYLE_NAMES];
-
-  // Remove styles that need missing data
   if (!isNonEmpty(campaign.review_text) && !isNonEmpty(campaign.proof))
     pool = pool.filter(s => s !== "proof-forward");
   if (!campaign.offers?.length && !isNonEmpty(campaign.offer_cta) && !isNonEmpty(campaign.price_label))
     pool = pool.filter(s => s !== "offer-card");
   if (!getAvailableBullets(campaign).length)
     pool = pool.filter(s => s !== "bullet-list");
-
-  // Never repeat
   pool = pool.filter(s => s !== previousStyle);
   if (!pool.length) pool = ALL_STYLE_NAMES.filter(s => s !== previousStyle);
-
   return rng.pick(pool);
 }
 
-// ── Shape factory helpers ──────────────────────────────────────────────────────
+// ── Primitives ─────────────────────────────────────────────────────────────────
+
+/** Text slot — text always "", editor fills via dataField */
 function T(
-  text: string, x: number, y: number, w: number, h: number,
+  dataField: string,
+  x: number, y: number, w: number, h: number,
   fontSize: number, weight: number, color: string, font: string,
   align: "left"|"center"|"right" = "left",
   extra: Partial<TemplateShape> = {}
@@ -89,16 +71,19 @@ function T(
   return {
     id: makeId("t"), type: "text",
     x: Math.round(x), y: Math.round(y),
-    width: Math.round(w), height: Math.round(h),
-    text, fontSize: Math.round(fontSize), fontWeight: weight,
+    width: Math.round(Math.max(w, 10)), height: Math.round(Math.max(h, 10)),
+    text: "", dataField,
+    fontSize: Math.round(Math.max(fontSize, 12)), fontWeight: weight,
     textColor: color, textAlign: align,
-    fontFamily: font, lineHeight: extra.lineHeight ?? 0.95,
+    fontFamily: font,
+    lineHeight: extra.lineHeight ?? 1.0,
     letterSpacing: extra.letterSpacing ?? 0,
     borderWidth: 0, zIndex: Z_TEXT,
     ...extra,
   } as TemplateShape;
 }
 
+/** Rect / pill */
 function R(
   x: number, y: number, w: number, h: number,
   bg: string, radius = 0, extra: Partial<TemplateShape> = {}
@@ -106,32 +91,94 @@ function R(
   return {
     id: makeId("r"), type: "rounded-rect",
     x: Math.round(x), y: Math.round(y),
-    width: Math.round(w), height: Math.round(h),
+    width: Math.round(Math.max(w, 2)), height: Math.round(Math.max(h, 2)),
     backgroundColor: bg, borderWidth: 0, borderRadius: radius,
     zIndex: Z_DECOR, ...extra,
   } as TemplateShape;
 }
 
+/** Image / logo slot */
 function IMG(
   slotKey: string, x: number, y: number, w: number, h: number,
-  fit: "cover"|"contain" = "cover", radius = 0
+  fit: "cover"|"contain" = "cover",
+  radius = 0, zIndex = Z_HERO, slotVisibleWhenEmpty = false
 ): TemplateShape {
+  const isLogo = slotKey === "logo";
   return {
-    id: makeId("img"), type: "image",
+    id: makeId(`img-${slotKey}`), type: "image",
     x: Math.round(x), y: Math.round(y),
     width: Math.round(w), height: Math.round(h),
     src: undefined, fit, radius,
-    slotKey, slotType: slotKey === "logo" ? "logo" : "image",
-    slotRole: slotKey === "logo" ? "logo" : "hero",
-    slotVisibleWhenEmpty: slotKey === "logo",
-    zIndex: slotKey === "logo" ? 22 : Z_HERO,
-    borderWidth: 0,
+    slotKey,
+    slotType:  isLogo ? "logo" : "image",
+    slotRole:  isLogo ? "logo" : slotKey === "dashboard_image" ? "secondary" : "hero",
+    slotVisibleWhenEmpty: isLogo || slotVisibleWhenEmpty,
+    slotLabel: isLogo ? "Logo" : slotKey === "dashboard_image" ? "Secondary Image" : "Hero Image",
+    borderWidth: 0, zIndex,
   } as TemplateShape;
 }
 
-// ── Contact strip — always at canvas bottom ────────────────────────────────────
+/** Gradient scrim */
+function SCRIM(
+  x: number, y: number, w: number, h: number,
+  angle: number, stops: Array<{stop: number; color: string}>
+): TemplateShape {
+  return {
+    id: makeId("scrim"), type: "gradient-overlay",
+    x: Math.round(x), y: Math.round(y),
+    width: Math.round(w), height: Math.round(h),
+    gradientColors: stops as GradientStop[],
+    gradientAngle: angle,
+    backgroundColor: "transparent", borderWidth: 0,
+    zIndex: Z_HERO + 1,
+  } as TemplateShape;
+}
+
+/** CTA button — background + text slot */
+function CTA(
+  x: number, y: number, w: number, h: number,
+  palette: Palette, brand: BrandFingerprint, font: string, efs: number
+): TemplateShape[] {
+  const r = brand.cardStyle === "pill" ? 999
+          : brand.cardStyle === "sharp" ? 4
+          : Math.round(12 * efs);
+  return [
+    R(x, y, w, h, palette.accent, r, {
+      gradientColors: palette.accentGradient, gradientAngle: 90,
+      shadowBlur: Math.round(28 * efs), shadowX: 0, shadowY: Math.round(8 * efs),
+      shadowColor: palette.glowColor, zIndex: Z_CTA,
+    }),
+    T("cta",
+      x + Math.round(20 * efs), y + Math.round(h * 0.18),
+      w - Math.round(40 * efs), Math.round(h * 0.66),
+      Math.round(38 * efs), 900, "#ffffff", font, "center",
+      { letterSpacing: 1.0, lineHeight: 1.0, zIndex: Z_CTA + 1 }),
+  ];
+}
+
+/** Logo slot — properly mapped, always visible */
+function LOGO(x: number, y: number, w: number, h: number): TemplateShape {
+  return {
+    id: makeId("img-logo"), type: "image",
+    x: Math.round(x), y: Math.round(y),
+    width: Math.round(w), height: Math.round(h),
+    src: undefined,
+    fit: "contain",
+    radius: 0,
+    slotKey: "logo",
+    slotType: "logo",
+    slotRole: "logo",
+    slotLabel: "Company Logo",
+    slotVisibleWhenEmpty: true,
+    borderWidth: 0,
+    zIndex: Z_LOGO,
+  } as TemplateShape;
+}
+
+// ── Contact strip — ONLY place contacts are rendered ─────────────────────────
+// Larger fonts, no duplication — this is the single source of truth.
 export function buildContactStrip(
-  c: NormalizedCampaignData,
+  campaign: NormalizedCampaignData,
   palette: Palette,
   brand: BrandFingerprint,
   canvasW: number,
@@ -139,94 +186,54 @@ export function buildContactStrip(
   efs: number
 ): TemplateShape[] {
   const shapes: TemplateShape[] = [];
-  const biz     = c.businessInfo || {};
-  const stripH  = Math.round(96 * efs);
+  // Taller strip — more room for large readable fonts
+  const stripH  = Math.round(132 * efs);
   const stripY  = canvasH - stripH;
   const pad     = Math.round(40 * efs);
   const DF      = brand.displayFont;
+  // Full width minus minimal padding — bounding box wide enough for long strings
+  const textW   = canvasW - pad * 2;
+  const row1H   = Math.round(38 * efs);   // taller hit area — text wraps in editor
+  const row2H   = Math.round(32 * efs);
 
-  // Background strip
-  shapes.push(R(0, stripY, canvasW, stripH, hexToRgba(palette.accent, 0.09), 0, { zIndex: Z_TEXT - 2 }));
-  // Top accent line
-  shapes.push(R(0, stripY, canvasW, Math.round(3 * efs), palette.accent, 0, { zIndex: Z_TEXT - 1 }));
+  // Strip background — solid dark for contrast
+  shapes.push(R(0, stripY, canvasW, stripH,
+    hexToRgba(palette.bg, 0.95), 0, { zIndex: Z_TEXT - 2 }));
+  // Top accent line — bold
+  shapes.push(R(0, stripY, canvasW, Math.round(5 * efs),
+    palette.accent, 0, { zIndex: Z_TEXT - 1 }));
 
-  // Collect contact data
-  const phone   = c.phone   || biz.phone_primary || biz.phone_secondary || "";
-  const email   = c.email   || biz.email_primary || biz.email_support   || "";
-  const website = c.website || biz.website || c.business_website        || "";
-  const wa      = c.whatsapp || biz.whatsapp                            || "";
-  const city    = c.city    || biz.city                                 || "";
-  const country = c.country || biz.country                              || "";
-  const address = [biz.address, city, country].filter(Boolean).join(", ");
-  const reg     = c.registration_no || biz.registration_no              || "";
-  const vat     = c.vat_number      || biz.vat_number                   || "";
+  // ROW 1 — "COMPANY · 📞 phone · ✉ email · 🌐 website"
+  // 26px — large and readable at any zoom
+  shapes.push(T("contact_row1",
+    pad, stripY + Math.round(14 * efs), textW, row1H,
+    Math.round(26 * efs), 700, palette.text, DF, "left",
+    { letterSpacing: 0.4, lineHeight: 1.15, zIndex: Z_TEXT + 1 }
+  ));
 
-  const fb      = c.facebook_url  || biz.facebook_url  || "";
-  const ig      = c.instagram_url || biz.instagram_url || "";
-  const li      = c.linkedin_url  || biz.linkedin_url  || "";
-  const tt      = c.tiktok_url    || biz.tiktok_url    || "";
-  const yt      = c.youtube_url   || biz.youtube_url   || "";
+  // ROW 2 — "📍 city · 💬 wa · FB · IG · Reg · VAT"
+  // 21px — clear secondary line
+  shapes.push(T("contact_row2",
+    pad, stripY + row1H + Math.round(20 * efs), textW, row2H,
+    Math.round(21 * efs), 400, palette.muted, DF, "left",
+    { letterSpacing: 0.3, lineHeight: 1.15, zIndex: Z_TEXT + 1 }
+  ));
 
-  // Row 1 — identity + primary contact
-  const row1: string[] = [];
-  if (c.companyName)  row1.push(c.companyName.toUpperCase());
-  if (phone)          row1.push(`📞 ${phone}`);
-  if (wa && wa !== phone) row1.push(`💬 ${wa}`);
-  if (email)          row1.push(`✉ ${email}`);
-  if (website)        row1.push(`🌐 ${website.replace(/^https?:\/\//, "")}`);
-
-  // Row 2 — location + socials + registration
-  const row2: string[] = [];
-  if (address)        row2.push(`📍 ${address}`);
-  const socials: string[] = [];
-  if (fb) socials.push(`FB: ${fb.replace(/.*facebook\.com\//, "")}`);
-  if (ig) socials.push(`IG: @${ig.replace(/.*instagram\.com\//, "").replace(/\/$/, "")}`);
-  if (li) socials.push(`IN: ${li.replace(/.*linkedin\.com\/company\//, "")}`);
-  if (tt) socials.push(`TT: @${tt.replace(/.*tiktok\.com\/@/, "").replace(/\/$/, "")}`);
-  if (yt) socials.push(`YT: ${yt.replace(/.*youtube\.com\/(channel\/|@)?/, "")}`);
-  if (socials.length) row2.push(socials.join("  ·  "));
-  if (reg) row2.push(`REG: ${reg}`);
-  if (vat) row2.push(`VAT: ${vat}`);
-
-  const lineH  = Math.round(24 * efs);
-  const fsize1 = Math.round(17 * efs);
-  const fsize2 = Math.round(14 * efs);
-  const textW  = canvasW - pad * 2;
-
-  if (row1.length) {
-    shapes.push(T(
-      row1.join("  ·  "),
-      pad, stripY + Math.round(12 * efs), textW, lineH,
-      fsize1, 700, palette.text, DF, "left",
-      { letterSpacing: 0.2, lineHeight: 1.1, zIndex: Z_TEXT + 1 }
-    ));
-  }
-
-  if (row2.length) {
-    shapes.push(T(
-      row2.join("  ·  "),
-      pad, stripY + lineH + Math.round(18 * efs), textW, lineH,
-      fsize2, 400, palette.muted, DF, "left",
-      { letterSpacing: 0.2, lineHeight: 1.1, zIndex: Z_TEXT + 1 }
-    ));
-  }
-
-  // Website accent — top right of strip
-  const cleanWeb = website.replace(/^https?:\/\//, "").toUpperCase();
-  if (cleanWeb) {
-    shapes.push(T(
-      cleanWeb,
-      canvasW - Math.round(380 * efs), stripY + Math.round(30 * efs),
-      Math.round(340 * efs), Math.round(32 * efs),
-      Math.round(18 * efs), 800, palette.accent, DF, "right",
-      { letterSpacing: 1.0, lineHeight: 1.0, zIndex: Z_TEXT + 2 }
-    ));
-  }
+  // Website — right side, accent colour, bold
+  // Wide bounding box so long URLs don't get clipped
+  shapes.push(T("business_website",
+    canvasW - Math.round(480 * efs), stripY + Math.round(32 * efs),
+    Math.round(436 * efs), row1H,
+    Math.round(22 * efs), 800, palette.accent, DF, "right",
+    { letterSpacing: 0.8, lineHeight: 1.0, zIndex: Z_TEXT + 2 }
+  ));
 
   return shapes;
 }
 
 // ── Main style renderer ────────────────────────────────────────────────────────
+// All styles target 1080×1080 square canvas — compact, no voids.
+// NO CONTACT() blocks inside styles — contacts live ONLY in buildContactStrip().
 export function buildStyleShapes(
   style: TemplateStyleName,
   campaign: NormalizedCampaignData,
@@ -238,596 +245,629 @@ export function buildStyleShapes(
   imageSlots: { logo?: string; hero_person?: string; dashboard_image?: string }
 ): TemplateShape[] {
 
-  const efs     = (canvasW / 1080) * (orientation === "landscape" ? 0.80 : orientation === "square" ? 0.88 : 1.0);
-  const pad     = Math.round(50 * efs);
-  const stripH  = Math.round(96 * efs);
+  // Font scale — 1.0 at 1080px
+  const efs     = (canvasW / 1080) * (orientation === "landscape" ? 0.85 : orientation === "square" ? 0.95 : 1.0);
+  const pad     = Math.round(44 * efs);
+  // Strip is 110px — leave it free
+  const stripH  = Math.round(110 * efs);
   const usableH = canvasH - stripH;
   const W       = canvasW - pad * 2;
   const shapes: TemplateShape[] = [];
 
-  // CTA helper — pill or sharp based on brand
-  const ctaRadius = brand.cardStyle === "pill" ? 999 : brand.cardStyle === "sharp" ? 6 : Math.round(14 * efs);
-  function CTA(text: string, x: number, y: number, w: number, h: number, font: string): TemplateShape[] {
-    return [
-      R(x, y, w, h, palette.accent, ctaRadius, {
-        gradientColors: palette.accentGradient, gradientAngle: 90,
-        shadowBlur: Math.round(24 * efs), shadowX: 0, shadowY: Math.round(6 * efs),
-        shadowColor: palette.glowColor, zIndex: Z_CTA,
-      }),
-      T(text.toUpperCase(), x + Math.round(16 * efs), y + Math.round(h * 0.22),
-        w - Math.round(32 * efs), Math.round(h * 0.58),
-        Math.round(38 * efs), 900, "#ffffff", font, "center",
-        { letterSpacing: 1.5, lineHeight: 1.0, zIndex: Z_CTA + 1 }
-      ),
-    ];
-  }
+  // Logo dimensions — consistent, prominent
+  const logoW = Math.round(160 * efs);
+  const logoH = Math.round(56 * efs);
 
   switch (style) {
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // 1. HEADLINE ONLY — Bebas Neue — massive type, 1 element, raw power
-    // Reference: TouchPeace anxiety/stress post
-    // ─────────────────────────────────────────────────────────────────────────
+    // ── 1. HEADLINE ONLY ─────────────────────────────────────────────────────
+    // Left: logo + massive headline + proof
+    // Right: hero image, full height
+    // Layout fills the square perfectly
     case "headline-only": {
-      const F     = BEBAS_NEUE;
-      const lines = campaign.hook.split(/\n|(?<=.{22})\s/g).slice(0, 3);
-      const hSize = clamp(
-        lines.length === 1 ? Math.round(168 * efs) :
-        lines.length === 2 ? Math.round(138 * efs) : Math.round(108 * efs),
-        60, Math.round(180 * efs)
-      );
-      const lineH  = Math.round(hSize * 0.98);
-      const totalH = lines.length * lineH;
-      const startY = Math.round((usableH - totalH) / 2);
+      const F      = BEBAS_NEUE;
+      const splitX = Math.round(canvasW * 0.50);
+      const textW  = splitX - pad - Math.round(16 * efs);
 
-      lines.forEach((line, i) => {
-        const isAccent = i === lines.length - 1 && lines.length > 1;
-        shapes.push(T(
-          line.toUpperCase(), pad, startY + i * lineH, W, lineH + 10,
-          hSize, 900, isAccent ? palette.textEmphasis : palette.text, F, "left",
-          { lineHeight: 0.95, letterSpacing: -1 }
-        ));
-      });
+      // Hero — right half
+      shapes.push(IMG("hero_person", splitX, 0, canvasW - splitX, usableH, "cover", 0));
+      shapes.push(SCRIM(splitX, 0, Math.round(100 * efs), usableH, 90, [
+        { stop: 0, color: `${palette.bg}ff` }, { stop: 1, color: "#00000000" },
+      ]));
+      // Secondary — bottom-right corner of image area
+      shapes.push(IMG("dashboard_image",
+        splitX + Math.round(16 * efs), usableH - Math.round(220 * efs),
+        canvasW - splitX - Math.round(24 * efs), Math.round(200 * efs),
+        "cover", Math.round(12 * efs), Z_HERO + 2, true));
 
-      // Bold left accent bar
-      shapes.push(R(Math.round(6 * efs), startY, Math.round(10 * efs), totalH, palette.accent, 999, { zIndex: Z_DECOR + 1 }));
+      // Logo — top-left
+      shapes.push(LOGO(pad, Math.round(28 * efs), logoW, logoH));
 
-      // Tagline if any — small, bottom area
-      if (campaign.subheading || campaign.proof) {
-        shapes.push(T(
-          (campaign.proof || campaign.subheading).toUpperCase(),
-          pad, startY + totalH + Math.round(28 * efs), W, Math.round(38 * efs),
-          Math.round(24 * efs), 600, palette.muted, F, "left",
-          { letterSpacing: 3, lineHeight: 1.1 }
-        ));
-      }
+      // Headline — fills most of left column
+      const hSize = Math.round(116 * efs);
+      const hY    = Math.round(usableH * 0.18);
+      shapes.push(T("hook", pad, hY, textW, Math.round(hSize * 2.6),
+        hSize, 900, palette.text, F, "left",
+        { lineHeight: 0.93, letterSpacing: -1 }));
+
+      // Accent bar
+      shapes.push(R(Math.round(6 * efs), hY, Math.round(10 * efs),
+        Math.round(hSize * 2.6), palette.accent, 999, { zIndex: Z_DECOR + 1 }));
+
+      // Proof — below headline
+      shapes.push(T("proof", pad, hY + Math.round(hSize * 2.8),
+        textW, Math.round(60 * efs),
+        Math.round(26 * efs), 600, palette.muted, F, "left",
+        { letterSpacing: 1.5 }));
+
+      // Gradient rule
+      shapes.push(R(pad, hY + Math.round(hSize * 2.8) + Math.round(46 * efs),
+        Math.round(textW * 0.40), Math.round(5 * efs), palette.accent, 999,
+        { gradientColors: palette.accentGradient, gradientAngle: 90 }));
       break;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // 2. CTA DOMINANT — Oswald — the button IS the ad
-    // ─────────────────────────────────────────────────────────────────────────
+    // ── 2. CTA DOMINANT ──────────────────────────────────────────────────────
+    // Top half: hero image with logo overlay
+    // Bottom half: hook + massive CTA — no blank space
     case "cta-dominant": {
-      const F = OSWALD;
+      const F      = OSWALD;
+      const heroH  = Math.round(usableH * 0.42);
+      const contentY = heroH + Math.round(28 * efs);
 
-      // Hook — compact, top
-      shapes.push(T(
-        campaign.hook.toUpperCase(),
-        pad, Math.round(usableH * 0.08), W, Math.round(90 * efs),
-        Math.round(58 * efs), 800, palette.text, F, "center",
-        { lineHeight: 0.92, letterSpacing: 0.5 }
-      ));
+      // Hero — top strip, full width
+      shapes.push(IMG("hero_person", 0, 0, canvasW, heroH, "cover", 0));
+      shapes.push(SCRIM(0, Math.round(heroH * 0.50), canvasW, Math.round(heroH * 0.50), 180, [
+        { stop: 0, color: "#00000000" }, { stop: 1, color: `${palette.bg}ff` },
+      ]));
 
-      // Proof / subheading under hook
-      const sub = campaign.proof || campaign.subheading;
-      if (sub) {
-        shapes.push(T(
-          sub.toUpperCase(),
-          pad, Math.round(usableH * 0.08) + Math.round(96 * efs), W, Math.round(36 * efs),
-          Math.round(22 * efs), 600, palette.muted, F, "center",
-          { letterSpacing: 2.5, lineHeight: 1.1 }
-        ));
-      }
+      // Logo — over hero, top-left
+      shapes.push(LOGO(pad, Math.round(24 * efs), logoW, logoH));
 
-      // GIANT CTA — fills middle third
-      const ctaW = W;
-      const ctaH = Math.round(138 * efs);
-      const ctaY = Math.round(usableH * 0.40);
-      shapes.push(...CTA(campaign.cta || "Get Started Now", pad, ctaY, ctaW, ctaH, F));
+      // Secondary — top-right corner, small
+      shapes.push(IMG("dashboard_image",
+        canvasW - Math.round(170 * efs), Math.round(24 * efs),
+        Math.round(148 * efs), Math.round(heroH - 48 * efs),
+        "cover", Math.round(12 * efs), Z_HERO + 2, true));
+      shapes.push(R(canvasW - Math.round(172 * efs), Math.round(22 * efs),
+        Math.round(152 * efs), Math.round(heroH - 44 * efs),
+        "transparent", Math.round(14 * efs),
+        { borderWidth: Math.round(2 * efs), borderColor: palette.accent, zIndex: Z_HERO + 1 }));
 
-      // Small arrow hint below CTA
-      shapes.push(T(
-        "↓", pad + Math.round(ctaW / 2) - Math.round(20 * efs), ctaY + ctaH + Math.round(12 * efs),
-        Math.round(40 * efs), Math.round(40 * efs),
-        Math.round(32 * efs), 400, hexToRgba(palette.accent, 0.4), F, "center"
-      ));
+      // Hook — compact, below hero
+      shapes.push(T("hook", pad, contentY, W, Math.round(76 * efs),
+        Math.round(54 * efs), 900, palette.text, F, "center",
+        { lineHeight: 0.94, letterSpacing: 0.3 }));
+
+      // Proof — one tight line
+      shapes.push(T("proof", pad, contentY + Math.round(82 * efs), W, Math.round(60 * efs),
+        Math.round(24 * efs), 500, palette.muted, F, "center",
+        { letterSpacing: 1.5 }));
+
+      // CTA — large, fills width, tight to proof
+      const ctaY = contentY + Math.round(122 * efs);
+      const ctaH = Math.round(usableH - ctaY - Math.round(20 * efs));
+      shapes.push(...CTA(pad, ctaY, W, Math.max(ctaH, Math.round(90 * efs)), palette, brand, F, efs));
       break;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // 3. STAT CALLOUT — Barlow Condensed — Spotify-style milestone
-    // Reference: "711,661 all-time streams" post
-    // ─────────────────────────────────────────────────────────────────────────
+    // ── 3. STAT CALLOUT ───────────────────────────────────────────────────────
+    // Left: giant number + label
+    // Right: hero image, full height
     case "stat-callout": {
-      const F = BARLOW;
+      const F       = BARLOW;
+      const splitX  = Math.round(canvasW * 0.52);
+      const textW   = splitX - pad - Math.round(16 * efs);
 
-      // Album / product image top-left if available
-      if (imageSlots.hero_person) {
-        shapes.push(IMG("hero_person", pad, Math.round(usableH * 0.06), Math.round(260 * efs), Math.round(260 * efs), "cover", Math.round(12 * efs)));
-        // Label beside image
-        shapes.push(T(
-          "LATEST · RELEASE", pad + Math.round(276 * efs), Math.round(usableH * 0.06) + Math.round(14 * efs),
-          W - Math.round(276 * efs), Math.round(26 * efs),
-          Math.round(17 * efs), 600, palette.muted, F, "left",
-          { letterSpacing: 3 }
-        ));
-        shapes.push(T(
-          campaign.companyName || campaign.hook,
-          pad + Math.round(276 * efs), Math.round(usableH * 0.06) + Math.round(46 * efs),
-          W - Math.round(276 * efs), Math.round(60 * efs),
-          Math.round(42 * efs), 800, palette.text, F, "left"
-        ));
-      }
+      // Hero — right
+      shapes.push(IMG("hero_person", splitX, 0, canvasW - splitX, usableH, "cover", 0));
+      shapes.push(SCRIM(splitX, 0, Math.round(80 * efs), usableH, 90, [
+        { stop: 0, color: `${palette.bg}ff` }, { stop: 1, color: "#00000000" },
+      ]));
+      // Secondary — below hero image split
+      shapes.push(IMG("dashboard_image",
+        splitX + Math.round(12 * efs), usableH - Math.round(200 * efs),
+        canvasW - splitX - Math.round(20 * efs), Math.round(188 * efs),
+        "cover", Math.round(10 * efs), Z_HERO + 2, true));
 
-      // Giant stat number
-      const stat = campaign.hook_number || campaign.proof?.match(/[\d,]+/)?.[0] || "500+";
-      shapes.push(T(
-        stat, pad, Math.round(usableH * 0.38), W, Math.round(220 * efs),
-        Math.round(200 * efs), 900, palette.text, F, "left",
-        { lineHeight: 0.85, letterSpacing: -4 }
-      ));
+      // Logo — top-left
+      shapes.push(LOGO(pad, Math.round(24 * efs), logoW, logoH));
 
-      // Horizontal rule after stat
-      shapes.push(R(pad, Math.round(usableH * 0.38) + Math.round(210 * efs), W, Math.round(4 * efs), palette.accent, 0));
+      // Giant stat
+      shapes.push(T("hook_number", pad, Math.round(usableH * 0.14), textW, Math.round(196 * efs),
+        Math.round(180 * efs), 900, palette.text, F, "left",
+        { lineHeight: 0.88, letterSpacing: -4 }));
 
-      // Label
-      const label = campaign.proof?.replace(/[\d,]+/g, "").trim() || campaign.subheading || campaign.hook;
-      shapes.push(T(
-        label.toUpperCase(), pad, Math.round(usableH * 0.38) + Math.round(222 * efs), W, Math.round(100 * efs),
-        Math.round(56 * efs), 700, palette.text, F, "left",
-        { lineHeight: 1.05 }
-      ));
+      // Rule
+      shapes.push(R(pad, Math.round(usableH * 0.14) + Math.round(194 * efs),
+        textW, Math.round(5 * efs), palette.accent, 0,
+        { gradientColors: palette.accentGradient, gradientAngle: 90 }));
+
+      // Label + subheading
+      shapes.push(T("hook_label", pad, Math.round(usableH * 0.14) + Math.round(208 * efs),
+        textW, Math.round(80 * efs),
+        Math.round(56 * efs), 800, palette.text, F, "left", { lineHeight: 1.05 }));
+      shapes.push(T("subheading", pad, Math.round(usableH * 0.14) + Math.round(298 * efs),
+        textW, Math.round(80 * efs),
+        Math.round(26 * efs), 400, palette.muted, F, "left", { lineHeight: 1.3 }));
+
+      // Hook tag pill
+      shapes.push(R(pad, Math.round(usableH * 0.14) + Math.round(358 * efs),
+        Math.round(textW * 0.60), Math.round(46 * efs), palette.accent, 999));
+      shapes.push(T("hook_tag",
+        pad + Math.round(14 * efs), Math.round(usableH * 0.14) + Math.round(358 * efs) + Math.round(10 * efs),
+        Math.round(textW * 0.56), Math.round(28 * efs),
+        Math.round(22 * efs), 800, "#ffffff", F, "center", { letterSpacing: 1.5 }));
       break;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // 4. EDITORIAL — Playfair Display — elegant, serif, lots of white space
-    // ─────────────────────────────────────────────────────────────────────────
+    // ── 4. EDITORIAL ─────────────────────────────────────────────────────────
+    // Elegant: logo top, hero full-width middle band, text bottom
     case "editorial": {
-      const F = PLAYFAIR;
-      const hLen  = campaign.hook.length;
-      const hSize = hLen < 30 ? Math.round(116 * efs) : hLen < 55 ? Math.round(90 * efs) : Math.round(70 * efs);
+      const F      = PLAYFAIR;
+      const heroY  = Math.round(usableH * 0.14);
+      const heroH  = Math.round(usableH * 0.38);
+      const textY  = heroY + heroH + Math.round(28 * efs);
 
-      // Headline — centered with generous leading
-      shapes.push(T(
-        campaign.hook, pad, Math.round(usableH * 0.15), W, Math.round(hSize * 2.6 * efs),
-        hSize, 700, palette.text, F, "center",
-        { lineHeight: 1.15, letterSpacing: -0.5, fontStyle: "italic" }
-      ));
+      // Logo top-left
+      shapes.push(LOGO(pad, Math.round(16 * efs), logoW, logoH));
 
-      // Gradient line centered
-      shapes.push(R(
-        pad + Math.round(W * 0.35), Math.round(usableH * 0.15) + Math.round(hSize * 2.8 * efs),
-        Math.round(W * 0.30), Math.round(5 * efs), palette.accent, 999,
-        { gradientColors: palette.accentGradient, gradientAngle: 90 }
-      ));
+      // Hero — full width middle band with radius
+      shapes.push(IMG("hero_person", Math.round(16 * efs), heroY,
+        canvasW - Math.round(32 * efs), heroH, "cover", Math.round(14 * efs)));
+      shapes.push(SCRIM(Math.round(16 * efs), heroY + Math.round(heroH * 0.45),
+        canvasW - Math.round(32 * efs), Math.round(heroH * 0.55), 180, [
+          { stop: 0, color: "#00000000" }, { stop: 1, color: `${palette.bg}dd` },
+        ]));
 
-      // Subheading — single line, elegant
-      if (campaign.subheading) {
-        shapes.push(T(
-          campaign.subheading,
-          pad, Math.round(usableH * 0.15) + Math.round(hSize * 2.8 * efs) + Math.round(30 * efs),
-          W, Math.round(56 * efs),
-          Math.round(26 * efs), 400, palette.muted, F, "center",
-          { lineHeight: 1.5, fontStyle: "italic" }
-        ));
-      }
+      // Secondary — right side, text area
+      shapes.push(IMG("dashboard_image",
+        canvasW - Math.round(220 * efs), textY,
+        Math.round(196 * efs), Math.round(160 * efs), "cover", Math.round(12 * efs),
+        Z_HERO + 1, true));
+
+      // Headline — left of text area
+      const hSize = Math.round(74 * efs);
+      const tW    = canvasW - pad - Math.round(234 * efs);
+      shapes.push(T("hook", pad, textY, tW, Math.round(hSize * 2.8),
+        hSize, 700, palette.text, F, "left",
+        { lineHeight: 1.12, letterSpacing: -0.5, fontStyle: "italic" }));
+
+      // Rule + subheading
+      shapes.push(R(pad, textY + Math.round(hSize * 3.0),
+        Math.round(tW * 0.35), Math.round(5 * efs), palette.accent, 999,
+        { gradientColors: palette.accentGradient, gradientAngle: 90 }));
+      shapes.push(T("subheading", pad, textY + Math.round(hSize * 3.0) + Math.round(20 * efs),
+        tW, Math.round(80 * efs),
+        Math.round(26 * efs), 400, palette.muted, F, "left",
+        { lineHeight: 1.45, fontStyle: "italic" }));
       break;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // 5. PROOF FORWARD — Playfair Display — quote fills canvas
-    // ─────────────────────────────────────────────────────────────────────────
+    // ── 5. PROOF FORWARD ─────────────────────────────────────────────────────
+    // Hero left strip + large quote right — fills square tightly
     case "proof-forward": {
-      const F     = PLAYFAIR;
-      const quote = campaign.review_text || campaign.proof || campaign.hook;
-      const auth  = campaign.review_author || campaign.companyName;
+      const F      = PLAYFAIR;
+      const imgW   = Math.round(canvasW * 0.36);
+      const textX  = imgW + Math.round(36 * efs);
+      const textW  = canvasW - textX - pad;
 
-      // Giant open quote mark
-      shapes.push(T(
-        "\u201C", pad - Math.round(8 * efs), Math.round(usableH * 0.04),
-        Math.round(130 * efs), Math.round(140 * efs),
-        Math.round(180 * efs), 900, hexToRgba(palette.accent, 0.18), F, "left",
-        { lineHeight: 0.8 }
-      ));
+      // Hero — left strip, full height
+      shapes.push(IMG("hero_person", 0, 0, imgW, usableH, "cover", 0));
+      shapes.push(SCRIM(Math.round(imgW * 0.62), 0, Math.round(imgW * 0.38), usableH, 90, [
+        { stop: 0, color: "#00000000" }, { stop: 1, color: `${palette.bg}ff` },
+      ]));
+      // Secondary — small, bottom-left
+      shapes.push(IMG("dashboard_image",
+        Math.round(14 * efs), usableH - Math.round(180 * efs),
+        Math.round(imgW - 28 * efs), Math.round(162 * efs),
+        "cover", Math.round(10 * efs), Z_HERO + 2, true));
+
+      // Logo — top-right of content
+      shapes.push(LOGO(textX, Math.round(22 * efs), logoW, logoH));
+
+      // Large open quote
+      shapes.push(T("deco_icon",
+        textX - Math.round(6 * efs), Math.round(usableH * 0.06),
+        Math.round(100 * efs), Math.round(110 * efs),
+        Math.round(140 * efs), 900, hexToRgba(palette.accent, 0.20), F, "left",
+        { lineHeight: 0.82 }));
 
       // Quote body
-      const qLen  = quote.length;
-      const qSize = qLen < 80 ? Math.round(48 * efs) : qLen < 140 ? Math.round(38 * efs) : Math.round(30 * efs);
-      shapes.push(T(
-        `\u201C${quote}\u201D`,
-        pad, Math.round(usableH * 0.12), W, Math.round(usableH * 0.54),
-        qSize, 700, palette.text, F, "left",
-        { lineHeight: 1.40, fontStyle: "italic" }
-      ));
+      shapes.push(T("review_text", textX, Math.round(usableH * 0.16), textW, Math.round(usableH * 0.48),
+        Math.round(36 * efs), 700, palette.text, F, "left",
+        { lineHeight: 1.38, fontStyle: "italic" }));
 
-      // Attribution
-      shapes.push(T(
-        `\u2014 ${auth}`,
-        pad, Math.round(usableH * 0.70), W, Math.round(44 * efs),
-        Math.round(28 * efs), 800, palette.accent, F, "left",
-        { letterSpacing: 0.5 }
-      ));
+      // Author + stars
+      shapes.push(T("review_author", textX, Math.round(usableH * 0.67), textW, Math.round(40 * efs),
+        Math.round(26 * efs), 800, palette.accent, F, "left", { letterSpacing: 0.3 }));
+      shapes.push(T("review_rating", textX, Math.round(usableH * 0.67) + Math.round(46 * efs),
+        Math.round(160 * efs), Math.round(30 * efs),
+        Math.round(22 * efs), 400, palette.accent, F, "left"));
 
-      // Stars if rating available
-      const rating = campaign.reviews?.[0]?.rating;
-      if (rating) {
-        const stars = "★".repeat(Math.round(rating)) + "☆".repeat(5 - Math.round(rating));
-        shapes.push(T(stars, pad, Math.round(usableH * 0.70) + Math.round(52 * efs), Math.round(200 * efs), Math.round(36 * efs),
-          Math.round(26 * efs), 400, palette.accent, F, "left"));
-      }
+      // CTA — below stars
+      const ctaY = Math.round(usableH * 0.67) + Math.round(82 * efs);
+      shapes.push(...CTA(textX, ctaY,
+        Math.min(textW, Math.round(380 * efs)), Math.round(70 * efs), palette, brand, F, efs));
       break;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // 6. OFFER CARD — Bebas Neue — price + CTA, retail energy
-    // ─────────────────────────────────────────────────────────────────────────
+    // ── 6. OFFER CARD ─────────────────────────────────────────────────────────
+    // Hero right 35%. Offer left — title + price + CTA stacked tight
     case "offer-card": {
       const F     = BEBAS_NEUE;
-      const offer = campaign.offers?.[0];
-      const title = offer?.title || campaign.offer_title || campaign.hook;
-      const price = campaign.price_label;
-      const desc  = offer?.description || campaign.subheading;
-      const exp   = offer?.expires_at;
+      const imgW  = Math.round(canvasW * 0.36);
+      const imgX  = canvasW - imgW;
+      const textW = imgX - pad - Math.round(18 * efs);
 
-      // "OFFER" tag
-      shapes.push(R(pad, pad, Math.round(180 * efs), Math.round(46 * efs), palette.accent, 999));
-      shapes.push(T(
-        "SPECIAL OFFER", pad + Math.round(14 * efs), pad + Math.round(10 * efs),
-        Math.round(152 * efs), Math.round(28 * efs),
-        Math.round(20 * efs), 900, "#ffffff", F, "center",
-        { letterSpacing: 2 }
-      ));
+      // Hero — right column
+      shapes.push(IMG("hero_person", imgX, 0, imgW, usableH, "cover", 0));
+      shapes.push(SCRIM(imgX, 0, Math.round(70 * efs), usableH, 90, [
+        { stop: 0, color: `${palette.bg}ff` }, { stop: 1, color: "#00000000" },
+      ]));
+      shapes.push(IMG("dashboard_image",
+        imgX + Math.round(12 * efs), usableH - Math.round(210 * efs),
+        Math.round(imgW - 24 * efs), Math.round(192 * efs),
+        "cover", Math.round(10 * efs), Z_HERO + 2, true));
 
-      // Title
-      const tLen  = title.length;
-      const tSize = tLen < 25 ? Math.round(108 * efs) : tLen < 45 ? Math.round(84 * efs) : Math.round(64 * efs);
-      shapes.push(T(
-        title.toUpperCase(), pad, pad + Math.round(62 * efs), W, Math.round(tSize * 2.2 * efs),
+      // Logo
+      shapes.push(LOGO(pad, Math.round(22 * efs), logoW, logoH));
+
+      // Offer badge
+      shapes.push(R(pad, Math.round(92 * efs), Math.round(172 * efs), Math.round(44 * efs), palette.accent, 999));
+      shapes.push(T("hook_tag",
+        pad + Math.round(12 * efs), Math.round(92 * efs) + Math.round(10 * efs),
+        Math.round(148 * efs), Math.round(26 * efs),
+        Math.round(19 * efs), 900, "#ffffff", F, "center", { letterSpacing: 2 }));
+
+      // Offer title
+      const tSize = Math.round(78 * efs);
+      shapes.push(T("offer_title", pad, Math.round(150 * efs), textW, Math.round(tSize * 2.4),
         tSize, 900, palette.text, F, "left",
-        { lineHeight: 0.92, letterSpacing: -1 }
-      ));
+        { lineHeight: 0.94, letterSpacing: -0.8 }));
 
-      // Price — huge accent
-      if (price) {
-        shapes.push(T(
-          price, pad, pad + Math.round(62 * efs) + Math.round(tSize * 2.4 * efs), Math.round(380 * efs), Math.round(120 * efs),
-          Math.round(110 * efs), 900, palette.accent, F, "left",
-          { lineHeight: 0.88, letterSpacing: -3 }
-        ));
-      }
+      // Price
+      shapes.push(T("price_label", pad, Math.round(150 * efs) + Math.round(tSize * 2.6),
+        Math.round(320 * efs), Math.round(100 * efs),
+        Math.round(96 * efs), 900, palette.accent, F, "left",
+        { lineHeight: 0.90, letterSpacing: -3 }));
 
-      // Description — single line only
-      if (desc) {
-        shapes.push(T(
-          desc.toUpperCase(), pad, Math.round(usableH * 0.64), W, Math.round(42 * efs),
-          Math.round(24 * efs), 400, palette.muted, F, "left",
-          { letterSpacing: 0.5 }
-        ));
-      }
+      // Description
+      shapes.push(T("subheading", pad, Math.round(150 * efs) + Math.round(tSize * 2.6) + Math.round(108 * efs),
+        textW, Math.round(80 * efs),
+        Math.round(26 * efs), 400, palette.muted, F, "left", { letterSpacing: 0.2 }));
 
       // CTA
-      const ctaY = Math.round(usableH * 0.76);
-      shapes.push(...CTA(offer?.cta_text || campaign.cta || "Claim Offer", pad, ctaY, Math.round(420 * efs), Math.round(82 * efs), F));
-
-      if (exp) {
-        shapes.push(T(`Expires: ${exp}`, pad, ctaY + Math.round(92 * efs), Math.round(300 * efs), Math.round(26 * efs),
-          Math.round(16 * efs), 400, palette.muted, F, "left"));
-      }
+      const ctaY = usableH - Math.round(96 * efs);
+      shapes.push(...CTA(pad, ctaY, Math.round(textW * 0.85), Math.round(80 * efs), palette, brand, F, efs));
+      shapes.push(T("fine_print", pad, ctaY + Math.round(86 * efs),
+        Math.round(280 * efs), Math.round(22 * efs),
+        Math.round(14 * efs), 400, palette.muted, F, "left"));
       break;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // 7. BULLET LIST — Oswald — numbered, structured, bold
-    // ─────────────────────────────────────────────────────────────────────────
+    // ── 7. BULLET LIST ────────────────────────────────────────────────────────
+    // Hero top-right quadrant. Logo + hook + 3 bullets fill left/bottom
     case "bullet-list": {
-      const F       = OSWALD;
-      const bullets = getAvailableBullets(campaign).slice(0, 3);
+      const F      = OSWALD;
+      const heroX  = Math.round(canvasW * 0.52);
+      const heroH  = Math.round(usableH * 0.52);
+      const bStep  = Math.round((usableH - heroH - Math.round(36 * efs)) / 3);
 
-      // Compact hook at top
-      shapes.push(T(
-        campaign.hook.toUpperCase(), pad, pad + Math.round(8 * efs), W, Math.round(80 * efs),
-        Math.round(60 * efs), 900, palette.text, F, "left",
-        { lineHeight: 0.92 }
-      ));
+      // Hero — top-right
+      shapes.push(IMG("hero_person", heroX, 0, canvasW - heroX, heroH, "cover", 0));
+      shapes.push(SCRIM(heroX, 0, Math.round(80 * efs), heroH, 90, [
+        { stop: 0, color: `${palette.bg}ff` }, { stop: 1, color: "#00000000" },
+      ]));
+      shapes.push(IMG("dashboard_image",
+        heroX + Math.round(12 * efs), heroH + Math.round(12 * efs),
+        canvasW - heroX - Math.round(20 * efs), usableH - heroH - Math.round(20 * efs),
+        "cover", Math.round(10 * efs), Z_HERO, true));
 
-      // Accent rule
-      shapes.push(R(pad, pad + Math.round(96 * efs), Math.round(90 * efs), Math.round(7 * efs), palette.accent, 999));
+      // Logo + hook — top-left
+      shapes.push(LOGO(pad, Math.round(20 * efs), logoW, logoH));
+      shapes.push(T("hook", pad, Math.round(86 * efs),
+        heroX - pad - Math.round(16 * efs), Math.round(112 * efs),
+        Math.round(56 * efs), 900, palette.text, F, "left", { lineHeight: 0.94 }));
 
-      // Numbered bullets
-      const bStep  = Math.round(116 * efs);
-      const bStart = pad + Math.round(118 * efs);
+      // Rule
+      shapes.push(R(pad, Math.round(206 * efs), Math.round(80 * efs),
+        Math.round(6 * efs), palette.accent, 999));
 
-      bullets.forEach((b, i) => {
+      // 3 numbered bullets — bottom half, full width
+      const bStart = Math.round(220 * efs);
+      const bFields = ["bullet_1","bullet_2","bullet_3"] as const;
+      bFields.forEach((field, i) => {
         const by = bStart + i * bStep;
-
-        // Large ghost number behind
-        shapes.push(T(
-          String(i + 1).padStart(2, "0"),
-          pad, by - Math.round(8 * efs), Math.round(80 * efs), Math.round(90 * efs),
-          Math.round(80 * efs), 900, hexToRgba(palette.accent, 0.12), F, "left",
-          { lineHeight: 0.88 }
-        ));
-
+        // Ghost number
+        shapes.push(T(`meta_${i+1}_value`,
+          pad, by, Math.round(68 * efs), Math.round(72 * efs),
+          Math.round(64 * efs), 900, hexToRgba(palette.accent, 0.14), F, "left",
+          { lineHeight: 0.90 }));
         // Bullet text
-        shapes.push(T(
-          b.toUpperCase(),
-          pad + Math.round(88 * efs), by + Math.round(14 * efs),
-          W - Math.round(88 * efs), Math.round(64 * efs),
-          Math.round(44 * efs), 700, palette.text, F, "left",
-          { lineHeight: 1.0 }
-        ));
-
-        // Thin divider between bullets
-        if (i < bullets.length - 1) {
-          shapes.push(R(pad, by + Math.round(92 * efs), W, Math.round(1 * efs),
-            hexToRgba(palette.accent, 0.14), 0));
-        }
+        shapes.push(T(field,
+          pad + Math.round(74 * efs), by + Math.round(10 * efs),
+          heroX - pad - Math.round(90 * efs), Math.round(bStep - 14 * efs),
+          Math.round(38 * efs), 700, palette.text, F, "left", { lineHeight: 1.0 }));
+        if (i < 2) shapes.push(R(pad, by + bStep - Math.round(6 * efs),
+          heroX - pad - Math.round(16 * efs), Math.round(1 * efs),
+          hexToRgba(palette.accent, 0.16), 0));
       });
       break;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // 8. SIDE BY SIDE — Barlow — image fills left, type fills right
-    // ─────────────────────────────────────────────────────────────────────────
+    // ── 8. SIDE BY SIDE ──────────────────────────────────────────────────────
+    // Classic split — image left, content right
     case "side-by-side": {
       const F      = BARLOW;
       const splitX = Math.round(canvasW * 0.46);
-      const cX     = splitX + Math.round(38 * efs);
-      const cW     = canvasW - cX - Math.round(32 * efs);
-      const imgH   = usableH;
+      const cX     = splitX + Math.round(10 * efs);
+      const cW     = canvasW - cX - pad;
 
-      // Image — left half, full height
-      if (imageSlots.hero_person) {
-        shapes.push(IMG("hero_person", 0, 0, splitX, imgH, "cover", 0));
-      } else {
-        shapes.push(R(0, 0, splitX, imgH, palette.surface, 0, { zIndex: Z_HERO }));
-      }
+      // Hero — left half
+      shapes.push(IMG("hero_person", 0, 0, splitX, usableH, "cover", 0));
+      shapes.push(SCRIM(Math.round(splitX * 0.75), 0, Math.round(splitX * 0.25), usableH, 90, [
+        { stop: 0, color: "#00000000" }, { stop: 1, color: `${palette.bg}dd` },
+      ]));
+      // Secondary — bottom of left strip
+      shapes.push(IMG("dashboard_image",
+        Math.round(16 * efs), usableH - Math.round(210 * efs),
+        Math.round(splitX - 28 * efs), Math.round(190 * efs),
+        "cover", Math.round(10 * efs), Z_HERO + 2, true));
 
-      // Accent divider line
-      shapes.push(R(splitX, 0, Math.round(8 * efs), imgH, palette.accent, 0, { zIndex: Z_DECOR + 1 }));
+      // Bold accent divider
+      shapes.push(R(splitX, 0, Math.round(8 * efs), usableH, palette.accent, 0, { zIndex: Z_DECOR + 1 }));
 
-      // Headline — right side, fills it
-      const hLen  = campaign.hook.length;
-      const hSize = hLen < 30 ? Math.round(96 * efs) : hLen < 55 ? Math.round(76 * efs) : Math.round(58 * efs);
-      shapes.push(T(
-        campaign.hook.toUpperCase(),
-        cX, Math.round(usableH * 0.10), cW, Math.round(hSize * 3.2 * efs),
+      // Logo — top of right column
+      shapes.push(LOGO(cX, Math.round(22 * efs), logoW, logoH));
+
+      // Hook — large, fills right column
+      const hSize = Math.round(68 * efs);
+      shapes.push(T("hook", cX, Math.round(90 * efs), cW, Math.round(hSize * 3.4),
         hSize, 900, palette.text, F, "left",
-        { lineHeight: 0.92, letterSpacing: 0.5 }
-      ));
+        { lineHeight: 0.94, letterSpacing: 0.3 }));
 
-      // CTA — right side bottom
-      const ctaY = Math.round(usableH * 0.72);
-      shapes.push(...CTA(campaign.cta || "Learn More", cX, ctaY, cW, Math.round(78 * efs), F));
+      // Rule
+      shapes.push(R(cX, Math.round(90 * efs) + Math.round(hSize * 3.6),
+        Math.round(cW * 0.40), Math.round(5 * efs), palette.accent, 999,
+        { gradientColors: palette.accentGradient, gradientAngle: 90 }));
+
+      // Subheading
+      shapes.push(T("subheading",
+        cX, Math.round(90 * efs) + Math.round(hSize * 3.6) + Math.round(26 * efs),
+        cW, Math.round(80 * efs),
+        Math.round(26 * efs), 400, palette.muted, F, "left", { lineHeight: 1.38 }));
+
+      // CTA
+      const ctaY = Math.round(90 * efs) + Math.round(hSize * 3.6) + Math.round(90 * efs);
+      shapes.push(...CTA(cX, ctaY, cW, Math.round(80 * efs), palette, brand, F, efs));
       break;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // 9. FULL BLEED IMAGE — Bebas Neue — photo fills all, minimal text overlay
-    // ─────────────────────────────────────────────────────────────────────────
+    // ── 9. FULL BLEED IMAGE ───────────────────────────────────────────────────
+    // Photo covers everything, deep scrim bottom 55%, text/CTA over it
     case "full-bleed-image": {
       const F = BEBAS_NEUE;
 
-      // Image covers entire canvas above strip
-      if (imageSlots.hero_person) {
-        shapes.push(IMG("hero_person", 0, 0, canvasW, usableH, "cover", 0));
-        // Heavy gradient scrim — bottom half only
-        shapes.push({
-          id: makeId("scrim"), type: "gradient-overlay",
-          x: 0, y: Math.round(usableH * 0.30),
-          width: canvasW, height: Math.round(usableH * 0.70),
-          gradientColors: [
-            { stop: 0, color: "#00000000" },
-            { stop: 0.45, color: "#000000bb" },
-            { stop: 1, color: "#000000ee" },
-          ] as GradientStop[],
-          gradientAngle: 180,
-          backgroundColor: "transparent", borderWidth: 0, zIndex: Z_HERO + 1,
-        } as TemplateShape);
-      } else {
-        shapes.push(R(0, 0, canvasW, usableH, palette.surface, 0, { zIndex: Z_HERO }));
-      }
+      shapes.push(IMG("hero_person", 0, 0, canvasW, usableH, "cover", 0));
+      // Top fade for logo
+      shapes.push(SCRIM(0, 0, canvasW, Math.round(usableH * 0.22), 180, [
+        { stop: 0, color: "#000000aa" }, { stop: 1, color: "#00000000" },
+      ]));
+      // Bottom deep scrim for text
+      shapes.push(SCRIM(0, Math.round(usableH * 0.40), canvasW, Math.round(usableH * 0.60), 180, [
+        { stop: 0, color: "#00000000" },
+        { stop: 0.35, color: "#000000bb" },
+        { stop: 1, color: "#000000f0" },
+      ]));
 
-      // Headline — bottom left, over scrim
-      const hLen  = campaign.hook.length;
-      const hSize = hLen < 35 ? Math.round(108 * efs) : Math.round(80 * efs);
-      shapes.push(T(
-        campaign.hook.toUpperCase(),
-        pad, Math.round(usableH * 0.52), W, Math.round(hSize * 2.2 * efs),
+      // Secondary — top-right
+      shapes.push(IMG("dashboard_image",
+        canvasW - Math.round(220 * efs), Math.round(20 * efs),
+        Math.round(200 * efs), Math.round(148 * efs),
+        "cover", Math.round(12 * efs), Z_HERO + 2, true));
+      shapes.push(R(canvasW - Math.round(222 * efs), Math.round(18 * efs),
+        Math.round(204 * efs), Math.round(152 * efs), "transparent", Math.round(14 * efs),
+        { borderWidth: Math.round(3 * efs), borderColor: palette.accent, zIndex: Z_HERO + 1 }));
+
+      // Logo — top-left
+      shapes.push(LOGO(pad, Math.round(22 * efs), logoW, logoH));
+
+      // Headline — large, over scrim
+      const hSize = Math.round(96 * efs);
+      shapes.push(T("hook", pad, Math.round(usableH * 0.46), W, Math.round(hSize * 2.4),
         hSize, 900, "#ffffff", F, "left",
-        { lineHeight: 0.92, letterSpacing: -1, shadowBlur: 10, shadowColor: "#00000099", zIndex: Z_TEXT + 2 }
-      ));
+        { lineHeight: 0.94, letterSpacing: -1,
+          shadowBlur: 16, shadowColor: "#000000bb", zIndex: Z_TEXT + 2 }));
 
-      // CTA — bottom area, accent pill
-      const ctaY = Math.round(usableH * 0.82);
-      shapes.push(...CTA(campaign.cta || "Find Out More", pad, ctaY, Math.round(380 * efs), Math.round(76 * efs), F));
+      // CTA — over scrim
+      const ctaY = Math.round(usableH * 0.78);
+      shapes.push(...CTA(pad, ctaY,
+        Math.round(380 * efs), Math.round(78 * efs), palette, brand, F, efs));
+
+      // Proof pill — beside CTA
+      shapes.push(T("proof",
+        pad + Math.round(400 * efs), ctaY + Math.round(20 * efs),
+        W - Math.round(400 * efs), Math.round(60 * efs),
+        Math.round(24 * efs), 500, "rgba(255,255,255,0.65)", F, "left",
+        { zIndex: Z_TEXT + 2 }));
       break;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // 10. CONTACT SHOWCASE — Syne — contact details ARE the product
-    // Directory-ad / Yellow Pages style
-    // ─────────────────────────────────────────────────────────────────────────
+    // ── 10. CONTACT SHOWCASE ─────────────────────────────────────────────────
+    // Big company name + contact grid fills left. Hero fills right.
     case "contact-showcase": {
-      const F   = SYNE;
-      const biz = campaign.businessInfo || {};
+      const F    = SYNE;
+      const splitX = Math.round(canvasW * 0.50);
+      const imgX   = splitX + Math.round(10 * efs);
+      const imgW   = canvasW - imgX;
 
-      // Company name — massive
-      const nameSize = (campaign.companyName || "").length < 12
-        ? Math.round(116 * efs) : Math.round(86 * efs);
-      shapes.push(T(
-        (campaign.companyName || "Your Business").toUpperCase(),
-        pad, pad, W, Math.round(nameSize * 1.1 * efs),
+      // Hero — right half
+      shapes.push(IMG("hero_person", imgX, 0, imgW, usableH, "cover", 0));
+      shapes.push(SCRIM(imgX, 0, Math.round(80 * efs), usableH, 90, [
+        { stop: 0, color: `${palette.bg}ff` }, { stop: 1, color: "#00000000" },
+      ]));
+      shapes.push(IMG("dashboard_image",
+        imgX + Math.round(12 * efs), usableH - Math.round(210 * efs),
+        imgW - Math.round(20 * efs), Math.round(192 * efs),
+        "cover", Math.round(10 * efs), Z_HERO + 2, true));
+
+      // Logo — top-left
+      shapes.push(LOGO(pad, Math.round(22 * efs), logoW, logoH));
+
+      // Company name
+      const nameSize = Math.round(82 * efs);
+      shapes.push(T("companyName", pad, Math.round(86 * efs),
+        splitX - pad - Math.round(16 * efs), Math.round(nameSize * 1.1),
         nameSize, 900, palette.text, F, "left",
-        { lineHeight: 0.88, letterSpacing: -1 }
-      ));
+        { lineHeight: 0.90, letterSpacing: -1 }));
 
-      // Tagline / hook — one line
-      const tag = campaign.subheading || campaign.hook || biz.tagline;
-      if (tag) {
-        shapes.push(T(
-          tag.toUpperCase(), pad, pad + Math.round(nameSize * 1.2 * efs), W, Math.round(42 * efs),
-          Math.round(24 * efs), 400, palette.muted, F, "left",
-          { letterSpacing: 1.5 }
-        ));
-      }
+      // Tagline
+      shapes.push(T("subheading", pad, Math.round(86 * efs) + Math.round(nameSize * 1.2),
+        splitX - pad - Math.round(16 * efs), Math.round(80 * efs),
+        Math.round(26 * efs), 400, palette.muted, F, "left", { letterSpacing: 0.8 }));
 
-      // Full-width rule
-      shapes.push(R(pad, pad + Math.round(nameSize * 1.3 * efs) + Math.round(50 * efs), W, Math.round(3 * efs), palette.accent, 0));
+      // Rule
+      shapes.push(R(pad, Math.round(86 * efs) + Math.round(nameSize * 1.3) + Math.round(44 * efs),
+        splitX - pad - Math.round(16 * efs), Math.round(4 * efs), palette.accent, 0));
 
-      // Contact grid — 2 columns
-      const phone   = campaign.phone   || biz.phone_primary;
-      const email   = campaign.email   || biz.email_primary;
-      const website = campaign.website || biz.website;
-      const address = [biz.address, biz.city, biz.country].filter(Boolean).join(", ");
-      const wa      = campaign.whatsapp || biz.whatsapp;
+      // Contact grid — 2 cols, 3 rows
+      const gY   = Math.round(86 * efs) + Math.round(nameSize * 1.3) + Math.round(58 * efs);
+      const colW = Math.round((splitX - pad * 2) / 2) - Math.round(10 * efs);
+      const itemH= Math.round(76 * efs);
 
-      const items = [
-        phone   && { icon: "📞", label: "CALL",     val: phone },
-        wa      && wa !== phone && { icon: "💬", label: "WHATSAPP", val: wa },
-        email   && { icon: "✉",  label: "EMAIL",    val: email },
-        website && { icon: "🌐", label: "VISIT",    val: website.replace(/^https?:\/\//, "") },
-        address && { icon: "📍", label: "FIND US",  val: address },
-      ].filter(Boolean) as Array<{icon:string; label:string; val:string}>;
-
-      const gY     = pad + Math.round(nameSize * 1.3 * efs) + Math.round(62 * efs);
-      const colW   = Math.round(W / 2) - Math.round(12 * efs);
-      const itemH  = Math.round(92 * efs);
-
-      items.slice(0, 6).forEach((item, i) => {
-        const col = i % 2;
-        const row = Math.floor(i / 2);
-        const ix  = pad + col * (colW + Math.round(24 * efs));
+      [1,2,3,4,5,6].forEach(i => {
+        const col = (i - 1) % 2;
+        const row = Math.floor((i - 1) / 2);
+        const ix  = pad + col * (colW + Math.round(20 * efs));
         const iy  = gY + row * itemH;
-
-        shapes.push(T(item.icon, ix, iy + Math.round(10 * efs), Math.round(34 * efs), Math.round(38 * efs),
-          Math.round(26 * efs), 400, palette.accent, F, "left"));
-        shapes.push(T(item.label, ix + Math.round(42 * efs), iy + Math.round(6 * efs),
-          colW - Math.round(42 * efs), Math.round(20 * efs),
-          Math.round(13 * efs), 800, palette.muted, F, "left", { letterSpacing: 2.5 }));
-        shapes.push(T(item.val, ix + Math.round(42 * efs), iy + Math.round(26 * efs),
-          colW - Math.round(42 * efs), Math.round(40 * efs),
-          Math.round(24 * efs), 700, palette.text, F, "left"));
+        // Label (CALL US, EMAIL etc.) — small uppercase
+        shapes.push(T(`meta_${i}_key`,
+          ix, iy, colW, Math.round(18 * efs),
+          Math.round(11 * efs), 800, palette.muted, F, "left",
+          { letterSpacing: 2.5 }));
+        // Value (phone, email etc.) — bold, larger
+        shapes.push(T(`meta_${i}_value`,
+          ix, iy + Math.round(20 * efs), colW, Math.round(38 * efs),
+          Math.round(22 * efs), 700, palette.text, F, "left"));
       });
       break;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // 11. ANNOUNCEMENT — Oswald — bold event / news, poster energy
-    // ─────────────────────────────────────────────────────────────────────────
+    // ── 11. ANNOUNCEMENT ─────────────────────────────────────────────────────
+    // Big bold headline fills left. Hero fills right bottom. Logo top.
     case "announcement": {
-      const F = OSWALD;
+      const F    = OSWALD;
+      const imgW = Math.round(canvasW * 0.42);
+      const imgH = Math.round(usableH * 0.52);
+      const imgX = canvasW - imgW;
+      const imgY = usableH - imgH;
 
-      // Tag at top
-      const tag = campaign.hook_tag || "ANNOUNCEMENT";
-      shapes.push(R(pad, pad, Math.round(200 * efs), Math.round(48 * efs), palette.accent, 999));
-      shapes.push(T(
-        tag.toUpperCase(), pad + Math.round(14 * efs), pad + Math.round(11 * efs),
-        Math.round(172 * efs), Math.round(28 * efs),
-        Math.round(20 * efs), 900, "#ffffff", F, "center",
-        { letterSpacing: 2 }
-      ));
+      // Hero — bottom-right
+      shapes.push(IMG("hero_person", imgX, imgY, imgW, imgH, "cover", Math.round(14 * efs)));
+      shapes.push(SCRIM(imgX, imgY, Math.round(80 * efs), imgH, 90, [
+        { stop: 0, color: `${palette.bg}ff` }, { stop: 1, color: "#00000000" },
+      ]));
+      // Secondary — top-right
+      shapes.push(IMG("dashboard_image",
+        imgX, Math.round(16 * efs),
+        imgW, imgY - Math.round(28 * efs),
+        "cover", Math.round(12 * efs), Z_HERO + 1, true));
 
-      // Main headline — very large
-      const hLen  = campaign.hook.length;
-      const hSize = hLen < 28 ? Math.round(128 * efs) : hLen < 50 ? Math.round(100 * efs) : Math.round(78 * efs);
-      const hY    = pad + Math.round(68 * efs);
-      shapes.push(T(
-        campaign.hook.toUpperCase(), pad, hY, W, Math.round(hSize * 2.5 * efs),
+      // Logo
+      shapes.push(LOGO(pad, Math.round(18 * efs), logoW, logoH));
+
+      // Tag badge
+      shapes.push(R(pad, Math.round(84 * efs), Math.round(192 * efs), Math.round(46 * efs), palette.accent, 999));
+      shapes.push(T("hook_tag",
+        pad + Math.round(12 * efs), Math.round(84 * efs) + Math.round(10 * efs),
+        Math.round(168 * efs), Math.round(28 * efs),
+        Math.round(19 * efs), 900, "#ffffff", F, "center", { letterSpacing: 2 }));
+
+      // Headline
+      const hSize = Math.round(90 * efs);
+      const hY    = Math.round(148 * efs);
+      const hW    = imgX - pad - Math.round(20 * efs);
+      shapes.push(T("hook", pad, hY, hW, Math.round(hSize * 2.8),
         hSize, 900, palette.text, F, "left",
-        { lineHeight: 0.90, letterSpacing: -0.5 }
-      ));
+        { lineHeight: 0.92, letterSpacing: -0.5 }));
 
-      // Left accent block beside detail
-      shapes.push(R(
-        0, hY + Math.round(hSize * 2.6 * efs),
-        Math.round(12 * efs), Math.round(100 * efs),
-        palette.accent, 0, { zIndex: Z_DECOR + 1 }
-      ));
+      // Accent block + date detail
+      shapes.push(R(0, hY + Math.round(hSize * 2.9),
+        Math.round(12 * efs), Math.round(90 * efs),
+        palette.accent, 0, { zIndex: Z_DECOR + 1 }));
+      shapes.push(T("hook_pre",
+        Math.round(26 * efs), hY + Math.round(hSize * 2.9) + Math.round(12 * efs),
+        hW - Math.round(26 * efs), Math.round(68 * efs),
+        Math.round(36 * efs), 600, palette.accent, F, "left", { letterSpacing: 0.3 }));
 
-      // Detail line (hook_pre = date / venue / subtitle)
-      if (campaign.hook_pre) {
-        shapes.push(T(
-          campaign.hook_pre.toUpperCase(),
-          Math.round(30 * efs), hY + Math.round(hSize * 2.6 * efs) + Math.round(10 * efs),
-          W - Math.round(30 * efs), Math.round(76 * efs),
-          Math.round(40 * efs), 600, palette.accent, F, "left",
-          { letterSpacing: 0.5 }
-        ));
-      }
-
-      // CTA — white background (high contrast)
-      const ctaY = Math.round(usableH * 0.78);
-      shapes.push(R(pad, ctaY, Math.round(400 * efs), Math.round(78 * efs), "#ffffff", Math.round(10 * efs), { zIndex: Z_CTA }));
-      shapes.push(T(
-        (campaign.cta || "Register Now").toUpperCase(),
-        pad + Math.round(16 * efs), ctaY + Math.round(20 * efs),
-        Math.round(368 * efs), Math.round(42 * efs),
-        Math.round(38 * efs), 900, palette.bg, F, "center",
-        { zIndex: Z_CTA + 1, letterSpacing: 1 }
-      ));
+      // White CTA
+      const ctaY = hY + Math.round(hSize * 2.9) + Math.round(108 * efs);
+      shapes.push(R(pad, ctaY, Math.round(380 * efs), Math.round(76 * efs),
+        "#ffffff", Math.round(10 * efs), { zIndex: Z_CTA }));
+      shapes.push(T("cta",
+        pad + Math.round(16 * efs), ctaY + Math.round(18 * efs),
+        Math.round(348 * efs), Math.round(42 * efs),
+        Math.round(36 * efs), 900, palette.bg, F, "center",
+        { zIndex: Z_CTA + 1, letterSpacing: 0.8 }));
       break;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // 12. MINIMAL LOGO — Syne — brand awareness, almost empty canvas
-    // ─────────────────────────────────────────────────────────────────────────
+    // ── 12. MINIMAL LOGO ─────────────────────────────────────────────────────
+    // Brand awareness. Logo + tagline centered. Hero texture bg. Secondary accent.
     case "minimal-logo": {
       const F = SYNE;
 
-      // Logo — centered top third
-      if (imageSlots.logo) {
-        shapes.push(IMG("logo", Math.round(canvasW / 2 - 130 * efs), Math.round(usableH * 0.12),
-          Math.round(260 * efs), Math.round(90 * efs), "contain", 0));
-      }
-      // Company name as fallback / alongside
-      shapes.push(T(
-        campaign.companyName.toUpperCase(),
-        pad, Math.round(usableH * 0.12), W, Math.round(90 * efs),
-        Math.round(68 * efs), 900, palette.text, F, "center",
-        { letterSpacing: 4, lineHeight: 0.9 }
-      ));
+      // Hero — full background, very heavy scrim = texture
+      shapes.push(IMG("hero_person", 0, 0, canvasW, usableH, "cover", 0));
+      shapes.push(SCRIM(0, 0, canvasW, usableH, 180, [
+        { stop: 0, color: `${palette.bg}d0` }, { stop: 1, color: `${palette.bg}f0` },
+      ]));
 
-      // Full-width rule
-      shapes.push(R(pad, Math.round(usableH * 0.32), W, Math.round(2 * efs), hexToRgba(palette.accent, 0.3), 0));
+      // Secondary — bottom-right, prominent
+      shapes.push(IMG("dashboard_image",
+        canvasW - Math.round(240 * efs), usableH - Math.round(220 * efs),
+        Math.round(220 * efs), Math.round(200 * efs),
+        "cover", Math.round(14 * efs), Z_HERO + 2, true));
+      shapes.push(R(canvasW - Math.round(242 * efs), usableH - Math.round(222 * efs),
+        Math.round(224 * efs), Math.round(204 * efs), "transparent", Math.round(16 * efs),
+        { borderWidth: Math.round(3 * efs), borderColor: palette.accent, zIndex: Z_HERO + 1 }));
 
-      // Single tagline — large, centered, accent colour
-      const tagline = campaign.subheading || campaign.hook;
-      shapes.push(T(
-        tagline.toUpperCase(),
-        pad, Math.round(usableH * 0.38), W, Math.round(160 * efs),
-        Math.round(82 * efs), 900, palette.accent, F, "center",
-        { lineHeight: 0.90, letterSpacing: -1 }
-      ));
+      // Logo — centered, large
+      shapes.push({
+        ...LOGO(Math.round(canvasW / 2 - 150 * efs), Math.round(usableH * 0.12),
+          Math.round(300 * efs), Math.round(100 * efs)),
+      });
 
-      // Second rule
-      shapes.push(R(pad, Math.round(usableH * 0.62), W, Math.round(2 * efs), hexToRgba(palette.accent, 0.3), 0));
+      // Company name
+      shapes.push(T("companyName", pad, Math.round(usableH * 0.12), W, Math.round(96 * efs),
+        Math.round(72 * efs), 900, palette.text, F, "center",
+        { letterSpacing: 5, lineHeight: 0.92 }));
 
-      // CTA — outline style
-      const ctaY = Math.round(usableH * 0.68);
-      const ctaW = Math.round(340 * efs);
+      // Rules
+      shapes.push(R(pad, Math.round(usableH * 0.33), W, Math.round(2 * efs),
+        hexToRgba(palette.accent, 0.35), 0));
+
+      // Big tagline
+      shapes.push(T("subheading", pad, Math.round(usableH * 0.38), W, Math.round(160 * efs),
+        Math.round(74 * efs), 900, palette.accent, F, "center",
+        { lineHeight: 0.92, letterSpacing: -0.8 }));
+
+      shapes.push(R(pad, Math.round(usableH * 0.62), W, Math.round(2 * efs),
+        hexToRgba(palette.accent, 0.35), 0));
+
+      // Outline CTA — centered
+      const ctaW = Math.round(300 * efs);
       const ctaX = Math.round(canvasW / 2 - ctaW / 2);
+      const ctaY = Math.round(usableH * 0.68);
       shapes.push(R(ctaX, ctaY, ctaW, Math.round(68 * efs), "transparent", 999, {
         borderWidth: Math.round(3 * efs), borderColor: palette.accent, zIndex: Z_CTA,
       }));
-      shapes.push(T(
-        (campaign.cta || "Visit Us").toUpperCase(),
+      shapes.push(T("cta",
         ctaX + Math.round(14 * efs), ctaY + Math.round(16 * efs),
         ctaW - Math.round(28 * efs), Math.round(38 * efs),
         Math.round(32 * efs), 800, palette.accent, F, "center",
-        { letterSpacing: 3, zIndex: Z_CTA + 1 }
-      ));
+        { letterSpacing: 3, zIndex: Z_CTA + 1 }));
       break;
     }
   }

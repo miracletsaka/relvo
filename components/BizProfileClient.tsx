@@ -1150,7 +1150,7 @@ const socialLinks = [
         {/* ── Footer ── */}
         <div style={{ borderTop: "1px solid #f3f4f6", padding: "28px 24px", textAlign: "center", marginTop: 40 }}>
           <p style={{ fontSize: 12, color: "#d1d5db", fontFamily: "DM Mono, monospace" }}>
-            Powered by <strong style={{ color: "#6366f1" }}>Relvō</strong>
+            Powered by <strong style={{ color: "#6366f1" }}>Relvo</strong>
           </p>
         </div>
       </div>

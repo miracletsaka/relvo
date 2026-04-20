@@ -362,7 +362,7 @@ export async function drawReviewCard(
   ctx.font         = `600 14px 'Inter', sans-serif`;
   ctx.textAlign    = "left";
   ctx.textBaseline = "middle";
-  ctx.fillText("Powered by Relvō", INSET + PAD / 2, BADGE_Y + BADGE_H / 2);
+  ctx.fillText("Powered by NeuroFlow AI", INSET + PAD / 2, BADGE_Y + BADGE_H / 2);
 }
 
 // ── Colour helpers ─────────────────────────────────────────────────────────────

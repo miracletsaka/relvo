@@ -127,7 +127,6 @@ const META_CATS      = ['ai_context', 'compliance', 'audience', 'brand_voice', '
 export default function CampaignDataForm({ data, onChange }: CampaignDataFormProps) {
   const set = (field: keyof CampaignData | any, value: any) => onChange({ ...data, [field]: value })
 
-  console.log("CampaignDataForm render with data:", data);
 
   const updateBullet = (i: number, v: string) => { const b = [...(data.bullets || [])]; b[i] = v; set('bullets', b) }
   const addBullet    = () => set('bullets', [...(data.bullets || []), ''])

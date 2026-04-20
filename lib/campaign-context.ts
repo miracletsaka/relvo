@@ -19,7 +19,7 @@ export const DEFAULT_CAMPAIGN_DATA: CampaignData = {
     "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80",
 
   location: "London, UK",
-  companyName: "Relvō AI",
+  companyName: "Relvo AI",
   ctaLink: "https://neuroflowai.co.uk",
   hashtags: "#AI #Automation #LeadGeneration #BusinessGrowth",
 
@@ -73,7 +73,7 @@ export const DEFAULT_CAMPAIGN_DATA: CampaignData = {
   accreditations: [
     {
       name: "Certified AI Solutions Partner",
-      issuer: "Relvō Academy",
+      issuer: "Relvo Academy",
       year: 2025,
     },
   ],

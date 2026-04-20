@@ -573,14 +573,14 @@ function CreateOrgStep({ onDone }: { onDone: (org: Org) => void }) {
         <Input
           value={name}
           onChange={setName}
-          placeholder="Relvō  Marketing Agency"
+          placeholder="Relvo  Marketing Agency"
           autoFocus
           onKeyDown={(e: any) => e.key === "Enter" && submit()}
           disabled={loading}
         />
         {slug && (
           <div style={{ marginTop: 8, fontSize: 10, color: "rgba(255,255,255,0.2)", fontFamily: "DM Mono, monospace" }}>
-            URL: <span style={{ color: "#818cf8" }}>Relvō.neuroflowai.co.uk/business/{slug}</span>
+            URL: <span style={{ color: "#818cf8" }}>Relvo.neuroflowai.co.uk/business/{slug}</span>
           </div>
         )}
       </div>
@@ -1085,7 +1085,7 @@ export default function OnboardingPage() {
               </svg>
             </div>
             <span style={{ fontSize: 22, fontWeight: 800, color: "#f1f5f9", letterSpacing: "-0.02em" }}>
-              Relvō
+              Relvo
             </span>
           </div>
 

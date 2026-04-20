@@ -130,7 +130,7 @@ export default function PlatformsPage() {
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
           <div>
             <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(124,58,237,0.7)", marginBottom: 4, fontFamily: "DM Mono, monospace" }}>
-              Relvō · Config
+              Relvo · Config
             </div>
             <h1 style={{ fontSize: 26, fontWeight: 800, color: "#e4e4e7", margin: 0, lineHeight: 1.1 }}>Platforms</h1>
             <p style={{ fontSize: 11, color: "rgba(255,255,255,0.28)", marginTop: 5 }}>

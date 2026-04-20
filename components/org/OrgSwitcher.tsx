@@ -8,6 +8,7 @@ type OrgItem = {
   name: string;
   slug: string;
   role: string;
+  logo_url?: string;
 };
 
 type OrgSwitcherProps = {
@@ -65,6 +66,7 @@ export default function OrgSwitcher({
         name: me.name,
         slug: me.slug,
         role: me.role,
+        logo_url: me.logo_url,
       });
     } catch (e: any) {
       setErr(e?.message || "Failed to load workspaces");
@@ -110,6 +112,8 @@ export default function OrgSwitcher({
 
   const activeName = currentOrg?.name || "Workspace";
   const activeRole = currentOrg?.role || "member";
+
+  console.log("OrgSwitcher render:", { currentOrg, orgs });
 
   return (
     <>
@@ -335,7 +339,7 @@ export default function OrgSwitcher({
         >
           <div className="orgs-trigger-left">
             <div className="">
-              <img src="/logo.png" alt="Relvō AI" style={{ width: 50, height: "auto" }} />
+              <img src={currentOrg?.logo_url} alt="Relvo AI" style={{ width: 50, height: "auto" }} />
             </div>
 
             {!collapsed && (

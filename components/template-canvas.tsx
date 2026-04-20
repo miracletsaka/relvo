@@ -10,6 +10,7 @@ import React, {
 } from "react";
 import { TemplateShape, CampaignData } from "@/lib/types";
 import { calculateSnapGuides, SnapGuide } from "@/lib/alignment-utils";
+import { getShapeText } from "@/lib/get-shape-text";
 
 interface TemplateCanvasProps {
   shapes: TemplateShape[];
@@ -184,60 +185,6 @@ function roundRectPath(
   ctx.closePath();
 }
 
-function getShapeText(shape: TemplateShape, campaignData: CampaignData): string {
-  if (shape.type !== "text") return "";
-
-  let text = "";
-  const field = shape.dataField as string;
-
-  if (!field) {
-    text = String((shape as any).customText || (shape as any).text || "");
-  } else if (field.startsWith("bullet-")) {
-    text = campaignData.bullets?.[parseInt(field.split("-")[1], 10)] || "";
-  } else if (field === "bullet_1") {
-    text = (campaignData as any).bullet_1 || campaignData.bullets?.[0] || "";
-  } else if (field === "bullet_2") {
-    text = (campaignData as any).bullet_2 || campaignData.bullets?.[1] || "";
-  } else if (field === "bullet_3") {
-    text = (campaignData as any).bullet_3 || campaignData.bullets?.[2] || "";
-  } else if (field === "business_tagline") {
-    text = campaignData.businessInfo?.tagline || (campaignData as any).business_tagline || "";
-  } else if (field === "business_description") {
-    text = campaignData.businessInfo?.description || (campaignData as any).business_description || "";
-  } else if (field === "business_type") {
-    text = campaignData.businessInfo?.business_type || (campaignData as any).business_type || "";
-  } else if (field === "business_website") {
-    text = campaignData.businessInfo?.website || (campaignData as any).business_website || "";
-  } else if (field === "business_meta") {
-    text = [
-      campaignData.businessInfo?.business_type || (campaignData as any).business_type,
-      campaignData.businessInfo?.tagline || (campaignData as any).business_tagline,
-      campaignData.location,
-    ]
-      .filter(Boolean)
-      .join(" • ");
-  } else if (field === "offer_title") {
-    text = (campaignData as any).offer_title || campaignData.offers?.[0]?.title || "";
-  } else if (field === "offer_cta") {
-    text = (campaignData as any).offer_cta || campaignData.offers?.[0]?.cta_text || "";
-  } else if (field === "review_text") {
-    text = (campaignData as any).review_text || campaignData.reviews?.[0]?.body || "";
-  } else if (field === "review_author") {
-    text = (campaignData as any).review_author || campaignData.reviews?.[0]?.author_name || "";
-  } else if (field === "sponsors") {
-    text = campaignData.sponsors?.map((s) => s.name).filter(Boolean).slice(0, 3).join(" • ") || "";
-  } else if (field === "accreditations") {
-    text = campaignData.accreditations?.map((a) => a.name).filter(Boolean).slice(0, 3).join(" • ") || "";
-  } else {
-    text = (shape as any).text || ((campaignData as any)[field] as string) || "";
-  }
-
-  const transform = (shape as any).textTransform || "none";
-  if (transform === "uppercase") return text.toUpperCase();
-  if (transform === "lowercase") return text.toLowerCase();
-  if (transform === "capitalize") return text.replace(/\b\w/g, (c) => c.toUpperCase());
-  return text;
-}
 
 const TemplateCanvas = forwardRef<HTMLCanvasElement, TemplateCanvasProps>(function TemplateCanvas(
   {
@@ -656,54 +603,96 @@ const TemplateCanvas = forwardRef<HTMLCanvasElement, TemplateCanvasProps>(functi
         ctx.stroke();
         ctx.setLineDash([]);
       } else if (shape.type === "image") {
-        let imageUrl: string | null =
-          shape.src ||
-          (shape.slotKey ? campaignData.imageSlots?.[shape.slotKey]?.url : null) ||
-          null;
-
-        if (!imageUrl && shape.slotKey === "logo" && campaignData.logo) imageUrl = campaignData.logo as string;
-        if (!imageUrl && shape.slotKey === "hero_person" && (campaignData as any).heroImage) {
-          imageUrl = (campaignData as any).heroImage;
-        }
-
-        if (imageUrl) {
-          try {
-            const img = await loadShapeImage(imageUrl);
-            const r = (shape as any).radius || 0;
-            if (r > 0) {
-              ctx.save();
-              roundRectPath(ctx, shape.x, shape.y, shape.width, shape.height, r);
-              ctx.clip();
-            }
-            if (shape.fit === "cover") drawImageCover(ctx, img, shape.x, shape.y, shape.width, shape.height);
-            else drawImageContain(ctx, img, shape.x, shape.y, shape.width, shape.height);
-            if (r > 0) ctx.restore();
-          } catch {
-            ctx.fillStyle = "#e5e7eb";
-            ctx.fillRect(shape.x, shape.y, shape.width, shape.height);
-            ctx.fillStyle = "#9ca3af";
-            ctx.font = "12px sans-serif";
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            ctx.fillText("Image", shape.x + shape.width / 2, shape.y + shape.height / 2);
+        function resolveSlotUrl(shape: TemplateShape, campaignData: CampaignData): string | null {
+          // 1. Explicit src wins
+          if (shape.src && shape.src !== "undefined") return shape.src;
+        
+          const slotKey = (shape as any).slotKey as string | undefined;
+          if (!slotKey) return null;
+        
+          const cd = campaignData;
+        
+          // 2. Named slot cases — priority order
+          switch (slotKey) {
+            case "logo":
+              return (
+                (cd.logo as string)                    ||  // campaignData.logo (direct URL)
+                cd.imageSlots?.logo?.url               ||  // imageSlots.logo.url
+                null
+              );
+        
+            case "hero_person":
+              return (
+                cd.imageSlots?.hero_person?.url        ||
+                (cd as any).heroImage                  ||
+                (cd as any).hero_person                ||
+                cd.logo as string                      ||  // fallback to logo if nothing else
+                null
+              );
+        
+            case "dashboard_image":
+              return (
+                cd.imageSlots?.dashboard_image?.url    ||
+                (cd as any).dashboard_image            ||
+                null
+              );
+        
+            default:
+              return cd.imageSlots?.[slotKey]?.url || null;
           }
-        } else {
-          ctx.fillStyle = "rgba(200,200,200,0.15)";
-          ctx.fillRect(shape.x, shape.y, shape.width, shape.height);
-          ctx.strokeStyle = "rgba(200,200,200,0.3)";
-          ctx.lineWidth = 1;
-          ctx.strokeRect(shape.x, shape.y, shape.width, shape.height);
-          ctx.fillStyle = "#9ca3af";
-          ctx.font = "11px sans-serif";
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.fillText(
-            (shape as any).slotLabel || shape.slotKey || "Image",
-            shape.x + shape.width / 2,
-            shape.y + shape.height / 2,
-          );
         }
+
+        let imageUrl: string | null = resolveSlotUrl(shape, campaignData);
+ 
+    if (imageUrl) {
+      try {
+        const img = await loadShapeImage(imageUrl);
+        const r = (shape as any).radius || 0;
+        if (r > 0) {
+          ctx.save();
+          roundRectPath(ctx, shape.x, shape.y, shape.width, shape.height, r);
+          ctx.clip();
+        }
+        if (shape.fit === "cover") drawImageCover(ctx, img, shape.x, shape.y, shape.width, shape.height);
+        else drawImageContain(ctx, img, shape.x, shape.y, shape.width, shape.height);
+        if (r > 0) ctx.restore();
+      } catch {
+        // Draw placeholder
+        ctx.fillStyle = "rgba(200,200,200,0.12)";
+        ctx.fillRect(shape.x, shape.y, shape.width, shape.height);
+        ctx.strokeStyle = "rgba(200,200,200,0.25)";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(shape.x, shape.y, shape.width, shape.height);
+        ctx.fillStyle = "#9ca3af";
+        ctx.font = "bold 11px sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(
+          (shape as any).slotLabel || (shape as any).slotKey || "Image",
+          shape.x + shape.width / 2,
+          shape.y + shape.height / 2,
+        );
       }
+    } else if ((shape as any).slotVisibleWhenEmpty) {
+      // Show labeled placeholder when empty and visible
+      ctx.fillStyle = "rgba(255,255,255,0.06)";
+      ctx.fillRect(shape.x, shape.y, shape.width, shape.height);
+      ctx.strokeStyle = "rgba(255,255,255,0.15)";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+      ctx.strokeRect(shape.x, shape.y, shape.width, shape.height);
+      ctx.setLineDash([]);
+      ctx.fillStyle = "rgba(255,255,255,0.30)";
+      ctx.font = "bold 11px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(
+        (shape as any).slotLabel || (shape as any).slotKey || "Image",
+        shape.x + shape.width / 2,
+        shape.y + shape.height / 2,
+      );
+    }
+  } else
 
       if (shape.type === "text") {
         const rawText = getShapeText(shape, campaignData);

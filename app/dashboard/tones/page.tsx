@@ -1,4 +1,5 @@
 "use client";
+import { AdminGuard } from "@/components/AdminGuard";
 /**
  * app/dashboard/tones/page.tsx
  * ─────────────────────────────
@@ -339,7 +340,7 @@ export default function TonesPage() {
   const inactive = filtered.filter(t => !t.is_active);
 
   return (
-    <>
+    <AdminGuard>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Mono:wght@400;500&display=swap');
         .tn-root { font-family: 'Syne', sans-serif; background: #080810; min-height: 100vh; color: #f1f5f9; padding: 28px 24px; }
@@ -355,7 +356,7 @@ export default function TonesPage() {
         {/* Header */}
         <div style={{ marginBottom: 28 }}>
           <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(129,140,248,0.6)", marginBottom: 4, fontFamily: "DM Mono, monospace" }}>
-            Relvō · Content
+            Relvo · Content
           </div>
           <h1 style={{ fontSize: 28, fontWeight: 800, color: "#f1f5f9", margin: "0 0 6px", letterSpacing: "-0.02em" }}>Tones</h1>
           <p style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", margin: 0 }}>
@@ -477,6 +478,6 @@ export default function TonesPage() {
       </div>
 
       {toast && <Toast msg={toast} onClose={() => setToast(null)} />}
-    </>
+    </AdminGuard>
   );
 }

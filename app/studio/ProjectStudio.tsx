@@ -406,7 +406,7 @@ export default function ProjectStudio() {
           <textarea
             value={concept}
             onChange={(e) => setConcept(e.target.value)}
-            placeholder="Example: A premium ad for Relvō that answers missed calls and books appointments automatically for plumbers in the UK…"
+            placeholder="Example: A premium ad for Relvo that answers missed calls and books appointments automatically for plumbers in the UK…"
             rows={6}
             style={{
               width: "100%",

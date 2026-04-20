@@ -421,19 +421,167 @@ function LoadingCards() {
   );
 }
 
+function LogoSection({
+  currentLogoUrl,
+  onSaved,
+  toast,
+}: {
+  currentLogoUrl: string | null;
+  onSaved: (url: string | null) => void;
+  toast: (ok: boolean, msg: string) => void;
+}) {
+  const [logoUrl,  setLogoUrl]  = useState(currentLogoUrl || "");
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [preview,  setPreview]  = useState(currentLogoUrl || "");
+  const [saving,   setSaving]   = useState(false);
+  const [drag,     setDrag]     = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+ 
+  useEffect(() => {
+    setLogoUrl(currentLogoUrl || "");
+    setPreview(currentLogoUrl || "");
+  }, [currentLogoUrl]);
+ 
+  const pickFile = (file: File | null) => {
+    if (!file || !file.type.startsWith("image/")) return;
+    setLogoFile(file);
+    setLogoUrl("");
+    const r = new FileReader();
+    r.onload = e => setPreview(e.target?.result as string);
+    r.readAsDataURL(file);
+  };
+ 
+  const saveLogo = async () => {
+    setSaving(true);
+    try {
+      let finalUrl = logoUrl.trim();
+      if (logoFile) {
+        finalUrl = await uploadFileToSpaces(logoFile);
+      }
+      if (!finalUrl) { toast(false, "Please provide a logo or URL"); return; }
+      await api("/organisations/me", {
+        method: "PATCH",
+        body: JSON.stringify({ logo_url: finalUrl }),
+      });
+      setLogoUrl(finalUrl);
+      setLogoFile(null);
+      setPreview(finalUrl);
+      onSaved(finalUrl);
+      toast(true, "Logo saved");
+    } catch (e: any) {
+      toast(false, e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+ 
+  const removeLogo = async () => {
+    setSaving(true);
+    try {
+      await api("/organisations/me", {
+        method: "PATCH",
+        body: JSON.stringify({ logo_url: "" }),
+      });
+      setLogoUrl(""); setLogoFile(null); setPreview("");
+      onSaved(null);
+      toast(true, "Logo removed");
+    } catch (e: any) { toast(false, e.message); }
+    finally { setSaving(false); }
+  };
+ 
+  const isDirty = !!(logoFile || (logoUrl.trim() && logoUrl.trim() !== currentLogoUrl));
+ 
+  return (
+    <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${C.border}` }}>
+      <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: C.dim, fontFamily: "DM Mono, monospace", marginBottom: 10 }}>
+        Organisation Logo
+      </div>
+      <p style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", fontFamily: "DM Mono, monospace", margin: "-4px 0 14px" }}>
+        Displayed on your public profile and embedded in review cards
+      </p>
+ 
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
+        {/* Preview */}
+        <div style={{ position: "relative", flexShrink: 0 }}>
+          <div style={{ width: 96, height: 96, borderRadius: 16, border: `1.5px solid ${preview ? C.borderHi : C.border}`, background: preview ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", transition: "border-color 0.2s" }}>
+            {preview
+              ? <img src={preview} alt="Logo" style={{ width: "100%", height: "100%", objectFit: "contain", padding: 10 }} onError={() => setPreview("")} />
+              : <span style={{ fontSize: 32, opacity: 0.35 }}>🏢</span>
+            }
+          </div>
+          {preview && (
+            <button onClick={removeLogo} disabled={saving}
+              style={{ position: "absolute", top: -6, right: -6, width: 22, height: 22, borderRadius: "50%", background: C.bg, border: `1.5px solid ${C.border}`, color: C.red, fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, lineHeight: 1 }}>
+              ✕
+            </button>
+          )}
+        </div>
+ 
+        {/* Upload + URL */}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 9 }}>
+          {/* Drop zone */}
+          <div
+            onClick={() => fileRef.current?.click()}
+            onDragOver={e => { e.preventDefault(); setDrag(true); }}
+            onDragLeave={() => setDrag(false)}
+            onDrop={e => { e.preventDefault(); setDrag(false); pickFile(e.dataTransfer.files[0]); }}
+            style={{ border: `1.5px dashed ${drag ? C.borderHi : logoFile ? "rgba(52,211,153,0.5)" : "rgba(255,255,255,0.1)"}`, borderRadius: 10, padding: "10px 14px", cursor: "pointer", background: drag ? "rgba(124,58,237,0.05)" : "rgba(255,255,255,0.02)", display: "flex", alignItems: "center", gap: 10, transition: "all 0.2s" }}>
+            <span style={{ fontSize: 18, flexShrink: 0 }}>📁</span>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontSize: 12, fontWeight: 600, color: logoFile ? C.green : C.muted, margin: 0 }}>
+                {logoFile ? `${logoFile.name} ✓` : "Drop logo here or click to browse"}
+              </p>
+              <p style={{ fontSize: 9, color: C.dim, margin: "2px 0 0", fontFamily: "DM Mono, monospace" }}>PNG · SVG · JPG — transparent bg recommended</p>
+            </div>
+            {logoFile && (
+              <button type="button" onClick={e => { e.stopPropagation(); setLogoFile(null); setPreview(currentLogoUrl || ""); }}
+                style={{ background: "none", border: "none", color: C.red, fontSize: 14, cursor: "pointer", padding: "2px 6px" }}>✕</button>
+            )}
+          </div>
+          <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => pickFile(e.target.files?.[0] || null)} />
+ 
+          {/* URL row */}
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <span style={{ fontSize: 9, color: C.dim, fontFamily: "DM Mono, monospace", flexShrink: 0 }}>OR URL</span>
+            <input type="url" value={logoUrl} onChange={e => { setLogoUrl(e.target.value); setLogoFile(null); setPreview(e.target.value); }}
+              placeholder="https://yourbrand.com/logo.png" disabled={!!logoFile}
+              style={{ flex: 1, background: "rgba(255,255,255,0.04)", border: `1px solid ${C.border}`, borderRadius: 9, padding: "8px 12px", color: C.text, fontSize: 11, fontFamily: "DM Mono, monospace", outline: "none", opacity: logoFile ? 0.4 : 1 }}
+              onFocus={e => { if (!logoFile) e.target.style.borderColor = C.borderHi; }}
+              onBlur={e => { e.target.style.borderColor = C.border; }} />
+          </div>
+ 
+          {isDirty && (
+            <button onClick={saveLogo} disabled={saving}
+              style={{ alignSelf: "flex-start", padding: "8px 18px", background: saving ? "rgba(255,255,255,0.06)" : "rgba(124,58,237,0.85)", border: "none", borderRadius: 9, color: saving ? C.dim : "#fff", fontSize: 11, fontWeight: 700, cursor: saving ? "not-allowed" : "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 7 }}>
+              {saving
+                ? <><span style={{ width: 11, height: 11, border: "2px solid rgba(255,255,255,0.2)", borderTopColor: "#fff", borderRadius: "50%", display: "inline-block", animation: "op-spin 0.6s linear infinite" }} />Saving…</>
+                : "Save Logo"
+              }
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+ 
 // ─────────────────────────────────────────────────────────────────────────────
 // TAB: Business Info
 // ─────────────────────────────────────────────────────────────────────────────
 function BusinessTab({ toast }: { toast: (ok: boolean, msg: string) => void }) {
   const [data,    setData]    = useState<BusinessInfo>({});
+  const [orgLogo, setOrgLogo] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving,  setSaving]  = useState(false);
  
   useEffect(() => {
-    api<BusinessInfo>("/org-profile/business-info")
-      .then(setData)
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    Promise.all([
+      api<BusinessInfo>("/org-profile/business-info").catch(() => ({} as BusinessInfo)),
+      api<{ logo_url?: string | null }>("/organisations/me").catch(() => ({})),
+    ]).then(([biz, org]) => {
+      setData(biz);
+      setOrgLogo(org?.logo_url || null);
+    }).finally(() => setLoading(false));
   }, []);
  
   const set = (field: keyof BusinessInfo, value: any) =>
@@ -463,154 +611,67 @@ function BusinessTab({ toast }: { toast: (ok: boolean, msg: string) => void }) {
       {/* ── Identity ── */}
       <Card>
         <SectionHeading title="Identity" sub="How your business presents itself" />
-        <Inp
-          label="Tagline"
-          value={data.tagline}
-          onChange={(v: string) => set("tagline", v)}
-          placeholder="Transforming brands through intelligent content"
+ 
+        {/* LOGO — top of identity card */}
+        <LogoSection
+          currentLogoUrl={orgLogo}
+          onSaved={url => setOrgLogo(url)}
+          toast={toast}
         />
-        <Textarea
-          label="Description"
-          value={data.description}
-          onChange={(v: string) => set("description", v)}
-          placeholder="Tell us about your business…"
-          rows={4}
-        />
+ 
+        <Inp label="Tagline" value={data.tagline}
+          onChange={(v: string) => set("tagline", v)} placeholder="Transforming brands through intelligent content" />
+        <Textarea label="Description" value={data.description}
+          onChange={(v: string) => set("description", v)} placeholder="Tell us about your business…" rows={4} />
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-          <Sel
-            label="Business Type"
-            value={data.business_type || ""}
-            onChange={v => set("business_type", v)}
-            options={BUSINESS_TYPES}
-          />
-          <Sel
-            label="Company Size"
-            value={data.company_size || ""}
-            onChange={v => set("company_size", v)}
-            options={COMPANY_SIZES}
-          />
-          <Inp
-            label="Founded Year"
-            type="number"
-            value={data.founded_year}
-            onChange={(v: string) => set("founded_year", v ? parseInt(v) : undefined)}
-            placeholder="2019"
-          />
+          <Sel label="Business Type" value={data.business_type || ""} onChange={v => set("business_type", v)} options={BUSINESS_TYPES} />
+          <Sel label="Company Size"  value={data.company_size  || ""} onChange={v => set("company_size",  v)} options={COMPANY_SIZES}  />
+          <Inp label="Founded Year" type="number" value={data.founded_year}
+            onChange={(v: string) => set("founded_year", v ? parseInt(v) : undefined)} placeholder="2019" />
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <Inp
-            label="Registration / Company Number"
-            value={data.registration_no}
-            onChange={(v: string) => set("registration_no", v)}
-            placeholder="12345678"
-          />
-          <Inp
-            label="VAT Number"
-            value={data.vat_number}
-            onChange={(v: string) => set("vat_number", v)}
-            placeholder="GB123456789"
-          />
+          <Inp label="Registration / Company Number" value={data.registration_no}
+            onChange={(v: string) => set("registration_no", v)} placeholder="12345678" />
+          <Inp label="VAT Number" value={data.vat_number}
+            onChange={(v: string) => set("vat_number", v)} placeholder="GB123456789" />
         </div>
       </Card>
  
       {/* ── Contact ── */}
       <Card>
         <SectionHeading title="Contact Details" sub="How customers and partners can reach you" />
- 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <Inp
-            label="Primary Email"
-            type="email"
-            value={data.email_primary}
-            onChange={(v: string) => set("email_primary", v)}
-            placeholder="hello@yourbrand.com"
-          />
-          <Inp
-            label="Support / Enquiries Email"
-            type="email"
-            value={data.email_support}
-            onChange={(v: string) => set("email_support", v)}
-            placeholder="support@yourbrand.com"
-          />
+          <Inp label="Primary Email" type="email" value={data.email_primary}
+            onChange={(v: string) => set("email_primary", v)} placeholder="hello@yourbrand.com" />
+          <Inp label="Support / Enquiries Email" type="email" value={data.email_support}
+            onChange={(v: string) => set("email_support", v)} placeholder="support@yourbrand.com" />
         </div>
- 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-          <PhoneInp
-            label="Primary Phone"
-            value={data.phone_primary}
-            onChange={v => set("phone_primary", v)}
-            placeholder="+44 7911 123456"
-          />
-          <PhoneInp
-            label="Secondary Phone"
-            value={data.phone_secondary}
-            onChange={v => set("phone_secondary", v)}
-            placeholder="+265 991 234567"
-          />
-          <PhoneInp
-            label="WhatsApp"
-            value={data.whatsapp}
-            onChange={v => set("whatsapp", v)}
-            placeholder="+44 7911 123456"
-          />
+          <PhoneInp label="Primary Phone"   value={data.phone_primary}   onChange={v => set("phone_primary",   v)} placeholder="+44 7911 123456" />
+          <PhoneInp label="Secondary Phone" value={data.phone_secondary} onChange={v => set("phone_secondary", v)} placeholder="+265 991 234567" />
+          <PhoneInp label="WhatsApp"        value={data.whatsapp}        onChange={v => set("whatsapp",        v)} placeholder="+44 7911 123456" />
         </div>
- 
-        <Inp
-          label="Website"
-          value={data.website}
-          onChange={(v: string) => set("website", v)}
-          placeholder="https://yourbrand.com"
-        />
+        <Inp label="Website" value={data.website}
+          onChange={(v: string) => set("website", v)} placeholder="https://yourbrand.com" />
       </Card>
  
       {/* ── Location ── */}
       <Card>
         <SectionHeading title="Location" sub="Your physical or registered business address" />
- 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <Sel
-            label="Country"
-            value={data.country || ""}
-            onChange={v => set("country", v)}
-            options={COUNTRIES}
-          />
-          <Inp
-            label="City"
-            value={data.city}
-            onChange={(v: string) => set("city", v)}
-            placeholder="London"
-          />
+          <Sel label="Country" value={data.country || ""} onChange={v => set("country", v)} options={COUNTRIES} />
+          <Inp label="City" value={data.city} onChange={(v: string) => set("city", v)} placeholder="London" />
         </div>
- 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <Inp
-            label="State / Province / Region"
-            value={data.state_province}
-            onChange={(v: string) => set("state_province", v)}
-            placeholder="England"
-          />
-          <Inp
-            label="Postcode / ZIP"
-            value={data.postal_code}
-            onChange={(v: string) => set("postal_code", v)}
-            placeholder="SW1A 1AA"
-          />
+          <Inp label="State / Province / Region" value={data.state_province}
+            onChange={(v: string) => set("state_province", v)} placeholder="England" />
+          <Inp label="Postcode / ZIP" value={data.postal_code}
+            onChange={(v: string) => set("postal_code", v)} placeholder="SW1A 1AA" />
         </div>
- 
-        <Textarea
-          label="Street Address"
-          value={data.address}
-          onChange={(v: string) => set("address", v)}
-          placeholder="123 High Street, Westminster"
-          rows={2}
-        />
- 
-        <Inp
-          label="Google Maps URL"
-          value={data.map_url}
-          onChange={(v: string) => set("map_url", v)}
-          placeholder="https://maps.google.com/?q=…"
-        />
+        <Textarea label="Street Address" value={data.address}
+          onChange={(v: string) => set("address", v)} placeholder="123 High Street, Westminster" rows={2} />
+        <Inp label="Google Maps URL" value={data.map_url}
+          onChange={(v: string) => set("map_url", v)} placeholder="https://maps.google.com/?q=…" />
         <p style={{ fontSize: 9, color: "rgba(255,255,255,0.2)", margin: "-8px 0 0", fontFamily: "DM Mono, monospace" }}>
           Paste a Google Maps share link or embed URL — shown as a map button on your public profile
         </p>
@@ -625,22 +686,12 @@ function BusinessTab({ toast }: { toast: (ok: boolean, msg: string) => void }) {
               <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(255,255,255,0.3)", fontFamily: "DM Mono, monospace", marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
                 <span>{icon}</span> {label}
               </div>
-              <input
-                type="url"
-                value={(data as any)[key] ?? ""}
+              <input type="url" value={(data as any)[key] ?? ""}
                 onChange={e => set(key as keyof BusinessInfo, e.target.value)}
                 placeholder={placeholder}
-                style={{
-                  width: "100%", boxSizing: "border-box",
-                  background: "rgba(255,255,255,0.04)",
-                  border: "1px solid rgba(255,255,255,0.07)",
-                  borderRadius: 10, padding: "10px 13px",
-                  color: "#f1f5f9", fontSize: 12,
-                  fontFamily: "DM Mono, monospace", outline: "none",
-                }}
+                style={{ width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10, padding: "10px 13px", color: "#f1f5f9", fontSize: 12, fontFamily: "DM Mono, monospace", outline: "none" }}
                 onFocus={e => { e.target.style.borderColor = "rgba(99,102,241,0.5)"; e.target.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.1)"; }}
-                onBlur={e => { e.target.style.borderColor = "rgba(255,255,255,0.07)"; e.target.style.boxShadow = "none"; }}
-              />
+                onBlur={e => { e.target.style.borderColor = "rgba(255,255,255,0.07)"; e.target.style.boxShadow = "none"; }} />
             </div>
           ))}
         </div>
@@ -706,8 +757,8 @@ function SponsorsTab({ toast }: { toast: (ok: boolean, msg: string) => void }) {
         <Card style={{ border: `1px solid rgba(124,58,237,0.2)`, background: "rgba(124,58,237,0.04)", animation: "op-fadein 0.2s ease" }}>
           <SectionHeading title="Add Sponsor" />
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Inp label="Name *" value={form.name} onChange={(v: string) => setForm(f => ({ ...f, name: v }))} placeholder="Relvō  Corp" />
-            <Inp label="Website" value={form.website} onChange={(v: string) => setForm(f => ({ ...f, website: v }))} placeholder="https://Relvō .com" />
+            <Inp label="Name *" value={form.name} onChange={(v: string) => setForm(f => ({ ...f, name: v }))} placeholder="Relvo  Corp" />
+            <Inp label="Website" value={form.website} onChange={(v: string) => setForm(f => ({ ...f, website: v }))} placeholder="https://Relvo .com" />
           </div>
           {/* ↓ Logo supports both URL and file upload */}
           <ImageInput label="Sponsor Logo" value={form.logo_url} onChange={url => setForm(f => ({ ...f, logo_url: url }))} placeholder="https://cdn.example.com/logo.png" />
@@ -1214,7 +1265,7 @@ export default function OrgProfilePage() {
         {/* Header */}
         <div style={{ marginBottom: 28 }}>
           <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(124,58,237,0.7)", marginBottom: 4, fontFamily: "DM Mono, monospace" }}>
-            Relvō · Organisation
+            Relvo · Organisation
           </div>
           <h1 style={{ fontSize: 26, fontWeight: 800, color: C.text, margin: "0 0 6px", letterSpacing: "-0.02em" }}>Org Profile</h1>
           <p style={{ fontSize: 12, color: C.muted, margin: 0 }}>

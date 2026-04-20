@@ -2,7 +2,7 @@
 import { uploadFileToSpaces } from "@/lib/upload-client";
 /**
  * app/dashboard/org-profile/reviews/page.tsx
- * Re-themed to Relvō dark studio aesthetic.
+ * Re-themed to Relvo dark studio aesthetic.
  * Added: file upload support for all image slots.
  */
 import { useEffect, useState, useCallback, useRef } from "react";
