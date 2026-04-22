@@ -288,7 +288,7 @@ export default function ReviewPage() {
                   </button>
                 </form>
               </div>
-              <p style={{ textAlign: "center", marginTop: 20, fontSize: 11, color: "#d1d5db", fontFamily: "DM Mono,monospace" }}>Powered by NeuroFlow AI · Verified Reviews</p>
+              <p style={{ textAlign: "center", marginTop: 20, fontSize: 11, color: "#d1d5db", fontFamily: "DM Mono,monospace" }}>Powered by Relvo · Verified Reviews</p>
             </div>
           </div>
         )}

@@ -150,7 +150,7 @@ export interface CampaignData {
   bullets: string[];
   proof: string;
   cta: string;
-
+  toneName?  : string
   logo?: string;
   heroImage?: string;
 

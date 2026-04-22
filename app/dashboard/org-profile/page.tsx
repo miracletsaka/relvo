@@ -1,5 +1,6 @@
 "use client";
 import ReviewsManagerPage from "@/components/review-manager";
+import { ReviewsTab } from "@/components/reviews-tab-and-mobile-guard";
 import { uploadFileToSpaces } from "@/lib/upload-client";
 /**
  * app/dashboard/org-profile/page.tsx
@@ -798,84 +799,6 @@ function SponsorsTab({ toast }: { toast: (ok: boolean, msg: string) => void }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TAB: Reviews
-// ─────────────────────────────────────────────────────────────────────────────
-function ReviewsTab({ toast }: { toast: (ok: boolean, msg: string) => void }) {
-  const [items, setItems]     = useState<Review[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm]       = useState({ author_name: "", rating: "5", body: "", source: "", review_date: "", is_featured: false });
-  const [adding, setAdding]   = useState(false);
-
-  const SOURCES = ["Google","Trustpilot","Facebook","Yelp","Clutch","G2","Capterra","Other"];
-
-  const load = useCallback(async () => {
-    try { setItems(await api<Review[]>("/org-profile/reviews")); }
-    catch {} finally { setLoading(false); }
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
-
-  const add = async () => {
-    if (!form.author_name.trim()) return;
-    setAdding(true);
-    try {
-      await api("/org-profile/reviews", { method: "POST", body: JSON.stringify({ author_name: form.author_name, rating: parseFloat(form.rating), body: form.body || null, source: form.source || null, review_date: form.review_date || null, is_featured: form.is_featured }) });
-      setForm({ author_name: "", rating: "5", body: "", source: "", review_date: "", is_featured: false });
-      setShowForm(false);
-      await load();
-      toast(true, "Review added");
-    } catch (e: any) { toast(false, e.message); }
-    finally { setAdding(false); }
-  };
-
-  const remove = async (id: string) => {
-    try { await api(`/org-profile/reviews/${id}`, { method: "DELETE" }); await load(); toast(true, "Removed"); }
-    catch (e: any) { toast(false, e.message); }
-  };
-
-  const toggleFeatured = async (item: Review) => {
-    try { await api(`/org-profile/reviews/${item.id}`, { method: "PATCH", body: JSON.stringify({ is_featured: !item.is_featured }) }); await load(); }
-    catch (e: any) { toast(false, e.message); }
-  };
-
-  if (loading) return <LoadingCards />;
-
-  return (
-    <div>
-      <TabHeader title="Reviews" sub={`${items.length} review${items.length !== 1 ? "s" : ""}`} onAdd={() => setShowForm(v => !v)} />
-
-      <ReviewsManagerPage />
-
-      {items.length === 0 ? <EmptyState icon="⭐" text="No reviews yet" /> : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {items.map((r, i) => (
-            <Card key={r.id} style={{ animation: `op-fadein 0.3s ease ${i * 0.04}s both` }}>
-              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{r.author_name}</span>
-                    {r.is_featured && <Badge label="Featured" color={C.yellow} />}
-                    {r.source && <Badge label={r.source} color={C.accent} />}
-                  </div>
-                  <Stars rating={r.rating} />
-                  {r.review_date && <span style={{ fontSize: 9, color: C.dim, fontFamily: "DM Mono, monospace", marginLeft: 8 }}>{r.review_date}</span>}
-                </div>
-                <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                  <Btn onClick={() => toggleFeatured(r)} variant="ghost" small>{r.is_featured ? "Unfeature" : "Feature"}</Btn>
-                  <Btn onClick={() => remove(r.id)} variant="danger" small>Remove</Btn>
-                </div>
-              </div>
-              {r.body && <p style={{ fontSize: 12, color: C.muted, margin: 0, lineHeight: 1.65, borderTop: `1px solid ${C.border}`, paddingTop: 10 }}>{r.body}</p>}
-            </Card>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // TAB: Goals
 // ─────────────────────────────────────────────────────────────────────────────
 function GoalsTab({ toast }: { toast: (ok: boolean, msg: string) => void }) {
@@ -1291,7 +1214,7 @@ export default function OrgProfilePage() {
         <div style={{ maxWidth: 900 }}>
           {activeTab === "business"       && <BusinessTab       toast={showToast} />}
           {activeTab === "sponsors"       && <SponsorsTab       toast={showToast} />}
-          {activeTab === "reviews"        && <ReviewsTab        toast={showToast} />}
+          {activeTab === "reviews" && <ReviewsTab toast={showToast} />}
           {activeTab === "goals"          && <GoalsTab          toast={showToast} />}
           {activeTab === "offers"         && <OffersTab         toast={showToast} />}
           {activeTab === "accreditations" && <AccreditationsTab toast={showToast} />}

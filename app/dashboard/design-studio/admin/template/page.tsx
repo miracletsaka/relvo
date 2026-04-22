@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import { Suspense } from "react";
 import EditorPage from "../../editor";
+import { MobileDesktopGuard } from "@/components/reviews-tab-and-mobile-guard";
 
 export const metadata: Metadata = {
   title: "Design Template - Admin",
@@ -11,7 +12,9 @@ export const metadata: Metadata = {
 export default function TemplateDesignPage() {
   return (
     <Suspense fallback={<div>Loading...</div>}>
-      <EditorPage />
+      <MobileDesktopGuard pageTitle="Design Studio">
+        <EditorPage />
+      </MobileDesktopGuard>
     </Suspense>
   );
 }

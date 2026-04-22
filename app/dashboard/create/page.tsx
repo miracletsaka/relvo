@@ -1293,6 +1293,7 @@ tone_id === toneId && t.brand_id === brandId);
             );
             setResults(updated);
             setStatusMsg({ type: "ok", text: "Images generated and attached ✓" });
+            window.location.href = `/dashboard/topic-chats/${results[0]?.topic_chat_id ?? ""}`;
           } catch {
             setStatusMsg({ type: "ok", text: "Images generated. Refresh to see them." });
           }

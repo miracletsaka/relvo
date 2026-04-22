@@ -349,7 +349,7 @@ export default function AutoGenerateImagesDialog(props: {
               USD: "$",
               GBP: "£",
               EUR: "€",
-              MWK: "MWK ",
+              MWK: "MWK",
               ZAR: "R ",
             };
 

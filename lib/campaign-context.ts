@@ -19,7 +19,7 @@ export const DEFAULT_CAMPAIGN_DATA: CampaignData = {
     "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80",
 
   location: "London, UK",
-  companyName: "Relvo AI",
+  companyName: "Relvo",
   ctaLink: "https://neuroflowai.co.uk",
   hashtags: "#AI #Automation #LeadGeneration #BusinessGrowth",
 
