@@ -306,7 +306,8 @@ export type UpdateTemplatePayload = Partial<{
   brand_id: string | null;
   name: string;
   description: string | null;
-
+  tone_id?: string | null
+  orientation?: 'portrait' | 'landscape' | null
   shapes: TemplateShape[];
   canvasWidth: number;
   canvasHeight: number;

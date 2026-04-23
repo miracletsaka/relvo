@@ -1,36 +1,67 @@
 // lib/video-upload-client.ts
 // ─────────────────────────────────────────────────────────────────────────────
-// FIX: server-side (render-video route) calls S3 directly instead of
-//      fetching /api/uploads/presign over HTTP.
+// Safe upload helper for both browser and server-side usage.
 //
-// WHY: uploadFileToSpaces is called from the render-video API route (server-side).
-//      The old code did fetch(`${NEXT_PUBLIC_APP_URL}/api/uploads/presign`) which
-//      on the droplet resolved to http://localhost:3000/... — a self-fetch that
-//      either failed or didn't carry the right env vars, causing "Failed to presign".
+// Keeps current working behavior:
+//   - Server-side: presign directly with S3 SDK
+//   - Client-side: call /api/uploads/presign
 //
-//      Media uploads from the browser still use the /api/uploads/presign route
-//      as before — zero change to that path.
+// Fixes added:
+//   1. Longer presign expiry on server-side direct presign
+//   2. One-time retry if PUT fails because the signed URL expired
+//   3. credentials: "include" on browser presign call
+//   4. safer file-name normalization
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
+type PresignResult = {
+  uploadUrl: string;
+  publicUrl: string;
+};
+
+function sanitizeFileName(fileName: string): string {
+  return fileName
+    .replace(/[^\w.\-]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function isExpiredUploadError(status: number, bodyText: string): boolean {
+  const t = (bodyText || "").toLowerCase();
+  return (
+    status === 403 &&
+    (
+      t.includes("request has expired") ||
+      t.includes("<code>accessdenied</code>") ||
+      t.includes("accessdenied") ||
+      t.includes("expired")
+    )
+  );
+}
+
 // ── Server-side: generate presigned URL directly via S3 SDK ──────────────────
 async function presignServer(
   fileName: string,
   contentType: string
-): Promise<{ uploadUrl: string; publicUrl: string }> {
-  // Dynamic import keeps the S3 SDK out of the browser bundle entirely
+): Promise<PresignResult> {
   const { s3, S3_BUCKET, S3_PUBLIC_URL } = await import("@/lib/s3-server");
-  const key = `neuroflow/${Date.now()}-${fileName}`.replace(/\s+/g, "_");
+
+  const safeName = sanitizeFileName(fileName);
+  const key = `neuroflow/${Date.now()}-${safeName}`;
+
   const command = new PutObjectCommand({
     Bucket: S3_BUCKET,
     Key: key,
     ContentType: contentType,
     ACL: "public-read",
   });
-  const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 300 });
+
+  // Increased from 300 to 600 for safer multi-step onboarding flows
+  const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 600 });
   const publicUrl = `${S3_PUBLIC_URL}/${key}`;
+
   return { uploadUrl, publicUrl };
 }
 
@@ -38,29 +69,45 @@ async function presignServer(
 async function presignClient(
   fileName: string,
   contentType: string
-): Promise<{ uploadUrl: string; publicUrl: string }> {
+): Promise<PresignResult> {
   const res = await fetch(`${window.location.origin}/api/uploads/presign`, {
     method: "POST",
+    credentials: "include",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ fileName, contentType }),
+    body: JSON.stringify({
+      fileName: sanitizeFileName(fileName),
+      contentType,
+    }),
   });
-  if (!res.ok) throw new Error("Failed to presign upload");
-  return res.json();
+
+  const json = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(
+      typeof json?.detail === "string"
+        ? json.detail
+        : "Failed to presign upload"
+    );
+  }
+
+  return json as PresignResult;
 }
 
-// ── Main export ───────────────────────────────────────────────────────────────
-export async function uploadFileToSpaces(file: File): Promise<string> {
-  const contentType = file.type || "application/octet-stream";
+async function presign(
+  fileName: string,
+  contentType: string
+): Promise<PresignResult> {
+  return typeof window === "undefined"
+    ? presignServer(fileName, contentType)
+    : presignClient(fileName, contentType);
+}
 
-  // Server-side (API routes, render-video): go direct to S3, no HTTP self-fetch
-  // Client-side (browser): use the presign API route as before
-  const { uploadUrl, publicUrl } =
-    typeof window === "undefined"
-      ? await presignServer(file.name, contentType)
-      : await presignClient(file.name, contentType);
-
-  // Upload file bytes directly to Spaces via the presigned URL
-  const putRes = await fetch(uploadUrl, {
+async function putWithSignedUrl(
+  uploadUrl: string,
+  file: File,
+  contentType: string
+): Promise<Response> {
+  return fetch(uploadUrl, {
     method: "PUT",
     headers: {
       "Content-Type": contentType,
@@ -68,13 +115,41 @@ export async function uploadFileToSpaces(file: File): Promise<string> {
     },
     body: file,
   });
+}
 
-  if (!putRes.ok) {
-    const t = await putRes.text().catch(() => "");
-    throw new Error(`Upload failed: ${putRes.status} ${t.slice(0, 200)}`);
+// ── Main export ───────────────────────────────────────────────────────────────
+export async function uploadFileToSpaces(file: File): Promise<string> {
+  const contentType = file.type || "application/octet-stream";
+
+  // 1st attempt
+  let { uploadUrl, publicUrl } = await presign(file.name, contentType);
+
+  let putRes = await putWithSignedUrl(uploadUrl, file, contentType);
+
+  if (putRes.ok) {
+    return publicUrl;
   }
 
-  return publicUrl;
+  let bodyText = await putRes.text().catch(() => "");
+
+  // Retry once if the signed URL expired
+  if (isExpiredUploadError(putRes.status, bodyText)) {
+    console.warn("Signed upload URL expired. Re-presigning and retrying once...");
+
+    const retryPresign = await presign(file.name, contentType);
+    uploadUrl = retryPresign.uploadUrl;
+    publicUrl = retryPresign.publicUrl;
+
+    putRes = await putWithSignedUrl(uploadUrl, file, contentType);
+
+    if (putRes.ok) {
+      return publicUrl;
+    }
+
+    bodyText = await putRes.text().catch(() => "");
+  }
+
+  throw new Error(`Upload failed: ${putRes.status} ${bodyText.slice(0, 300)}`);
 }
 
 // ── Helper: download image URL / base64 and upload to Spaces ─────────────────
@@ -84,18 +159,18 @@ export async function uploadGeneratedBackgroundToSpaces(
   let blob: Blob;
 
   if (imageUrl.startsWith("data:")) {
-    // base64 data URL (e.g. from OpenAI image generation)
     const [header, base64Data] = imageUrl.split(",");
     const mimeMatch = header.match(/:(.*?);/);
     const mimeType = mimeMatch ? mimeMatch[1] : "image/png";
+
     const binaryString = atob(base64Data);
     const bytes = new Uint8Array(binaryString.length);
     for (let i = 0; i < binaryString.length; i++) {
       bytes[i] = binaryString.charCodeAt(i);
     }
+
     blob = new Blob([bytes], { type: mimeType });
   } else {
-    // Regular HTTP URL — download first
     const response = await fetch(imageUrl);
     if (!response.ok) {
       throw new Error(`Failed to download image: ${response.statusText}`);
@@ -108,5 +183,6 @@ export async function uploadGeneratedBackgroundToSpaces(
     `generated-background-${Date.now()}.png`,
     { type: "image/png" }
   );
+
   return uploadFileToSpaces(file);
 }

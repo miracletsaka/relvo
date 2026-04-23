@@ -151,7 +151,7 @@ function getBrandLabel(brand: BrandOption) {
   return brand.display_name || brand.name || brand.id;
 }
 
-function getCanvasDimensions(orientation: Orientation) {
+export function getCanvasDimensions(orientation: Orientation) {
   return {
     width: 1080,
     height: orientation === "portrait" ? 1350 : 1080,

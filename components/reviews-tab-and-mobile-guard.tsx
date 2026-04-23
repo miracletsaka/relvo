@@ -101,12 +101,27 @@ async function copyText(text: string): Promise<boolean> {
 }
 
 // ── Share button row ──────────────────────────────────────────────────────────
-function ShareRow({ cardUrl, authorName }: { cardUrl: string; authorName: string }) {
+// shareUrl  = the OG page URL (/review/[id]) — what gets shared on social
+// cardUrl   = the raw image URL — used only for download
+function ShareRow({
+  shareUrl,
+  cardUrl,
+  authorName,
+  orgName,
+}: {
+  shareUrl:  string;
+  cardUrl:   string;
+  authorName: string;
+  orgName?:  string;
+}) {
   const [copied, setCopied] = useState(false);
   const [dlDone, setDlDone] = useState(false);
 
-  const text = encodeURIComponent(`Check out this review by ${authorName}!`);
-  const url  = encodeURIComponent(cardUrl);
+  const text = encodeURIComponent(
+    `${authorName} left a verified review for ${orgName || "this business"} ⭐`
+  );
+  // Share the OG page, NOT the raw image — so platforms render the rich preview
+  const url  = encodeURIComponent(shareUrl);
 
   const shareLinks = [
     {
@@ -174,7 +189,8 @@ function ShareRow({ cardUrl, authorName }: { cardUrl: string; authorName: string
   };
 
   const handleCopy = async () => {
-    const ok = await copyText(cardUrl);
+    // Copy the OG page URL — gives rich preview when pasted
+    const ok = await copyText(shareUrl);
     if (ok) { setCopied(true); setTimeout(() => setCopied(false), 2000); }
   };
 
@@ -232,9 +248,13 @@ function ShareRow({ cardUrl, authorName }: { cardUrl: string; authorName: string
 
 // ── Review card item ───────────────────────────────────────────────────────────
 function ReviewCardItem({
-  r, onToggleFeatured, onRemove, i,
-}: { r: Review; onToggleFeatured: () => void; onRemove: () => void; i: number }) {
+  r, onToggleFeatured, onRemove, i, orgName,
+}: { r: Review; onToggleFeatured: () => void; onRemove: () => void; i: number; orgName?: string }) {
   const [imgExpanded, setImgExpanded] = useState(false);
+
+  // Build the OG share URL — the dedicated page that serves rich meta tags
+  const APP_URL  = process.env.NEXT_PUBLIC_APP_URL || "";
+  const shareUrl = `${APP_URL}/review/${r.id}`;
 
   return (
     <div
@@ -353,7 +373,12 @@ function ReviewCardItem({
             <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: C.dim, fontFamily: "DM Mono, monospace", marginBottom: 6 }}>
               Share this review card
             </div>
-            <ShareRow cardUrl={r.card_image_url} authorName={r.author_name} />
+            <ShareRow
+                shareUrl={shareUrl}
+                cardUrl={r.card_image_url!}
+                authorName={r.author_name}
+                orgName={orgName}
+              />
           </div>
         )}
       </div>
@@ -371,6 +396,7 @@ export function ReviewsTab({ toast }: { toast: (ok: boolean, msg: string) => voi
   const [form,     setForm]     = useState({ author_name: "", rating: "5", body: "", source: "", review_date: "", is_featured: false });
   const [adding,   setAdding]   = useState(false);
   const [filter,   setFilter]   = useState<"all" | "with-card" | "verified" | "featured">("all");
+  const [orgName,  setOrgName]  = useState<string | undefined>(undefined);
 
   const SOURCES = ["Google","Trustpilot","Facebook","Yelp","Clutch","G2","Capterra","Other"];
 
@@ -379,7 +405,13 @@ export function ReviewsTab({ toast }: { toast: (ok: boolean, msg: string) => voi
     catch {} finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    // Fetch org name for share text
+    api<{ name: string }>("/organisations/me")
+      .then(o => setOrgName(o.name))
+      .catch(() => {});
+  }, [load]);
 
   const add = async () => {
     if (!form.author_name.trim()) return;
@@ -524,6 +556,7 @@ export function ReviewsTab({ toast }: { toast: (ok: boolean, msg: string) => voi
             key={r.id}
             r={r}
             i={i}
+            orgName={orgName}
             onToggleFeatured={() => toggleFeatured(r)}
             onRemove={() => remove(r.id)}
           />
