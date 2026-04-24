@@ -43,7 +43,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-import { synthesizeAndSaveTemplate } from "@/lib/api";
 import {
   getPremiumComponent,
   type PremiumComponentKey,
@@ -901,31 +900,6 @@ export default function EditorPage() {
     }
   }, [CANVAS_HEIGHT, CANVAS_WIDTH, campaignData, generateMode, resetSelection]);
 
-  const handleGeneratePremiumTemplate = useCallback(async () => {
-    setErr(null);
-    try {
-      const res = await synthesizeAndSaveTemplate({
-        brand_id: selectedBrandId || "neuroflow",
-        canvas_width: CANVAS_WIDTH,
-        canvas_height: CANVAS_HEIGHT,
-      });
-
-      if (!res.ok) {
-        throw new Error(res.error || "Synthesis failed");
-      }
-
-      if (res.template) {
-        setShapes(res.template.shapes || []);
-        setBackgroundImage(ensureBgString((res.template as any).backgroundImage));
-        setLogoPlacement((res.template as any).logoPlacement || undefined);
-        setActiveTemplate(res.template as Template);
-        resetSelection();
-      }
-    } catch (error) {
-      setErr(error instanceof Error ? error.message : "Failed to generate template");
-    }
-  }, [CANVAS_HEIGHT, CANVAS_WIDTH, resetSelection, selectedBrandId]);
-
   const handleSelectTemplate = useCallback((template: Template) => {
     syncFromTemplate(template);
   }, [syncFromTemplate]);
@@ -1248,9 +1222,6 @@ export default function EditorPage() {
         </div>
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-          <StudioButton onClick={handleGeneratePremiumTemplate} variant="accent" icon={<RefreshCcw size={12} />}>
-            Generate AI Template
-          </StudioButton>
           <StudioButton onClick={resetToNewTemplate} variant="ghost" icon={<RefreshCcw size={12} />}>
             New
           </StudioButton>

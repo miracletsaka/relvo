@@ -174,7 +174,7 @@ export default function ReviewPage() {
         <p style={{ fontSize: 48, marginBottom: 16 }}>🔒</p>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: "#111827", marginBottom: 10 }}>{pageError.includes("ALREADY_USED") ? "Already submitted" : pageError.includes("EXPIRED") ? "Link expired" : "Invalid link"}</h1>
         <p style={{ fontSize: 14, color: "#6b7280", lineHeight: 1.65 }}>{pageError.includes("ALREADY_USED") ? "You've already used this link. Thank you!" : pageError.includes("EXPIRED") ? "This link expired. Request a new one from the business page." : "This link is invalid or has been revoked."}</p>
-        {slug && <a href={`/biz/${slug}`} style={{ display: "inline-block", marginTop: 20, padding: "11px 24px", background: "#111827", color: "#fff", borderRadius: 10, textDecoration: "none", fontSize: 14, fontWeight: 600 }}>← Back to profile</a>}
+        {slug && <a href={`/business/${slug}`} style={{ display: "inline-block", marginTop: 20, padding: "11px 24px", background: "#111827", color: "#fff", borderRadius: 10, textDecoration: "none", fontSize: 14, fontWeight: 600 }}>← Back to profile</a>}
       </div>
     </div></>
   );
@@ -222,7 +222,7 @@ export default function ReviewPage() {
                 <p style={{ textAlign: "center", marginTop: 14, fontSize: 11, color: "#d1d5db", fontFamily: "DM Mono,monospace" }}>Share on social media to help others discover {tokenData?.org.name}</p>
               </div>
             )}
-            <a href={`/biz/${slug}`} style={{ fontSize: 13, color: "#6366f1", textDecoration: "none", fontWeight: 600 }}>← View full business profile</a>
+            <a href={`/business/${slug}`} style={{ fontSize: 13, color: "#6366f1", textDecoration: "none", fontWeight: 600 }}>← View full business profile</a>
           </div>
         )}
 

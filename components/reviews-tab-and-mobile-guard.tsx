@@ -101,27 +101,12 @@ async function copyText(text: string): Promise<boolean> {
 }
 
 // ── Share button row ──────────────────────────────────────────────────────────
-// shareUrl  = the OG page URL (/review/[id]) — what gets shared on social
-// cardUrl   = the raw image URL — used only for download
-function ShareRow({
-  shareUrl,
-  cardUrl,
-  authorName,
-  orgName,
-}: {
-  shareUrl:  string;
-  cardUrl:   string;
-  authorName: string;
-  orgName?:  string;
-}) {
+function ShareRow({ cardUrl, authorName }: { cardUrl: string; authorName: string }) {
   const [copied, setCopied] = useState(false);
   const [dlDone, setDlDone] = useState(false);
 
-  const text = encodeURIComponent(
-    `${authorName} left a verified review for ${orgName || "this business"} ⭐`
-  );
-  // Share the OG page, NOT the raw image — so platforms render the rich preview
-  const url  = encodeURIComponent(shareUrl);
+  const text = encodeURIComponent(`Check out this review by ${authorName}!`);
+  const url  = encodeURIComponent(cardUrl);
 
   const shareLinks = [
     {
@@ -189,8 +174,7 @@ function ShareRow({
   };
 
   const handleCopy = async () => {
-    // Copy the OG page URL — gives rich preview when pasted
-    const ok = await copyText(shareUrl);
+    const ok = await copyText(cardUrl);
     if (ok) { setCopied(true); setTimeout(() => setCopied(false), 2000); }
   };
 
@@ -248,13 +232,9 @@ function ShareRow({
 
 // ── Review card item ───────────────────────────────────────────────────────────
 function ReviewCardItem({
-  r, onToggleFeatured, onRemove, i, orgName,
-}: { r: Review; onToggleFeatured: () => void; onRemove: () => void; i: number; orgName?: string }) {
+  r, onToggleFeatured, onRemove, i,
+}: { r: Review; onToggleFeatured: () => void; onRemove: () => void; i: number }) {
   const [imgExpanded, setImgExpanded] = useState(false);
-
-  // Build the OG share URL — the dedicated page that serves rich meta tags
-  const APP_URL  = process.env.NEXT_PUBLIC_APP_URL || "";
-  const shareUrl = `${APP_URL}/review/${r.id}`;
 
   return (
     <div
@@ -373,12 +353,7 @@ function ReviewCardItem({
             <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: C.dim, fontFamily: "DM Mono, monospace", marginBottom: 6 }}>
               Share this review card
             </div>
-            <ShareRow
-                shareUrl={shareUrl}
-                cardUrl={r.card_image_url!}
-                authorName={r.author_name}
-                orgName={orgName}
-              />
+            <ShareRow cardUrl={r.card_image_url} authorName={r.author_name} />
           </div>
         )}
       </div>
@@ -389,14 +364,13 @@ function ReviewCardItem({
 // ─────────────────────────────────────────────────────────────────────────────
 // EXPORT 1: ReviewsTab
 // ─────────────────────────────────────────────────────────────────────────────
-export function ReviewsTab({ toast }: { toast: (ok: boolean, msg: string) => void }) {
+export function ReviewsTabMore({ toast }: { toast: (ok: boolean, msg: string) => void }) {
   const [items,    setItems]    = useState<Review[]>([]);
   const [loading,  setLoading]  = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [form,     setForm]     = useState({ author_name: "", rating: "5", body: "", source: "", review_date: "", is_featured: false });
   const [adding,   setAdding]   = useState(false);
   const [filter,   setFilter]   = useState<"all" | "with-card" | "verified" | "featured">("all");
-  const [orgName,  setOrgName]  = useState<string | undefined>(undefined);
 
   const SOURCES = ["Google","Trustpilot","Facebook","Yelp","Clutch","G2","Capterra","Other"];
 
@@ -405,29 +379,8 @@ export function ReviewsTab({ toast }: { toast: (ok: boolean, msg: string) => voi
     catch {} finally { setLoading(false); }
   }, []);
 
-  useEffect(() => {
-    load();
-    // Fetch org name for share text
-    api<{ name: string }>("/organisations/me")
-      .then(o => setOrgName(o.name))
-      .catch(() => {});
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
 
-  const add = async () => {
-    if (!form.author_name.trim()) return;
-    setAdding(true);
-    try {
-      await api("/org-profile/reviews", {
-        method: "POST",
-        body: JSON.stringify({ author_name: form.author_name, rating: parseFloat(form.rating), body: form.body || null, source: form.source || null, review_date: form.review_date || null, is_featured: form.is_featured }),
-      });
-      setForm({ author_name: "", rating: "5", body: "", source: "", review_date: "", is_featured: false });
-      setShowForm(false);
-      await load();
-      toast(true, "Review added");
-    } catch (e: any) { toast(false, e.message); }
-    finally { setAdding(false); }
-  };
 
   const remove = async (id: string) => {
     try { await api(`/org-profile/reviews/${id}`, { method: "DELETE" }); await load(); toast(true, "Removed"); }
@@ -468,11 +421,6 @@ export function ReviewsTab({ toast }: { toast: (ok: boolean, msg: string) => voi
             {items.length} total · {cardsCount} with card · {verifiedCount} verified
           </div>
         </div>
-        <button
-          onClick={() => setShowForm(v => !v)}
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 18px", background: `linear-gradient(135deg,${C.violet},#4f46e5)`, border: "none", borderRadius: 10, color: "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "Syne, sans-serif" }}>
-          + Add Review
-        </button>
       </div>
 
       {/* Filter chips */}
@@ -489,50 +437,6 @@ export function ReviewsTab({ toast }: { toast: (ok: boolean, msg: string) => voi
               {f.label}
             </button>
           ))}
-        </div>
-      )}
-
-      {/* Add form */}
-      {showForm && (
-        <div style={{ background: "rgba(124,58,237,0.04)", border: "1px solid rgba(124,58,237,0.2)", borderRadius: 16, padding: "20px 22px", marginBottom: 18, animation: "op-fadein 0.2s ease" }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: C.text, fontFamily: "Syne, sans-serif", marginBottom: 16 }}>Add Manual Review</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-            <div>
-              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: C.dim, fontFamily: "DM Mono, monospace", marginBottom: 6 }}>Name *</div>
-              <input value={form.author_name} onChange={e => setForm(f => ({ ...f, author_name: e.target.value }))} placeholder="Jane Smith"
-                style={inp} onFocus={focusIn} onBlur={blurIn} />
-            </div>
-            <div>
-              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: C.dim, fontFamily: "DM Mono, monospace", marginBottom: 6 }}>Rating</div>
-              <select value={form.rating} onChange={e => setForm(f => ({ ...f, rating: e.target.value }))} style={{ ...inp, appearance: "none", cursor: "pointer" }}>
-                {["5","4","3","2","1"].map(v => <option key={v} value={v}>{v} ★</option>)}
-              </select>
-            </div>
-            <div>
-              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: C.dim, fontFamily: "DM Mono, monospace", marginBottom: 6 }}>Source</div>
-              <select value={form.source} onChange={e => setForm(f => ({ ...f, source: e.target.value }))} style={{ ...inp, appearance: "none", cursor: "pointer" }}>
-                <option value="">— Select —</option>
-                {SOURCES.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-            <div>
-              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: C.dim, fontFamily: "DM Mono, monospace", marginBottom: 6 }}>Date</div>
-              <input type="date" value={form.review_date} onChange={e => setForm(f => ({ ...f, review_date: e.target.value }))} style={inp} onFocus={focusIn} onBlur={blurIn} />
-            </div>
-          </div>
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: C.dim, fontFamily: "DM Mono, monospace", marginBottom: 6 }}>Review Text</div>
-            <textarea value={form.body} onChange={e => setForm(f => ({ ...f, body: e.target.value }))} placeholder="What did they say?" rows={3}
-              style={{ ...inp, resize: "vertical", lineHeight: 1.6 }} onFocus={focusIn} onBlur={blurIn} />
-          </div>
-          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            <button onClick={add} disabled={!form.author_name.trim() || adding}
-              style={{ padding: "9px 18px", background: !form.author_name.trim() || adding ? "rgba(255,255,255,0.04)" : `linear-gradient(135deg,${C.violet},#4f46e5)`, border: "none", borderRadius: 10, color: !form.author_name.trim() || adding ? C.dim : "#fff", fontSize: 11, fontWeight: 700, cursor: !form.author_name.trim() || adding ? "not-allowed" : "pointer", fontFamily: "Syne, sans-serif", display: "flex", alignItems: "center", gap: 6 }}>
-              {adding && <span style={{ width: 11, height: 11, border: "2px solid rgba(255,255,255,0.2)", borderTopColor: "#fff", borderRadius: "50%", display: "inline-block", animation: "op-spin 0.7s linear infinite" }} />}
-              Add Review
-            </button>
-            <button onClick={() => setShowForm(false)} style={{ padding: "9px 14px", background: "transparent", border: `1px solid ${C.border}`, borderRadius: 10, color: C.muted, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "Syne, sans-serif" }}>Cancel</button>
-          </div>
         </div>
       )}
 
@@ -556,7 +460,6 @@ export function ReviewsTab({ toast }: { toast: (ok: boolean, msg: string) => voi
             key={r.id}
             r={r}
             i={i}
-            orgName={orgName}
             onToggleFeatured={() => toggleFeatured(r)}
             onRemove={() => remove(r.id)}
           />

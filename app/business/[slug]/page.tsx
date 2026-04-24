@@ -100,8 +100,8 @@ export async function generateMetadata({
   const image = resolveDraftImage(draft) || resolveBizImage(profile);
 
   const url = draftId
-    ? `${SITE_URL}/biz/${slug}?draftId=${draftId}`
-    : `${SITE_URL}/biz/${slug}`;
+    ? `${SITE_URL}/business/${slug}?draftId=${draftId}`
+    : `${SITE_URL}/business/${slug}`;
 
   return {
     title,

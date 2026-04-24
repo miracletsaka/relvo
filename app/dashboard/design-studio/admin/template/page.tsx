@@ -6,7 +6,7 @@ import { MobileDesktopGuard } from "@/components/reviews-tab-and-mobile-guard";
 export const metadata: Metadata = {
   title: "Design Template - Admin",
   description: "Create and manage campaign templates",
-  icons: ["/Neuroflow_AI_Logo.png"],
+  icons: ["/logo.png"],
 };
 
 export default function TemplateDesignPage() {

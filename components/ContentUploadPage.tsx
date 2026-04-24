@@ -335,33 +335,6 @@ export default function ContentUploadPage(props: {
 
       <div className="cup-root">
         <div style={{ maxWidth: 840, margin: '0 auto', padding: '18px 14px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-
-          {/* Header */}
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(124,58,237,0.7)', marginBottom: 3 }}>
-                Design Studio
-              </div>
-              <h1 style={{ fontSize: 18, fontWeight: 800, color: '#e4e4e7', lineHeight: 1.2 }}>Create Campaign</h1>
-              <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)', marginTop: 3 }}>
-                Pick template → background → generate
-              </p>
-            </div>
-            <button className="cup-outline" onClick={() => { setGenErr(null); setGenPrompt(defaultPrompt); setOpenGen(true) }}>
-              <Wand2 style={{ width: 13, height: 13 }} />
-              Generate Image
-            </button>
-          </div>
-
-          {/* Steps */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', ...SECTION }}>
-            <StepBadge n={1} label="Template" active={!step1Done} done={step1Done} />
-            <div style={{ flex: 1, height: 1, background: step1Done ? 'rgba(124,58,237,0.3)' : 'rgba(255,255,255,0.06)', transition: 'background 0.3s' }} />
-            <StepBadge n={2} label="Background" active={step1Done && !step2Done} done={step2Done} />
-            <div style={{ flex: 1, height: 1, background: step2Done ? 'rgba(124,58,237,0.3)' : 'rgba(255,255,255,0.06)', transition: 'background 0.3s' }} />
-            <StepBadge n={3} label="Generate" active={step2Done} done={false} />
-          </div>
-
           {/* Tab bar */}
           <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: 4 }}>
             {/* <button className={`cup-tab ${activeTab === 'template' ? 'cup-tab-active' : 'cup-tab-inactive'}`} style={{ flex: 1 }} onClick={() => setActiveTab('template')}>

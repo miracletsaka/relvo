@@ -92,6 +92,35 @@ const SHARE_PLATFORM_META: Record<string, { label: string; bg: string; border: s
   email: { label: "Email", bg: "rgba(168,85,247,0.12)", border: "rgba(168,85,247,0.28)", color: "#c4b5fd" },
 };
 
+
+type CurrentUser = {
+  id: string;
+  email: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  org_id?: string | null;
+  role?: string | null;
+  is_email_verified?: boolean;
+};
+
+const API = (process.env.NEXT_PUBLIC_API_BASE || "").replace(/\/$/, "");
+
+// Same admin gate style as the sidebar: only these emails can approve/reject
+// and see published/rejected management tabs.
+const ADMIN_EMAILS = new Set([
+  "neuroflowaimalawi@gmail.com",
+  "tsakamiracle@gmail.com",
+]);
+
+async function apiFetchCurrentUser(): Promise<CurrentUser> {
+  const res = await fetch(`${API}/auth/me`, {
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+  });
+
+  if (!res.ok) throw new Error(`${res.status}`);
+  return res.json();
+}
 /* ─── Sub-components ────────────────────────────────────── */
 function PlatformPill({ platform }: { platform: string }) {
   const color = PLATFORM_ACCENT[platform.toLowerCase()] ?? "#6b7280";
@@ -243,6 +272,13 @@ export default function TopicChatDetailPage() {
   const [copiedShareId, setCopiedShareId] = useState<string | null>(null);
   const [copiedCaptionId, setCopiedCaptionId] = useState<string | null>(null);
 const [downloadingMediaId, setDownloadingMediaId] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [userLoading, setUserLoading] = useState(true);
+
+  const isAdmin = useMemo(() => {
+    const email = String(currentUser?.email || "").trim().toLowerCase();
+    return !!email && ADMIN_EMAILS.has(email);
+  }, [currentUser]);
 
 async function copyDraftCaptionForSocial(draftItem: any) {
   const fullText = [draftItem?.body_text, draftItem?.hashtags].filter(Boolean).join("\n\n");
@@ -312,6 +348,30 @@ async function downloadDraftMedia(draftItem: any) {
 
   useEffect(() => { if (topicChatId) refresh(); }, [topicChatId]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCurrentUser() {
+      try {
+        const user = await apiFetchCurrentUser();
+        if (!cancelled) setCurrentUser(user);
+      } catch {
+        if (!cancelled) setCurrentUser(null);
+      } finally {
+        if (!cancelled) setUserLoading(false);
+      }
+    }
+
+    loadCurrentUser();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!userLoading && !isAdmin && tab !== "pending") {
+      setTab("pending");
+    }
+  }, [isAdmin, tab, userLoading]);
+
   const draftsByTab = useMemo(() => {
     const g: Record<TabKey, any[]> = { pending: [], published: [], failed: [] };
     for (const d of drafts) g[tabForDraft(d)].push(d);
@@ -358,13 +418,13 @@ async function downloadDraftMedia(draftItem: any) {
 };
 
   const bulkApprove = async () => {
-    if (!selectedIds.length) return;
+    if (!isAdmin || !selectedIds.length) return;
     setLoading(true); setErr(null);
     try { await publishViaMake(selectedIds); await refresh(); }
     catch (e: any) { setErr(e?.message || "Bulk publish failed"); setLoading(false); }
   };
   const bulkRejectDrafts = async () => {
-    if (!selectedIds.length || tab !== "pending") return;
+    if (!isAdmin || !selectedIds.length || tab !== "pending") return;
     const reason = prompt("Reject reason?");
     if (!reason) return;
     setLoading(true); setErr(null);
@@ -544,11 +604,15 @@ ${url}`)}`,
     await copyDraftShareLink(item.id);
   };
 
-  const TAB_CONFIG: { key: TabKey; label: string; count: number }[] = [
-    { key: "pending", label: "Pending", count: counts.pending },
-    { key: "published", label: "Published", count: counts.published },
-    { key: "failed", label: "Failed / Rejected", count: counts.failed },
-  ];
+  const TAB_CONFIG: { key: TabKey; label: string; count: number }[] = isAdmin
+    ? [
+        { key: "pending", label: "Pending", count: counts.pending },
+        { key: "published", label: "Published", count: counts.published },
+        { key: "failed", label: "Failed / Rejected", count: counts.failed },
+      ]
+    : [
+        { key: "pending", label: "Pending", count: counts.pending },
+      ];
 
   // Drafts fed to the image-gen dialog based on current target
   const autoGenDrafts = regenImgTarget === "selected"
@@ -657,7 +721,7 @@ ${url}`)}`,
                   {chat?.topic || "—"}
                 </h1>
                 <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", marginTop: 6, fontFamily: "DM Mono, monospace" }}>
-                  {chat?.brand_id} &nbsp;·&nbsp; {chat?.target_month} &nbsp;·&nbsp; {chat?.posts_per_week} posts/wk
+                  {chat?.target_month} &nbsp;·&nbsp; {chat?.posts_per_week} posts/wk
                 </div>
               </div>
 
@@ -700,7 +764,7 @@ ${url}`)}`,
                     </button>
                   )}
                 </div>
-                {tab === "pending" && selectedIds.length > 0 && (
+                {isAdmin && tab === "pending" && selectedIds.length > 0 && (
                   <>
                     <button className="action-btn action-btn-primary" onClick={bulkApprove}>
                       <Check className="w-3.5 h-3.5" />
@@ -712,7 +776,7 @@ ${url}`)}`,
                     </button>
                   </>
                 )}
-                {tab === "published" && selectedIds.length > 0 && (
+                {isAdmin && tab === "published" && selectedIds.length > 0 && (
                   <button className="action-btn action-btn-primary" onClick={bulkApprove}>
                     <RefreshCw className="w-3.5 h-3.5" />
                     Republish ({selectedIds.length})
@@ -753,7 +817,7 @@ ${url}`)}`,
               />
             </div>
 
-            {(tab === "pending" || tab === "published") && filtered.length > 0 && (
+            {(tab === "pending" || (isAdmin && tab === "published")) && filtered.length > 0 && (
               <label className="select-all-row" onClick={() => toggleAll(!allChecked)}>
                 <span className={`custom-check ${allChecked ? "checked" : someChecked ? "indeterminate" : ""}`}>
                   {allChecked && <Check className="w-2.5 h-2.5 text-white" />}
@@ -797,7 +861,7 @@ ${url}`)}`,
               <div style={{ width: 1, height: 16, background: "rgba(255,255,255,0.1)", flexShrink: 0 }} />
 
               {/* Approve / Reject (pending only) */}
-              {tab === "pending" && (
+              {isAdmin && tab === "pending" && (
                 <>
                   <button className="action-btn action-btn-primary" style={{ borderRadius: 9, padding: "6px 12px" }} onClick={bulkApprove}>
                     <Check className="w-3 h-3" />
@@ -817,7 +881,7 @@ ${url}`)}`,
                   </button>
                 </>
               )}
-              {tab === "published" && (
+              {isAdmin && tab === "published" && (
                 <button className="action-btn action-btn-primary" style={{ borderRadius: 9, padding: "6px 12px" }} onClick={bulkApprove}>
                   <RefreshCw className="w-3 h-3" />
                   Republish
@@ -850,7 +914,7 @@ ${url}`)}`,
                   selected={!!selected[it.id]}
                   onSelect={(checked) => toggleOne(it.id, checked)}
                   onOpen={() => setActive(it)}
-                  showCheckbox={tab === "pending" || tab === "published"}
+                  showCheckbox={tab === "pending" || (isAdmin && tab === "published")}
                 />
               ))}
             </div>

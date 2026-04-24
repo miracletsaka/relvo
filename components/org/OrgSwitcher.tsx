@@ -113,8 +113,6 @@ export default function OrgSwitcher({
   const activeName = currentOrg?.name || "Workspace";
   const activeRole = currentOrg?.role || "member";
 
-  console.log("OrgSwitcher render:", { currentOrg, orgs });
-
   return (
     <>
       <style>{`
@@ -339,7 +337,7 @@ export default function OrgSwitcher({
         >
           <div className="orgs-trigger-left">
             <div className="">
-              <img src={currentOrg?.logo_url} alt="Relvo AI" style={{ width: 50, height: "auto" }} />
+              <img src={currentOrg?.logo_url || "/logo.png"} alt="Relvo AI" style={{ width: 50, height: "auto" }} />
             </div>
 
             {!collapsed && (

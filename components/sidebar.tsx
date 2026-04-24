@@ -579,10 +579,6 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
                   <Settings className="sb-dropdown-item-icon" />
                   <span className="sb-dropdown-item-label">Settings</span>
                 </Link>
-                <Link href="/dashboard/users" className="sb-dropdown-item" onClick={() => setProfileOpen(false)}>
-                  <User className="sb-dropdown-item-icon" />
-                  <span className="sb-dropdown-item-label">Profile</span>
-                </Link>
                 <div className="sb-dropdown-divider" />
                 <button
                   className="sb-dropdown-item sb-logout"

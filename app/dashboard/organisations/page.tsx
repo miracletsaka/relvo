@@ -423,7 +423,7 @@ export default function OrgManagementPage() {
                   autoFocus value={createName}
                   onChange={e => { setCreateName(e.target.value); setCreateSlug(slugify(e.target.value)); }}
                   onKeyDown={e => e.key === "Enter" && createOrg()}
-                  placeholder="Relvo"
+                  placeholder="relvo"
                   style={inp}
                 />
               </div>
@@ -434,7 +434,7 @@ export default function OrgManagementPage() {
                 </label>
                 <div style={{ display: "flex", alignItems: "center", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, overflow: "hidden" }}>
                   <span style={{ padding: "10px 12px", fontSize: 11, color: "rgba(255,255,255,0.2)", fontFamily: "DM Mono, monospace", borderRight: "1px solid rgba(255,255,255,0.06)", whiteSpace: "nowrap" }}>
-                    Relvo.neuroflowai.co.uk/business
+                    relvo.neuroflowai.co.uk/business
                   </span>
                   <input
                     value={createSlug}
@@ -577,7 +577,7 @@ export default function OrgManagementPage() {
                       </span>
                     </div>
                     <div style={{ fontSize: 11, color: "rgba(255,255,255,0.25)", fontFamily: "DM Mono, monospace" }}>
-                      Relvo.neuroflowai.co.uk/business/{activeOrg.slug} · ID: {activeOrg.id.slice(0, 8)}…
+                      relvo.neuroflowai.co.uk/business/{activeOrg.slug} · ID: {activeOrg.id.slice(0, 8)}…
                     </div>
                   </div>
                   {activeOrg.plan !== "agency" && (
@@ -742,7 +742,7 @@ export default function OrgManagementPage() {
                         <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.3)", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "DM Mono, monospace", marginBottom: 7 }}>Workspace Slug</label>
                         <div style={{ display: "flex", alignItems: "center", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, overflow: "hidden" }}>
                           <span style={{ padding: "10px 12px", fontSize: 11, color: "rgba(255,255,255,0.2)", fontFamily: "DM Mono, monospace", borderRight: "1px solid rgba(255,255,255,0.06)", whiteSpace: "nowrap" }}>
-                            Relvo.neuroflowai.co.uk/business/
+                            relvo.neuroflowai.co.uk/business/
                           </span>
                           <input value={editSlug} onChange={e => setEditSlug(slugify(e.target.value))} disabled={!canManage} style={{ ...inp, border: "none", borderRadius: 0, background: "transparent", flex: 1, padding: "10px 12px", opacity: canManage ? 1 : 0.5 }} />
                         </div>

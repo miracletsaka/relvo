@@ -120,7 +120,7 @@ export default async function ReviewOgPage({
   // Redirect human visitors to the business profile.
   // Bots (WhatsApp, Facebook, Twitter, etc.) ignore the script and read meta.
   const bizProfileUrl = review?.org_slug
-    ? `${APP_URL}/biz/${review.org_slug}`
+    ? `${APP_URL}/business/${review.org_slug}`
     : LANDING_URL;
 
   const redirectScript = [

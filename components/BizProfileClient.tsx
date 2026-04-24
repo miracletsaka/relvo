@@ -146,9 +146,9 @@ function Avatar({ name, size = 40 }: { name: string; size?: number }) {
 // ── Section ───────────────────────────────────────────────────────────────────
 function Sec({ title, children, id }: { title: string; children: React.ReactNode; id?: string }) {
   return (
-    <section id={id} style={{ marginBottom: 64 }}>
+    <section id={id} className="section-container" style={{ marginBottom: 64 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 28 }}>
-        <h2 style={{ fontSize: 18, fontWeight: 700, color: "#111827", margin: 0, letterSpacing: "-0.3px" }}>{title}</h2>
+        <h2 className="section-title" style={{ fontSize: 18, fontWeight: 700, color: "#111827", margin: 0, letterSpacing: "-0.3px" }}>{title}</h2>
         <div style={{ flex: 1, height: 1, background: "#f3f4f6" }} />
       </div>
       {children}
@@ -314,6 +314,46 @@ const socialLinks = [
         .hover-lift:hover { transform: translateY(-3px); box-shadow: 0 8px 28px rgba(0,0,0,0.1) !important; }
         .gallery-img { cursor: zoom-in; transition: transform 0.3s, box-shadow 0.3s; }
         .gallery-img:hover { transform: scale(1.02); box-shadow: 0 12px 40px rgba(0,0,0,0.15); }
+
+        /* Mobile responsive styles */
+        @media (max-width: 640px) {
+          .profile-header-wrapper { padding: 0 16px !important; }
+          .profile-header { gap: 12px !important; margin-top: -40px !important; margin-bottom: 20px !important; flex-direction: column; align-items: flex-start !important; }
+          .profile-image { width: 80px !important; height: 80px !important; }
+          .profile-content { min-width: auto !important; }
+          .profile-content h1 { font-size: 24px !important; }
+          .profile-content p { font-size: 13px !important; }
+          .rating-pill { width: 100%; margin: 16px 0 0 0 !important; justify-content: center !important; }
+          .meta-strip { gap: 12px !important; margin-bottom: 32px !important; padding-bottom: 20px !important; flex-direction: column !important; }
+          .meta-strip > * { width: 100%; }
+          .section-container { padding: 0 16px !important; margin-bottom: 48px !important; }
+          .section-title { font-size: 16px !important; }
+          .gallery-grid { gap: 8px !important; grid-template-columns: repeat(2, 1fr) !important; }
+          .reviews-container { gap: 16px !important; grid-template-columns: 1fr !important; margin-bottom: 24px !important; }
+          .offers-grid { gap: 10px !important; grid-template-columns: 1fr !important; }
+          .fade-up { animation-delay: 0s !important; }
+        }
+
+        @media (max-width: 768px) {
+          .main-container { max-width: 100%; }
+          .gallery-grid { grid-template-columns: repeat(3, 1fr) !important; gap: 10px !important; }
+          .section-container { padding: 0 20px !important; }
+          .hero-section { height: 240px !important; }
+          .reviews-container { gap: 16px !important; grid-template-columns: 1fr !important; }
+          .profile-header { margin-bottom: 24px !important; }
+        }
+
+        @media (min-width: 641px) and (max-width: 1024px) {
+          .profile-header { gap: 16px !important; margin-bottom: 28px !important; }
+          .gallery-grid { grid-template-columns: repeat(4, 1fr) !important; }
+          .offers-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .reviews-container { grid-template-columns: 1fr !important; }
+          .section-container { padding: 0 20px !important; }
+        }
+
+        @media (min-width: 1025px) {
+          .reviews-container { grid-template-columns: 1fr 1fr !important; }
+        }
       `}</style>
 
       {/* ── Lightbox ── */}
@@ -327,7 +367,7 @@ const socialLinks = [
       <div style={{ fontFamily: "'Instrument Sans', sans-serif", minHeight: "100vh", background: "#fafaf8" }}>
 
         {/* ── Hero / Cover ── */}
-        <div style={{ position: "relative", height: loading ? 280 : data?.cover_image ? 360 : 240, background: data?.cover_image ? "#000" : "linear-gradient(135deg, #0f0c29, #302b63, #24243e)", overflow: "hidden" }}>
+        <div className="hero-section" style={{ position: "relative", height: loading ? 280 : data?.cover_image ? 360 : 240, background: data?.cover_image ? "#000" : "linear-gradient(135deg, #0f0c29, #302b63, #24243e)", overflow: "hidden" }}>
           {data?.cover_image && (
             <img src={data.cover_image.url} alt="Cover" style={{ width: "100%", height: "100%", objectFit: "cover", opacity: 0.75 }} />
           )}
@@ -338,10 +378,10 @@ const socialLinks = [
         </div>
 
         {/* ── Profile header ── */}
-        <div  style={{ maxWidth: 860, margin: "0 auto", padding: "0 24px" }}>
-          <div  style={{ display: "flex", alignItems: "flex-end", gap: 20, marginTop: -56, marginBottom: 32, flexWrap: "wrap" }}>
+        <div className="profile-header-wrapper" style={{ maxWidth: 860, margin: "0 auto", padding: "0 24px" }}>
+          <div className="profile-header" style={{ display: "flex", alignItems: "flex-end", gap: 20, marginTop: -56, marginBottom: 32, flexWrap: "wrap" }}>
             {/* Profile image */}
-            <div className="z-50" style={{ width: 112, height: 112, borderRadius: 20, border: "4px solid #fafaf8", overflow: "hidden", background: "#e5e7eb", flexShrink: 0, boxShadow: "0 4px 20px rgba(0,0,0,0.15)" }}>
+            <div className="profile-image z-50" style={{ width: 112, height: 112, borderRadius: 20, border: "4px solid #fafaf8", overflow: "hidden", background: "#e5e7eb", flexShrink: 0, boxShadow: "0 4px 20px rgba(0,0,0,0.15)" }}>
               {loading ? (
                 <div style={{ width: "100%", height: "100%", background: "#e5e7eb" }} />
               ) : data?.profile_image ? (
@@ -355,7 +395,7 @@ const socialLinks = [
 
             {/* email */}
 
-            <div style={{ flex: 1, paddingBottom: 8, minWidth: 200 }}>
+            <div className="profile-content" style={{ flex: 1, paddingBottom: 8, minWidth: 200 }}>
               {loading ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   <Sk w={220} h={32} r={8} />
@@ -382,7 +422,7 @@ const socialLinks = [
 
             {/* Rating pill */}
             {!loading && rs && rs.total_reviews > 0 && (
-              <a href="#reviews" style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 18px", background: "#fff", border: "1px solid #e5e7eb", borderRadius: 40, textDecoration: "none", boxShadow: "0 2px 8px rgba(0,0,0,0.06)", transition: "box-shadow 0.2s", marginBottom: 8 }}>
+              <a href="#reviews" className="rating-pill" style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 18px", background: "#fff", border: "1px solid #e5e7eb", borderRadius: 40, textDecoration: "none", boxShadow: "0 2px 8px rgba(0,0,0,0.06)", transition: "box-shadow 0.2s", marginBottom: 8 }}>
                 <span style={{ fontSize: 20, fontWeight: 800, color: "#111827", letterSpacing: "-0.5px" }}>{rs.average}</span>
                 <div>
                   <Stars rating={rs.average || 0} size={13} />
@@ -393,11 +433,9 @@ const socialLinks = [
           </div>
 
           {/* ── Meta strip ── */}
-          {/* ── Meta strip ── */}
-          {/* ── Meta strip ── */}
           {!loading && biz && (
             <div
-              className="fade-up"
+              className="fade-up meta-strip"
               style={{
                 display: "flex",
                 flexWrap: "wrap",
@@ -672,7 +710,7 @@ const socialLinks = [
           {/* ── Gallery ── */}
           {!loading && data?.gallery && data.gallery.length > 0 && (
             <Sec title="Gallery">
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12 }}>
+              <div className="gallery-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12 }}>
                 {data.gallery.map((img, i) => (
                   <div key={img.id} className="gallery-img scale-in" style={{ animationDelay: `${i * 0.06}s`, borderRadius: 14, overflow: "hidden", aspectRatio: "4/3", background: "#f3f4f6" }}
                     onClick={() => setLightbox(img.url)}>
@@ -686,7 +724,7 @@ const socialLinks = [
           {/* ── Offers ── */}
           {!loading && data?.offers && data?.offers.length > 0 && (
             <Sec title="Current Offers">
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 14 }}>
+              <div className="offers-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 14 }}>
                 {data!.offers.map((offer, i) => (
                   <div key={offer.id} className="hover-lift scale-in" style={{ animationDelay: `${i * 0.06}s`, background: "#fff", border: "1px solid #f3f4f6", borderRadius: 16, padding: "22px 22px 18px", boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
                     <p style={{ fontSize: 15, fontWeight: 700, color: "#111827", marginBottom: 8, lineHeight: 1.3 }}>{offer.title}</p>
@@ -755,7 +793,7 @@ const socialLinks = [
           {/* ── Reviews ── */}
           {!loading && (
             <Sec title="Reviews" id="reviews">
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, marginBottom: 36 }}>
+              <div className="reviews-container" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, marginBottom: 36 }}>
 
                 {/* Summary */}
                 <div style={{ background: "#fff", border: "1px solid #f3f4f6", borderRadius: 20, padding: "28px", boxShadow: "0 1px 6px rgba(0,0,0,0.04)" }}>

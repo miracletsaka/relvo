@@ -1,6 +1,6 @@
 "use client";
 import ReviewsManagerPage from "@/components/review-manager";
-import { ReviewsTab } from "@/components/reviews-tab-and-mobile-guard";
+import { ReviewsTabMore } from "@/components/reviews-tab-and-mobile-guard";
 import { uploadFileToSpaces } from "@/lib/upload-client";
 /**
  * app/dashboard/org-profile/page.tsx
@@ -799,6 +799,59 @@ function SponsorsTab({ toast }: { toast: (ok: boolean, msg: string) => void }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// TAB: Reviews
+// ─────────────────────────────────────────────────────────────────────────────
+function ReviewsTab({ toast }: { toast: (ok: boolean, msg: string) => void }) {
+  const [items, setItems]     = useState<Review[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm]       = useState({ author_name: "", rating: "5", body: "", source: "", review_date: "", is_featured: false });
+  const [adding, setAdding]   = useState(false);
+
+  const SOURCES = ["Google","Trustpilot","Facebook","Yelp","Clutch","G2","Capterra","Other"];
+
+  const load = useCallback(async () => {
+    try { setItems(await api<Review[]>("/org-profile/reviews")); }
+    catch {} finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const add = async () => {
+    if (!form.author_name.trim()) return;
+    setAdding(true);
+    try {
+      await api("/org-profile/reviews", { method: "POST", body: JSON.stringify({ author_name: form.author_name, rating: parseFloat(form.rating), body: form.body || null, source: form.source || null, review_date: form.review_date || null, is_featured: form.is_featured }) });
+      setForm({ author_name: "", rating: "5", body: "", source: "", review_date: "", is_featured: false });
+      setShowForm(false);
+      await load();
+      toast(true, "Review added");
+    } catch (e: any) { toast(false, e.message); }
+    finally { setAdding(false); }
+  };
+
+  const remove = async (id: string) => {
+    try { await api(`/org-profile/reviews/${id}`, { method: "DELETE" }); await load(); toast(true, "Removed"); }
+    catch (e: any) { toast(false, e.message); }
+  };
+
+  const toggleFeatured = async (item: Review) => {
+    try { await api(`/org-profile/reviews/${item.id}`, { method: "PATCH", body: JSON.stringify({ is_featured: !item.is_featured }) }); await load(); }
+    catch (e: any) { toast(false, e.message); }
+  };
+
+  if (loading) return <LoadingCards />;
+
+  return (
+    <div>
+      <TabHeader title="Reviews" sub={`${items.length} review${items.length !== 1 ? "s" : ""}`} onAdd={() => setShowForm(v => !v)} />
+
+      <ReviewsManagerPage />
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // TAB: Goals
 // ─────────────────────────────────────────────────────────────────────────────
 function GoalsTab({ toast }: { toast: (ok: boolean, msg: string) => void }) {
@@ -1214,7 +1267,8 @@ export default function OrgProfilePage() {
         <div style={{ maxWidth: 900 }}>
           {activeTab === "business"       && <BusinessTab       toast={showToast} />}
           {activeTab === "sponsors"       && <SponsorsTab       toast={showToast} />}
-          {activeTab === "reviews" && <ReviewsTab toast={showToast} />}
+          {activeTab === "reviews"        && <ReviewsTab        toast={showToast} />}
+          {activeTab === "reviews"   && <ReviewsTabMore    toast={showToast} />}
           {activeTab === "goals"          && <GoalsTab          toast={showToast} />}
           {activeTab === "offers"         && <OffersTab         toast={showToast} />}
           {activeTab === "accreditations" && <AccreditationsTab toast={showToast} />}

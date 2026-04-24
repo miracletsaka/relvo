@@ -1061,11 +1061,67 @@ tone_id === toneId && t.brand_id === brandId);
         .msg-warn { color: #fbbf24; font-size: 12px; font-weight: 600; }
         .msg-err  { color: #f87171; font-size: 12px; font-weight: 600; }
         .img-toggle-box { background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.07); border-radius: 12px; padding: 12px 14px; }
+
+        /* Mobile & Tablet Responsive */
+        @media (max-width: 1024px) {
+          .topics-root { flex-direction: column; }
+          .panel-left { width: 100%; min-width: 100%; height: auto; border-right: none; border-bottom: 1px solid rgba(255,255,255,0.06); }
+          .panel-left .flex-1 { max-height: 300px; }
+          .panel-right { height: auto; min-height: 400px; }
+        }
+
+        @media (max-width: 768px) {
+          .topics-root { flex-direction: column; }
+          .panel-left { width: 100%; min-width: 100%; height: auto; border-right: none; border-bottom: 1px solid rgba(255,255,255,0.06); }
+          .panel-left .px-5 { padding-left: 12px !important; padding-right: 12px !important; }
+          .panel-left .flex-1 { max-height: 280px; overflow-y: auto; }
+          .panel-right { height: auto; }
+          .panel-right .px-5 { padding-left: 12px !important; padding-right: 12px !important; }
+          h1 { font-size: 13px !important; }
+          h2 { font-size: 12px !important; }
+          .field-label { font-size: 9px !important; }
+          .topics-input { font-size: 11px !important; padding: 10px !important; }
+          textarea { rows: 6 !important; }
+          .topics-select { font-size: 11px !important; padding: 8px 10px !important; }
+          .month-input { font-size: 11px !important; padding: 8px 10px !important; }
+          .generate-btn { font-size: 12px !important; padding: 10px 16px !important; }
+          .stat-chip { font-size: 10px !important; padding: 3px 8px !important; }
+          .spinner { width: 12px !important; height: 12px !important; }
+        }
+
+        @media (max-width: 640px) {
+          .topics-root { flex-direction: column; }
+          .panel-left { width: 100%; min-width: 100%; height: auto; border-right: none; border-bottom: 1px solid rgba(255,255,255,0.06); }
+          .panel-left .px-5 { padding-left: 14px !important; padding-right: 14px !important; }
+          .panel-left .pb-4 { padding-bottom: 12px !important; }
+          .panel-left .pt-6 { padding-top: 16px !important; }
+          .panel-left .space-y-5 { gap: 16px !important; }
+          .panel-left .flex-1 { max-height: 320px; overflow-y: auto; }
+          .panel-right { height: auto; }
+          .panel-right .px-5 { padding-left: 14px !important; padding-right: 14px !important; }
+          .topics-input { font-size: 12px !important; padding: 12px !important; rows: 5 !important; }
+          .generate-btn { width: 100% !important; font-size: 13px !important; padding: 12px 16px !important; }
+          .dialog-dark { max-width: 90vw !important; }
+          table { font-size: 10px !important; }
+          .img-toggle-box { padding: 10px 12px !important; }
+          .img-toggle-box p { font-size: 11px !important; }
+          svg { width: 10px !important; height: 10px !important; }
+        }
+
+        @media (max-width: 480px) {
+          .topics-root { gap: 0; }
+          .panel-left .flex-1 { max-height: 300px; }
+          .topics-input { font-size: 11px !important; }
+          .stat-chip { flex-wrap: wrap; width: 100%; }
+          .field-label { font-size: 8px !important; }
+          h1 { font-size: 12px !important; }
+          .generate-btn { padding: 10px 14px !important; }
+        }
       `}</style>
 
-      <div className="topics-root flex">
+      <div className="topics-root flex md:flex-row flex-col">
         {/* ── LEFT PANEL ── */}
-        <div className="panel-left">
+        <div className="panel-left md:w-[380px] md:h-screen md:border-r md:border-white/[0.06]">
           <div className="px-5 pt-6 pb-4 border-b border-white/[0.06]">
             <div className="flex items-center gap-2 mb-1">
               <h1 className="text-[15px] font-bold tracking-tight">Content Generator</h1>
@@ -1171,7 +1227,7 @@ tone_id === toneId && t.brand_id === brandId);
         </div>
 
         {/* ── RIGHT PANEL ── */}
-        <div className="panel-right overflow-y-auto">
+        <div className="panel-right md:flex-1 md:overflow-y-auto w-full">
           <div className="px-5 pt-6 pb-4 border-b border-white/[0.06] flex items-center gap-3">
             <h2 className="text-[13px] font-bold text-white/70">Generated Drafts</h2>
             {generating && (
@@ -1188,6 +1244,7 @@ tone_id === toneId && t.brand_id === brandId);
               <button
                 onClick={() => { const idx = results.findIndex(r => r.drafts.length > 0); if (idx !== -1) regenImagesForTopic(idx); }}
                 style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 7, background: "rgba(52,211,153,0.1)", border: "1px solid rgba(52,211,153,0.3)", color: "#34d399", fontSize: 12, fontWeight: 700, padding: "8px 16px", borderRadius: 10, cursor: "pointer", letterSpacing: "0.03em" }}
+                className="md:inline-flex hidden"
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
                 Regenerate Images
