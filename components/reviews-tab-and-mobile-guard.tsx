@@ -666,7 +666,7 @@ function MobileBlocker({ pageUrl, pageTitle }: { pageUrl: string; pageTitle: str
 
           {/* Back button */}
           <button
-            onClick={() => window.history.back()}
+            onClick={() => window.location.href = "/dashboard/create"}
             style={{ display: "flex", alignItems: "center", gap: 7, padding: "11px 22px", background: "none", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, color: "rgba(255,255,255,0.3)", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'Syne', sans-serif", transition: "all 0.15s", animation: "mb-fade 0.5s 0.35s ease both" }}
             onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.2)"; (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.6)"; }}
             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.08)"; (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.3)"; }}>
