@@ -1017,6 +1017,20 @@ export default function EditorPage() {
       return;
     }
 
+    if (!selectedBrandId) {
+      setErr("Please select a brand before saving this template.")
+      setActiveTab("templates")
+      setSaveOpen(true)
+      return
+    }
+
+    if (!selectedToneId) {
+      setErr("Please select a tone before saving this template.")
+      setActiveTab("templates")
+      setSaveOpen(true)
+      return
+    }
+
     try {
       setSaving(true);
       setErr(null);
@@ -1033,8 +1047,8 @@ export default function EditorPage() {
         backgroundImage: safeBackground,
         logoPlacement: logoPlacement ?? null,
         thumbnail_url: thumbnailUrl,
-        brand_id: selectedBrandId || null,
-        tone_id: selectedToneId || null,
+        brand_id: selectedBrandId,
+        tone_id: selectedToneId,
         orientation,
       } as any;
 
@@ -1053,8 +1067,8 @@ export default function EditorPage() {
           canvasHeight: CANVAS_HEIGHT,
           backgroundImage: safeBackground,
           logoPlacement,
-          brand_id: selectedBrandId || null,
-          tone_id: selectedToneId || null,
+          brand_id: selectedBrandId,
+          tone_id: selectedToneId,
           orientation,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -1079,8 +1093,8 @@ export default function EditorPage() {
               name,
               description: saveDesc.trim() || undefined,
               shapes,
-              brand_id: selectedBrandId || null,
-              tone_id: selectedToneId || null,
+              brand_id: selectedBrandId,
+              tone_id: selectedToneId,
               orientation,
               backgroundImage: safeBackground,
               logoPlacement,

@@ -1022,15 +1022,6 @@ ${url}`)}`,
                     </div>
                   </div>
                 </div>
-
-                {/* Structured preview */}
-                {active.structured && (
-                  <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14, padding: 16 }}>
-                    <span className="drawer-field-label">Structured Content</span>
-                    <StructuredPost item={active.structured} />
-                  </div>
-                )}
-
                 {/* Body text */}
                 <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14, padding: 16 }}>
                   <span className="drawer-field-label">Body Text</span>
@@ -1101,10 +1092,6 @@ ${url}`)}`,
               <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14, padding: 14 }}>
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(139,92,246,0.7)", marginBottom: 6 }}>Draft Destination</div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: "#e4e4e7", marginBottom: 6 }}>
-                      /biz/{getShareSlug() || "missing-slug"}?draftId={shareDraft.id}
-                    </div>
                     <p style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", lineHeight: 1.6 }}>
                       Social platforms will share the business page URL with the draft panel opened automatically for this draft.
                     </p>

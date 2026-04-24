@@ -1271,48 +1271,18 @@ tone_id === toneId && t.brand_id === brandId);
         <DialogContent className="dialog-dark max-w-2xl">
           <DialogHeader>
             <DialogTitle style={{ color: "#e4e4e7", fontFamily: "Syne, sans-serif" }}>Review before generating</DialogTitle>
-            <DialogDescription style={{ color: "rgba(255,255,255,0.4)", fontSize: 12 }}>
-              Phase 1 writes all drafts · Phase 2 auto-generates images after all are saved.
-            </DialogDescription>
           </DialogHeader>
           <div className="space-y-1 text-xs" style={{ color: "rgba(255,255,255,0.6)" }}>
             {[
-              ["Brand",          brandId],
               ["Topics",         topics.length],
               ["Target month",   targetMonth],
               ["Posts / week",   postsPerWeek],
-              ["Planned drafts", `${totalGenerate} (${plannedPerTopic} per topic)`],
-              ["Images",         skipImages ? "Skipped" : templates.length > 0 ? `Auto — ${templates.length} template${templates.length !== 1 ? "s" : ""} — starts after all drafts saved` : "No templates — will skip"],
             ].map(([k, v]) => (
               <div key={String(k)} className="flex gap-2">
                 <span style={{ color: "rgba(255,255,255,0.3)", width: 110, flexShrink: 0 }}>{k}</span>
                 <span className="font-bold" style={{ color: "#e4e4e7" }}>{String(v)}</span>
               </div>
             ))}
-          </div>
-          <div className="max-h-56 overflow-auto rounded-xl border border-white/[0.07] bg-white/[0.02]">
-            <table className="w-full text-xs">
-              <thead>
-                <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                  {["Topic", "Drafts", "Images"].map((h) => (
-                    <th key={h} className="text-left p-2.5" style={{ color: "rgba(255,255,255,0.3)", fontWeight: 700, letterSpacing: "0.08em", fontSize: 10, textTransform: "uppercase" }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {topics.map((t) => (
-                  <tr key={t} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-                    <td className="p-2.5" style={{ color: "rgba(255,255,255,0.7)" }}>{t}</td>
-                    <td className="p-2.5" style={{ color: "rgba(255,255,255,0.5)" }}>{plannedPerTopic}</td>
-                    <td className="p-2.5">
-                      {skipImages || !templates.length
-                        ? <span style={{ color: "rgba(255,255,255,0.3)", fontSize: 11 }}>—</span>
-                        : <span style={{ color: "#34d399", fontWeight: 700, fontSize: 11 }}>AUTO</span>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
           <DialogFooter className="gap-2">
             <button onClick={() => setReviewOpen(false)} style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.6)", fontFamily: "Syne, sans-serif", fontWeight: 600, fontSize: 13, padding: "9px 20px", borderRadius: 10, cursor: "pointer" }}>Cancel</button>

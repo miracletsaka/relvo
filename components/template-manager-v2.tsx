@@ -117,24 +117,35 @@ export default function TemplateManagerV2({
     setEditOpen(true)
   }
 
-  const saveEdit = async () => {
-    if (!editing) return
+const saveEdit = async () => {
+  if (!editing) return
 
-    const name = editName.trim()
-    if (!name) {
-      setErr('Template name is required.')
-      return
-    }
+  const name = editName.trim()
 
-    setEditSaving(true)
-    setErr(null)
+  if (!name) {
+    setErr('Template name is required.')
+    return
+  }
 
-    try {
-      const res = await updateTemplate(editing.id, {
-        name,
-        description: editDescription.trim() || null,
-        tone_id: editToneId || null,
-      })
+  if (!brandId) {
+    setErr('A brand must be selected before updating a template.')
+    return
+  }
+
+  if (!editToneId) {
+    setErr('Template must have a tone. Please select a tone.')
+    return
+  }
+
+  setEditSaving(true)
+  setErr(null)
+
+  try {
+    const res = await updateTemplate(editing.id, {
+      name,
+      description: editDescription.trim() || null,
+      tone_id: editToneId, // 🚫 NEVER NULL
+    })
 
       if (!res?.ok) throw new Error('Update failed')
 
@@ -695,7 +706,6 @@ export default function TemplateManagerV2({
                 onChange={(e) => setEditToneId(e.target.value)}
                 style={{ width: '100%', height: 40 }}
               >
-                <option className="text-black" value="">No tone</option>
                 {tones.map((tone) => (
                   <option className="text-black" key={tone.id} value={tone.id}>
                     {tone.label || tone.name}
@@ -733,14 +743,24 @@ export default function TemplateManagerV2({
                 Cancel
               </button>
               <button
-                className="tmv2-save-btn"
-                style={{ flex: 2, justifyContent: 'center' }}
-                onClick={saveEdit}
-                disabled={editSaving}
-              >
+                  className="tmv2-save-btn"
+                  style={{ flex: 2, justifyContent: 'center' }}
+                  onClick={saveEdit}
+                  disabled={editSaving || !editToneId || !brandId}
+                >
                 {editSaving ? <><span className="tmv2-spinner" />Saving…</> : <><Check style={{ width: 13, height: 13 }} />Save</>}
               </button>
             </div>
+            {!editToneId && (
+              <p style={{
+                fontSize: 10,
+                color: '#f87171',
+                marginTop: 6,
+                fontFamily: 'DM Mono, monospace'
+              }}>
+                A tone is required for every template.
+              </p>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

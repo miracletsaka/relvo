@@ -35,6 +35,7 @@ const C = {
 };
 
 const API = (process.env.NEXT_PUBLIC_API_BASE || "").replace(/\/$/, "");
+const APP_URL = (process.env.NEXT_PUBLIC_APP_URL || "https://app.neuroflowai.co.uk").replace(/\/$/, "");
 
 async function api<T>(path: string, opts: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API}${path}`, {
@@ -101,12 +102,29 @@ async function copyText(text: string): Promise<boolean> {
 }
 
 // ── Share button row ──────────────────────────────────────────────────────────
-function ShareRow({ cardUrl, authorName }: { cardUrl: string; authorName: string }) {
+function ShareRow({
+  cardUrl,
+  reviewUrl,
+  authorName,
+  reviewBody,
+}: {
+  cardUrl: string;
+  reviewUrl: string;
+  authorName: string;
+  reviewBody?: string;
+}) {
   const [copied, setCopied] = useState(false);
   const [dlDone, setDlDone] = useState(false);
 
-  const text = encodeURIComponent(`Check out this review by ${authorName}!`);
-  const url  = encodeURIComponent(cardUrl);
+  const cleanBody = (reviewBody || "").trim();
+  const shareText = cleanBody
+    ? `Review from ${authorName}: "${cleanBody.slice(0, 140)}${cleanBody.length > 140 ? "…" : ""}"`
+    : `Check out this review by ${authorName}!`;
+
+  // Share the public review PAGE, not the raw image URL.
+  // The /review/[id] page carries the OG tags so WhatsApp/Facebook can show the card image + review content.
+  const text = encodeURIComponent(shareText);
+  const url  = encodeURIComponent(reviewUrl);
 
   const shareLinks = [
     {
@@ -174,7 +192,7 @@ function ShareRow({ cardUrl, authorName }: { cardUrl: string; authorName: string
   };
 
   const handleCopy = async () => {
-    const ok = await copyText(cardUrl);
+    const ok = await copyText(reviewUrl);
     if (ok) { setCopied(true); setTimeout(() => setCopied(false), 2000); }
   };
 
@@ -208,7 +226,7 @@ function ShareRow({ cardUrl, authorName }: { cardUrl: string; authorName: string
       {/* Copy link */}
       <button
         onClick={handleCopy}
-        title="Copy image link"
+        title="Copy review link"
         style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", background: copied ? "rgba(52,211,153,0.12)" : C.surface, border: `1px solid ${copied ? "rgba(52,211,153,0.3)" : C.border}`, borderRadius: 9, color: copied ? C.green : C.muted, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "DM Mono, monospace", transition: "all 0.15s", whiteSpace: "nowrap" }}>
         {copied
           ? <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>Copied!</>
@@ -351,9 +369,14 @@ function ReviewCardItem({
         {r.card_image_url && (
           <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 10 }}>
             <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: C.dim, fontFamily: "DM Mono, monospace", marginBottom: 6 }}>
-              Share this review card
+              Share this review
             </div>
-            <ShareRow cardUrl={r.card_image_url} authorName={r.author_name} />
+            <ShareRow
+              cardUrl={r.card_image_url}
+              reviewUrl={`${APP_URL}/review/${r.id}`}
+              authorName={r.author_name}
+              reviewBody={r.body}
+            />
           </div>
         )}
       </div>
