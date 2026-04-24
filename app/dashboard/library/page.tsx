@@ -566,7 +566,7 @@ export default function ContentLibraryPage() {
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.25)", fontFamily: "DM Mono, monospace" }}>Platform</span>
               <select className="lib-select" value={platform} onChange={e => setPlatform(e.target.value)}>
-                {PLATFORMS.map(p => <option key={p} value={p}>{p === "all" ? "All platforms" : p}</option>)}
+                {PLATFORMS.map(p => <option className="text-black" key={p} value={p}>{p === "all" ? "All platforms" : p}</option>)}
               </select>
             </div>
             {platform !== "all" && (

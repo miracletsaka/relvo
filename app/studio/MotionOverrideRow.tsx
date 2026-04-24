@@ -29,9 +29,9 @@ export default function MotionOverrideRow({
           outline: "none",
         }}
       >
-        <option value="">Auto</option>
+        <option className="text-black" value="">Auto</option>
         {PRESETS.map((p) => (
-          <option key={p} value={p}>
+          <option className="text-black" key={p} value={p}>
             {p}
           </option>
         ))}

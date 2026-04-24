@@ -151,7 +151,7 @@ export default function TextEditorPanel({
               className="w-full px-3 py-2 bg-secondary text-foreground border border-border rounded-lg text-sm"
             >
               {FONT_FAMILIES.map(font => (
-                <option key={font.value} value={font.value}>
+                <option className="text-black" key={font.value} value={font.value}>
                   {font.name}
                 </option>
               ))}

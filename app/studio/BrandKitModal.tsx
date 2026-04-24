@@ -229,8 +229,8 @@ export default function BrandKitModal({
                       outline: "none",
                     }}
                   >
-                    <option value="uppercase">UPPERCASE</option>
-                    <option value="none">normal</option>
+                    <option className="text-black" value="uppercase">UPPERCASE</option>
+                    <option className="text-black" value="none">normal</option>
                   </select>
                 </div>
               </div>

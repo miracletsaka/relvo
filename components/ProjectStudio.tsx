@@ -1025,12 +1025,12 @@ export default function ProjectStudio(props: {
                   >
                     <optgroup label="Female">
                       {VOICE_OPTIONS.filter(v => v.label.includes("Female")).map(v => (
-                        <option key={v.id} value={v.id}>{v.label}</option>
+                        <option className="text-black" key={v.id} value={v.id}>{v.label}</option>
                       ))}
                     </optgroup>
                     <optgroup label="Male">
                       {VOICE_OPTIONS.filter(v => v.label.includes("Male")).map(v => (
-                        <option key={v.id} value={v.id}>{v.label}</option>
+                        <option className="text-black" key={v.id} value={v.id}>{v.label}</option>
                       ))}
                     </optgroup>
                   </select>

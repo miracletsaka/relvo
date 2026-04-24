@@ -523,9 +523,9 @@ export default function TemplateManagerV2({
             onChange={(e) => setToneFilter(e.target.value)}
             title="Filter by tone"
           >
-            <option value="all">All tones</option>
+            <option className="text-black" value="all">All tones</option>
             {tones.map((tone) => (
-              <option key={tone.id} value={tone.id}>
+              <option className="text-black" key={tone.id} value={tone.id}>
                 {tone.label || tone.name}
               </option>
             ))}
@@ -695,9 +695,9 @@ export default function TemplateManagerV2({
                 onChange={(e) => setEditToneId(e.target.value)}
                 style={{ width: '100%', height: 40 }}
               >
-                <option value="">No tone</option>
+                <option className="text-black" value="">No tone</option>
                 {tones.map((tone) => (
-                  <option key={tone.id} value={tone.id}>
+                  <option className="text-black" key={tone.id} value={tone.id}>
                     {tone.label || tone.name}
                   </option>
                 ))}

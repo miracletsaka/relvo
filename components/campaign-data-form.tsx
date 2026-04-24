@@ -63,8 +63,8 @@ function DarkSelect({ value, onChange, options }: {
       onChange={e => onChange(e.target.value)}
       style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 10, padding: '9px 12px', color: value ? '#e4e4e7' : 'rgba(255,255,255,0.3)', fontFamily: 'DM Mono, monospace', fontSize: 12, outline: 'none', boxSizing: 'border-box' }}
     >
-      <option value="">— Select —</option>
-      {options.map(o => <option key={o.value} value={o.value} style={{ background: '#1a1a2e' }}>{o.label}</option>)}
+      <option className="text-black" value="">— Select —</option>
+      {options.map(o => <option className="text-black" key={o.value} value={o.value} style={{ background: '#1a1a2e' }}>{o.label}</option>)}
     </select>
   )
 }

@@ -222,6 +222,7 @@ export function synthesizeAndSaveTemplate(payload?: {
   });
 }
 
+
 export async function deleteBrand(brandId: string): Promise<void> {
   const res = await fetch(`${API_BASE}/brands/${brandId}`, {
     method: "DELETE",

@@ -700,9 +700,9 @@ export default function OrgManagementPage() {
                               onChange={e => changeRole(m.user_id, e.target.value)}
                               style={{ ...sel, width: 100, fontSize: 11, padding: "6px 28px 6px 10px" }}
                             >
-                              <option value="admin">Admin</option>
-                              <option value="member">Member</option>
-                              <option value="viewer">Viewer</option>
+                              <option className="text-black" value="admin">Admin</option>
+                              <option className="text-black" value="member">Member</option>
+                              <option className="text-black" value="viewer">Viewer</option>
                             </select>
                           ) : (
                             <span style={{ fontSize: 10, fontWeight: 700, color: ROLE_COLORS[m.role] || "rgba(255,255,255,0.3)", fontFamily: "DM Mono, monospace", textTransform: "uppercase", letterSpacing: "0.08em", background: "rgba(255,255,255,0.04)", padding: "4px 10px", borderRadius: 6 }}>

@@ -44,6 +44,211 @@ type Brand = ApiBrand & {
   org_id?: string | null;
 };
 
+type ToneRow = {
+  id: string;
+  name?: string | null;
+  label?: string | null;
+  description?: string | null;
+  emoji?: string | null;
+  is_active?: boolean;
+  sort_order?: number | null;
+};
+
+type TemplateGenerationProgress = {
+  toneId: string;
+  label: string;
+  status: "queued" | "running" | "done" | "failed";
+  message?: string;
+};
+
+const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000").replace(/\/$/, "");
+const LANDSCAPE_WIDTH = 1080;
+const LANDSCAPE_HEIGHT = 1080;
+
+async function backendApi<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      ...(options.headers || {}),
+    },
+  });
+
+  const json = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(
+      typeof json?.detail === "string"
+        ? json.detail
+        : typeof json?.message === "string"
+        ? json.message
+        : `API ${res.status}`
+    );
+  }
+
+  return json as T;
+}
+
+async function listActiveTonesForBrandTemplates(): Promise<ToneRow[]> {
+  return backendApi<ToneRow[]>("/tones?active_only=true", { method: "GET" });
+}
+
+async function generateTemplateDraftForBrand(payload: {
+  companyName: string;
+  logoUrl?: string | null;
+}) {
+  const res = await fetch("/api/generate-template-to-canvas", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      campaignData: {
+        companyName: payload.companyName,
+      },
+      logoUrl: payload.logoUrl || "",
+      canvasWidth: LANDSCAPE_WIDTH,
+      canvasHeight: LANDSCAPE_HEIGHT,
+      includeDebug: true,
+    }),
+  });
+
+  const json = await res.json().catch(() => ({}));
+
+  if (!res.ok || !json?.success) {
+    throw new Error(
+      typeof json?.error === "string"
+        ? json.error
+        : typeof json?.detail === "string"
+        ? json.detail
+        : "Failed to generate template draft"
+    );
+  }
+
+  if (!Array.isArray(json.shapes) || json.shapes.length < 3) {
+    throw new Error("Generated template is incomplete");
+  }
+
+  return json as {
+    success: boolean;
+    shapes: any[];
+    backgroundImage?: string | null;
+    campaignData?: Record<string, any>;
+  };
+}
+
+async function saveGeneratedTemplate(payload: {
+  brandId: string;
+  toneId: string;
+  toneLabel: string;
+  companyName: string;
+  shapes: any[];
+  backgroundImage?: string | null;
+}) {
+  return backendApi<{ ok: boolean; id: string }>("/templates", {
+    method: "POST",
+    body: JSON.stringify({
+      name: `${payload.companyName} — ${payload.toneLabel}`,
+      description: "Auto-generated from brand manager after brand creation",
+      shapes: payload.shapes,
+      backgroundImage: payload.backgroundImage || null,
+      thumbnail_url: null,
+      preview_url: null,
+      canvasWidth: LANDSCAPE_WIDTH,
+      canvasHeight: LANDSCAPE_HEIGHT,
+      brand_id: payload.brandId,
+      tone_id: payload.toneId,
+      orientation: "landscape",
+    }),
+  });
+}
+
+async function generateRequiredTemplatesForBrand(params: {
+  brandId: string;
+  companyName: string;
+  logoUrl?: string | null;
+  onProgress?: (items: TemplateGenerationProgress[]) => void;
+}) {
+  const tones = await listActiveTonesForBrandTemplates();
+
+  if (!tones.length) {
+    return { created: 0, failed: 0, total: 0 };
+  }
+
+  let items: TemplateGenerationProgress[] = tones.map((tone) => ({
+    toneId: tone.id,
+    label: tone.label || tone.name || tone.id,
+    status: "queued",
+    message: "Waiting",
+  }));
+
+  const updateItem = (toneId: string, patch: Partial<TemplateGenerationProgress>) => {
+    items = items.map((item) =>
+      item.toneId === toneId ? { ...item, ...patch } : item
+    );
+    params.onProgress?.(items);
+  };
+
+  params.onProgress?.(items);
+
+  let created = 0;
+  let failed = 0;
+
+  for (const tone of tones) {
+    const toneLabel = tone.label || tone.name || tone.id;
+
+    try {
+      updateItem(tone.id, { status: "running", message: "Generating layout" });
+
+      let generated: Awaited<ReturnType<typeof generateTemplateDraftForBrand>> | null = null;
+      let lastError: any = null;
+
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          updateItem(tone.id, {
+            status: "running",
+            message: `Generating layout (${attempt}/2)`,
+          });
+          generated = await generateTemplateDraftForBrand({
+            companyName: params.companyName,
+            logoUrl: params.logoUrl,
+          });
+          break;
+        } catch (e) {
+          lastError = e;
+          if (attempt < 2) await new Promise((r) => setTimeout(r, 400));
+        }
+      }
+
+      if (!generated) {
+        throw lastError || new Error("Generation failed");
+      }
+
+      updateItem(tone.id, { status: "running", message: "Saving template" });
+
+      await saveGeneratedTemplate({
+        brandId: params.brandId,
+        toneId: tone.id,
+        toneLabel,
+        companyName: params.companyName,
+        shapes: generated.shapes,
+        backgroundImage: generated.backgroundImage || null,
+      });
+
+      created += 1;
+      updateItem(tone.id, { status: "done", message: "Template ready" });
+    } catch (e: any) {
+      failed += 1;
+      updateItem(tone.id, {
+        status: "failed",
+        message: e?.message || "Template generation failed",
+      });
+    }
+  }
+
+  return { created, failed, total: tones.length };
+}
+
 /* ─── Helpers ─────────────────────────────────────────────────────────────── */
 
 function fmtDate(iso?: string | null) {
@@ -918,6 +1123,8 @@ export default function BrandsPage() {
   const [primaryColor, setPrimaryColor] = useState("#7c3aed");
   const [isActive, setIsActive] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [templateSetupProgress, setTemplateSetupProgress] = useState<TemplateGenerationProgress[]>([]);
+  const [templateSetupSummary, setTemplateSetupSummary] = useState<string | null>(null);
 
   const autoId = displayName
     .trim()
@@ -944,6 +1151,8 @@ export default function BrandsPage() {
 
   const onCreate = async () => {
     const cleanName = displayName.trim();
+    const cleanLogoUrl = logoUrl.trim();
+
     if (!cleanName) {
       setMsg({ type: "err", text: "Display name is required." });
       return;
@@ -955,15 +1164,28 @@ export default function BrandsPage() {
 
     setCreating(true);
     setMsg(null);
+    setTemplateSetupProgress([]);
+    setTemplateSetupSummary(null);
 
     try {
-      await createBrand({
+      const createdBrand = (await createBrand({
         id: autoId,
         display_name: cleanName,
         is_active: isActive,
-        logo_url: logoUrl.trim() || null,
+        logo_url: cleanLogoUrl || null,
         primary_color: normalizeHex(primaryColor),
-      } as any);
+      } as any)) as Brand;
+
+      const brandId = createdBrand?.id || autoId;
+
+      setTemplateSetupSummary("Generating required templates for all active tones…");
+
+      const templateResult = await generateRequiredTemplatesForBrand({
+        brandId,
+        companyName: cleanName,
+        logoUrl: cleanLogoUrl || null,
+        onProgress: setTemplateSetupProgress,
+      });
 
       setDisplayName("");
       setLogoUrl("");
@@ -972,11 +1194,28 @@ export default function BrandsPage() {
       setShowForm(false);
 
       await refresh(true);
-      setMsg({ type: "ok", text: `Brand "${cleanName}" created.` });
+
+      if (templateResult.total === 0) {
+        setMsg({
+          type: "ok",
+          text: `Brand "${cleanName}" created. No active tones were found, so no templates were generated.`,
+        });
+      } else if (templateResult.failed > 0) {
+        setMsg({
+          type: "err",
+          text: `Brand "${cleanName}" created, but ${templateResult.failed}/${templateResult.total} template(s) failed. Open the brand and retry template generation.`,
+        });
+      } else {
+        setMsg({
+          type: "ok",
+          text: `Brand "${cleanName}" created with ${templateResult.created} landscape template(s).`,
+        });
+      }
     } catch (e: any) {
-      setMsg({ type: "err", text: e.message });
+      setMsg({ type: "err", text: e.message || "Failed to create brand" });
     } finally {
       setCreating(false);
+      setTemplateSetupSummary(null);
     }
   };
 
@@ -1471,6 +1710,83 @@ export default function BrandsPage() {
               </div>
             )}
 
+            {creating && (templateSetupSummary || templateSetupProgress.length > 0) && (
+              <div
+                style={{
+                  padding: "12px 14px",
+                  background: "rgba(124,58,237,0.08)",
+                  border: "1px solid rgba(124,58,237,0.2)",
+                  borderRadius: 14,
+                  marginBottom: 16,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    color: "#c4b5fd",
+                    fontSize: 11,
+                    fontWeight: 800,
+                    marginBottom: templateSetupProgress.length ? 10 : 0,
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 12,
+                      height: 12,
+                      border: "2px solid rgba(196,181,253,0.25)",
+                      borderTopColor: "#c4b5fd",
+                      borderRadius: "50%",
+                      display: "inline-block",
+                      animation: "brandspin 0.7s linear infinite",
+                    }}
+                  />
+                  {templateSetupSummary || "Generating required templates…"}
+                </div>
+
+                {templateSetupProgress.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {templateSetupProgress.map((item) => {
+                      const color =
+                        item.status === "done"
+                          ? "#34d399"
+                          : item.status === "failed"
+                          ? "#f87171"
+                          : item.status === "running"
+                          ? "#a78bfa"
+                          : "rgba(255,255,255,0.3)";
+
+                      return (
+                        <div
+                          key={item.toneId}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: 10,
+                            padding: "7px 9px",
+                            borderRadius: 9,
+                            background: "rgba(255,255,255,0.035)",
+                            border: "1px solid rgba(255,255,255,0.06)",
+                            fontFamily: "DM Mono, monospace",
+                            fontSize: 10,
+                          }}
+                        >
+                          <span style={{ color: "rgba(255,255,255,0.55)", fontWeight: 700 }}>
+                            {item.label}
+                          </span>
+                          <span style={{ color, textAlign: "right" }}>
+                            {item.message || item.status}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div style={{ display: "flex", gap: 8 }}>
               <button className="brand-btn brand-btn-primary" onClick={onCreate} disabled={creating}>
                 {creating ? (
@@ -1488,16 +1804,19 @@ export default function BrandsPage() {
                 ) : (
                   <Plus style={{ width: 12, height: 12 }} />
                 )}
-                {creating ? "Creating…" : "Create Brand"}
+                {creating ? "Creating + templates…" : "Create Brand"}
               </button>
 
               <button
                 className="brand-btn brand-btn-outline"
+                disabled={creating}
                 onClick={() => {
                   setShowForm(false);
                   setDisplayName("");
                   setLogoUrl("");
                   setPrimaryColor("#7c3aed");
+                  setTemplateSetupProgress([]);
+                  setTemplateSetupSummary(null);
                   setMsg(null);
                 }}
               >

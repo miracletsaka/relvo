@@ -308,8 +308,8 @@ function Sel({ label, value, onChange, options }: { label?: string; value: strin
       {label && <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: C.dim, fontFamily: "DM Mono, monospace", marginBottom: 6 }}>{label}</div>}
       <select value={value ?? ""} onChange={e => onChange(e.target.value)}
         style={{ width: "100%", background: "rgba(255,255,255,0.04)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 13px", color: value ? C.text : C.muted, fontSize: 12, fontFamily: "DM Mono, monospace", outline: "none" }}>
-        <option value="">— Select —</option>
-        {options.map(o => <option key={o} value={o}>{o}</option>)}
+        <option className="text-black" value="">— Select —</option>
+        {options.map(o => <option className="text-black" key={o} value={o}>{o}</option>)}
       </select>
     </div>
   );
@@ -397,7 +397,6 @@ function TabHeader({ title, sub, onAdd }: { title: string; sub?: string; onAdd?:
         <div style={{ fontSize: 18, fontWeight: 800, color: C.text, fontFamily: "Syne, sans-serif" }}>{title}</div>
         {sub && <div style={{ fontSize: 11, color: C.muted, marginTop: 3 }}>{sub}</div>}
       </div>
-      {onAdd && <Btn onClick={onAdd}>+ Add</Btn>}
     </div>
   );
 }
@@ -1169,7 +1168,7 @@ function MetadataTab({ toast }: { toast: (ok: boolean, msg: string) => void }) {
             <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: C.dim, fontFamily: "DM Mono, monospace", marginBottom: 6 }}>Category</div>
             <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
               style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 13px", color: C.text, fontSize: 11, fontFamily: "DM Mono, monospace", outline: "none" }}>
-              {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+              {CATEGORIES.map(c => <option className="text-black" key={c} value={c}>{c}</option>)}
             </select>
           </div>
           <div>

@@ -3,12 +3,7 @@
 import { useState } from "react"
 import { Save, Eye, EyeOff, Copy, Check, Shield, Sliders, Key, ChevronRight } from "lucide-react"
 import { Loader2 } from "lucide-react"
-
-// Mock changePassword for standalone demo
-async function changePassword(data: { current_password: string; new_password: string }) {
-  await new Promise((r) => setTimeout(r, 1200))
-  if (data.current_password === "wrong") throw new Error("Current password is incorrect.")
-}
+import { changePassword } from "@/lib/api"
 
 export default function SettingsPage() {
   const [apiKey] = useState("sk-relvo-abc123def456ghi789jkl")
@@ -716,7 +711,7 @@ export default function SettingsPage() {
                     <select className="select-field" value={settings.defaultLanguage}
                       onChange={(e) => setSettings(s => ({ ...s, defaultLanguage: e.target.value }))}>
                       {["English", "French", "Spanish", "German", "Portuguese", "Arabic"].map(l => (
-                        <option key={l}>{l}</option>
+                        <option className="text-black" key={l}>{l}</option>
                       ))}
                     </select>
                   </div>

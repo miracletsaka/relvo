@@ -424,9 +424,9 @@ console.log("selectedIds", selectedIds);
               value={month}
               onChange={(e) => setMonth(e.target.value)}
             >
-              <option value="all">All</option>
+              <option className="text-black" value="all">All</option>
               {months.map((m) => (
-                <option key={m} value={m}>
+                <option className="text-black" key={m} value={m}>
                   {monthLabel(m)}
                 </option>
               ))}
@@ -440,9 +440,9 @@ console.log("selectedIds", selectedIds);
               value={platform}
               onChange={(e) => setPlatform(e.target.value as any)}
             >
-              <option value="all">All</option>
+              <option className="text-black" value="all">All</option>
               {platformOptions.map((p) => (
-                <option key={p.id} value={p.id}>
+                <option className="text-black" key={p.id} value={p.id}>
                   {p.display_name}
                 </option>
               ))}
@@ -456,7 +456,7 @@ console.log("selectedIds", selectedIds);
               onChange={(e) => setCtype(e.target.value as any)}
             >
               {TYPES.map((t) => (
-                <option key={t} value={t}>
+                <option className="text-black" key={t} value={t}>
                   {t === "all" ? "All" : t}
                 </option>
               ))}

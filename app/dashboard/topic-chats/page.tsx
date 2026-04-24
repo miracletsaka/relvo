@@ -634,15 +634,15 @@ export default function TopicChatsPage() {
             <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
               <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.25)", fontFamily: "DM Mono, monospace" }}>Brand</span>
               <select className="tc-select" value={brand} onChange={e => setBrand(e.target.value)}>
-                <option value="all">All brands</option>
-                {brands.map(b => <option key={b} value={b}>{b}</option>)}
+                <option className="text-black" value="all">All brands</option>
+                {brands.map(b => <option className="text-black" key={b} value={b}>{b}</option>)}
               </select>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
               <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.25)", fontFamily: "DM Mono, monospace" }}>Month</span>
               <select className="tc-select" value={month} onChange={e => setMonth(e.target.value)}>
-                <option value="all">All months</option>
-                {months.map(m => <option key={m} value={m}>{m}</option>)}
+                <option className="text-black" value="all">All months</option>
+                {months.map(m => <option className="text-black" key={m} value={m}>{m}</option>)}
               </select>
             </div>
             {(brand !== "all" || month !== "all") && (

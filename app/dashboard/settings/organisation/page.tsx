@@ -195,9 +195,9 @@ export default function OrgSettingsPage() {
             <div style={{ display: "flex", gap: 8 }}>
               <input value={invite} onChange={e => setInvite(e.target.value)} placeholder="colleague@company.com" onKeyDown={e => e.key === "Enter" && sendInvite()} style={{ flex: 1, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "10px 14px", color: "#e4e4e7", fontSize: 12, outline: "none", fontFamily: "DM Mono, monospace" }} />
               <select value={invRole} onChange={e => setInvRole(e.target.value)} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "10px 12px", color: "#e4e4e7", fontSize: 12, outline: "none", fontFamily: "Syne, sans-serif" }}>
-                <option value="admin">Admin</option>
-                <option value="member">Member</option>
-                <option value="viewer">Viewer</option>
+                <option className="text-black" value="admin">Admin</option>
+                <option className="text-black" value="member">Member</option>
+                <option className="text-black" value="viewer">Viewer</option>
               </select>
               <button onClick={sendInvite} disabled={saving || !invite.trim()} style={{ padding: "10px 18px", background: invite.trim() ? "rgba(52,211,153,0.15)" : "rgba(255,255,255,0.04)", border: `1px solid ${invite.trim() ? "rgba(52,211,153,0.3)" : "rgba(255,255,255,0.08)"}`, borderRadius: 10, color: invite.trim() ? "#34d399" : "rgba(255,255,255,0.2)", fontSize: 12, fontWeight: 700, cursor: invite.trim() ? "pointer" : "default", fontFamily: "Syne, sans-serif" }}>
                 Invite

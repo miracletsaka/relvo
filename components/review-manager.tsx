@@ -473,7 +473,7 @@ export default function ReviewsManagerPage() {
             <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.06)" }} />
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          <div className="grid grid-cols-1 md:grid-cols-2">
             {/* Send form */}
             <div style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 16, padding: "24px" }}>
               <p style={{ fontSize: 13, fontWeight: 700, color: "#e4e4e7", margin: "0 0 6px" }}>Send Review Link</p>

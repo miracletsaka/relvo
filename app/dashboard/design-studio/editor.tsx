@@ -421,9 +421,9 @@ function StudioSelect({
         boxSizing: "border-box",
       }}
     >
-      <option value="">{placeholder}</option>
+      <option className="text-black" value="">{placeholder}</option>
       {options.map((item) => (
-        <option key={getValue(item)} value={getValue(item)}>
+        <option className="text-black" key={getValue(item)} value={getValue(item)}>
           {getLabel(item)}
         </option>
       ))}
@@ -498,8 +498,6 @@ export default function EditorPage() {
     setSelectedShapeId(null);
     setSelectedShapeIds([]);
   }, []);
-
-  console.log("active template", activeTemplate);
 
   const syncFromTemplate = useCallback(
     (template: Template) => {

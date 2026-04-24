@@ -145,7 +145,7 @@ function PriceEditor({
           }}
         >
           {["USD","GBP","EUR","ZAR","NGN","KES","GHS","UGX","TZS"].map(c => (
-            <option key={c} value={c}>{c}</option>
+            <option className="text-black" key={c} value={c}>{c}</option>
           ))}
         </select>
         {/* Amount */}

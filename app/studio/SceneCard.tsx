@@ -171,9 +171,9 @@ export default function SceneCard({
               onChange={(e) => onEdit({ mode: e.target.value as any })}
               style={{ ...inputStyle, fontWeight: 800 }}
             >
-              <option value="webcam">Webcam (video+audio)</option>
-              <option value="broll">B-roll (audio only)</option>
-              <option value="ai">AI (Veo scene)</option>
+              <option className="text-black" value="webcam">Webcam (video+audio)</option>
+              <option className="text-black" value="broll">B-roll (audio only)</option>
+              <option className="text-black" value="ai">AI (Veo scene)</option>
             </select>
           </div>
 

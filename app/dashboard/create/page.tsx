@@ -1136,16 +1136,16 @@ tone_id === toneId && t.brand_id === brandId);
             <div>
               <span className="field-label">Brand / Page</span>
               <select className="topics-select" value={brandId} onChange={(e) => setBrandId(e.target.value)}>
-                {brands.map((b) => <option key={b.id} value={b.id}>{b.display_name}</option>)}
+                {brands.map((b) => <option className="text-black" key={b.id} value={b.id}>{b.display_name}</option>)}
               </select>
             </div>
 
             <div>
               <span className="field-label">Tone</span>
               <select className="topics-select" value={toneId} onChange={(e) => setToneId(e.target.value)}>
-                <option value="">Select tone</option>
+                <option className="text-black" value="">Select tone</option>
                 {tones.map((t) => (
-                  <option key={t.id} value={t.id}>
+                  <option className="text-black" key={t.id} value={t.id}>
                     {t.emoji ? `${t.emoji} ` : ""}{t.label || t.name}
                   </option>
                 ))}
@@ -1187,7 +1187,7 @@ tone_id === toneId && t.brand_id === brandId);
                 <div>
                   <span className="field-label">Posts per week</span>
                   <select value={postsPerWeek} onChange={(e) => setPostsPerWeek(Number(e.target.value))} className="topics-select">
-                    {[1,2,3,4,5].map((n) => <option key={n} value={n}>{n} / week</option>)}
+                    {[1,2,3,4,5].map((n) => <option className="text-black" key={n} value={n}>{n} / week</option>)}
                   </select>
                 </div>
                 <p className="text-[11px] text-white/25 leading-relaxed">Platforms detected from your active page connections.</p>

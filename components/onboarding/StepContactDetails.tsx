@@ -106,7 +106,7 @@ export default function StepContactDetails({ initial = {}, onNext, onBack, stepI
               <label style={labelStyle}>Country</label>
               <select value={data.country} onChange={e => set("country")(e.target.value)}
                 style={{ ...inputStyle, appearance: "none", cursor: "pointer" }}>
-                <option value="">Select country…</option>
+                <option className="text-black" value="">Select country…</option>
                 {COUNTRIES.map(c => <option className="text-black" key={c} value={c}>{c}</option>)}
               </select>
             </div>
