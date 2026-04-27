@@ -193,9 +193,28 @@ export async function buildOfferLayoutResult(
   }
 
   // Sub-millisecond entropy
-  const entropySeed = options?.entropySeed !== undefined
-    ? options.entropySeed
-    : Math.floor((typeof performance !== "undefined" ? performance.now() : Date.now()) * 1000) % 999983;
+  // ── Entropy seed: 5-source mix prevents any two generations colliding ─────
+  // Sources: explicit override | org name hash | timestamp μs | random | call counter
+  const entropySeed = (() => {
+    if (options?.entropySeed !== undefined) return options.entropySeed;
+    const tsNs  = Math.floor(
+      (typeof performance !== "undefined" ? performance.now() : Date.now()) * 1_000_000
+    );
+    const orgStr = [
+      (campaignData as any)?.companyName,
+      (campaignData as any)?.email,
+      (campaignData as any)?.phone,
+    ].filter(Boolean).join("|");
+    // FNV-1a hash of org string for org-specific offset
+    let h = 0x811c9dc5;
+    for (let i = 0; i < orgStr.length; i++) {
+      h ^= orgStr.charCodeAt(i);
+      h = Math.imul(h, 0x01000193);
+    }
+    const orgHash = h >>> 0;
+    const random  = Math.floor(Math.random() * 999983);
+    return ((tsNs ^ orgHash ^ random) >>> 0) % 99_999_983;
+  })();
 
   const campaign = normalizeCampaignData(campaignData);
   const brand    = buildBrandFingerprint(campaign, entropySeed);

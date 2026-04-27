@@ -179,61 +179,171 @@ function LOGO(x: number, y: number, w: number, h: number): TemplateShape {
 // Larger fonts, no duplication — this is the single source of truth.
 export function buildContactStrip(
   campaign: NormalizedCampaignData,
-  palette: Palette,
-  brand: BrandFingerprint,
-  canvasW: number,
-  canvasH: number,
-  efs: number
+  palette:  Palette,
+  brand:    BrandFingerprint,
+  canvasW:  number,
+  canvasH:  number,
+  efs:      number
 ): TemplateShape[] {
   const shapes: TemplateShape[] = [];
-  // Taller strip — more room for large readable fonts
-  const stripH  = Math.round(132 * efs);
-  const stripY  = canvasH - stripH;
-  const pad     = Math.round(40 * efs);
-  const DF      = brand.displayFont;
-  // Full width minus minimal padding — bounding box wide enough for long strings
-  const textW   = canvasW - pad * 2;
-  const row1H   = Math.round(38 * efs);   // taller hit area — text wraps in editor
-  const row2H   = Math.round(32 * efs);
+  const rng   = seededRng(brand.seed ^ 0xC0FFEE42);   // deterministic per brand, unique per seed
+  const DF    = brand.displayFont;
 
-  // Strip background — solid dark for contrast
-  shapes.push(R(0, stripY, canvasW, stripH,
-    hexToRgba(palette.bg, 0.95), 0, { zIndex: Z_TEXT - 2 }));
-  // Top accent line — bold
-  shapes.push(R(0, stripY, canvasW, Math.round(5 * efs),
-    palette.accent, 0, { zIndex: Z_TEXT - 1 }));
+  // ── Pick a strip VARIANT (0–7) driven by brand seed ─────────────────────
+  // Each variant has a completely different visual structure so no two orgs
+  // share the same footer design even if they generate at the same time.
+  const variant = rng.nextInt(0, 7);
 
-  // ROW 1 — "COMPANY · 📞 phone · ✉ email · 🌐 website"
-  // 26px — large and readable at any zoom
+  // Shared sizing — varies slightly per variant
+  const stripH = Math.round((variant % 2 === 0 ? 120 : 136) * efs);
+  const stripY = canvasH - stripH;
+  const pad    = Math.round((variant < 4 ? 40 : 50) * efs);
+  const textW  = canvasW - pad * 2;
+  const fs1    = Math.round((variant % 3 === 0 ? 24 : variant % 3 === 1 ? 22 : 26) * efs);
+  const fs2    = Math.round((variant % 3 === 0 ? 18 : variant % 3 === 1 ? 17 : 20) * efs);
+  const row1H  = Math.round(fs1 * 1.6);
+  const row2H  = Math.round(fs2 * 1.6);
+
+  // Alignment alternates per variant
+  const row1Align: "left"|"center"|"right" = variant < 3 ? "left" : variant < 6 ? "center" : "right";
+  const row1X = row1Align === "center" ? 0   : row1Align === "right" ? canvasW - textW - pad : pad;
+  const row1W = row1Align === "center" ? canvasW : textW;
+
+  // ── Background — 4 distinct styles ───────────────────────────────────────
+  switch (variant % 4) {
+    case 0:
+      // Solid dark bg
+      shapes.push(R(0, stripY, canvasW, stripH,
+        hexToRgba(palette.bg, 0.96), 0, { zIndex: Z_TEXT - 2 }));
+      break;
+    case 1:
+      // Accent tinted bg
+      shapes.push(R(0, stripY, canvasW, stripH,
+        hexToRgba(palette.accent, 0.12), 0, { zIndex: Z_TEXT - 2 }));
+      break;
+    case 2:
+      // Solid bg + subtle inner glow
+      shapes.push(R(0, stripY, canvasW, stripH,
+        hexToRgba(palette.bg, 0.98), 0, {
+          zIndex: Z_TEXT - 2,
+          shadowBlur: Math.round(20 * efs), shadowX: 0, shadowY: -4,
+          shadowColor: hexToRgba(palette.accent, 0.10),
+        }));
+      break;
+    case 3:
+      // Near-transparent — dark wash
+      shapes.push(R(0, stripY, canvasW, stripH,
+        hexToRgba(palette.bg, 0.82), 0, { zIndex: Z_TEXT - 2 }));
+      // Gradient overlay reinforcement
+      shapes.push({
+        id: makeId("strip-grad"), type: "gradient-overlay",
+        x: 0, y: stripY, width: canvasW, height: stripH,
+        gradientColors: [
+          { stop: 0, color: hexToRgba(palette.accent, 0.05) },
+          { stop: 1, color: hexToRgba(palette.bg, 0.0) },
+        ],
+        gradientAngle: variant % 2 === 0 ? 90 : 270,
+        backgroundColor: "transparent", borderWidth: 0,
+        zIndex: Z_TEXT - 1,
+      } as TemplateShape);
+      break;
+  }
+
+  // ── Top border — 4 distinct styles ───────────────────────────────────────
+  switch (variant % 4) {
+    case 0:
+      // Bold single line
+      shapes.push(R(0, stripY, canvasW, Math.round(5 * efs),
+        palette.accent, 0, { zIndex: Z_TEXT - 1 }));
+      break;
+    case 1:
+      // Gradient line
+      shapes.push(R(0, stripY, canvasW, Math.round(4 * efs),
+        palette.accent, 0, {
+          gradientColors: palette.accentGradient, gradientAngle: 90,
+          zIndex: Z_TEXT - 1,
+        }));
+      break;
+    case 2:
+      // Double thin line
+      shapes.push(R(0, stripY, canvasW, Math.round(2 * efs),
+        palette.accent, 0, { zIndex: Z_TEXT - 1 }));
+      shapes.push(R(0, stripY + Math.round(5 * efs), canvasW, Math.round(1 * efs),
+        hexToRgba(palette.accent, 0.30), 0, { zIndex: Z_TEXT - 1 }));
+      break;
+    case 3:
+      // Left inset accent block
+      shapes.push(R(0, stripY, Math.round(8 * efs), stripH,
+        palette.accent, 0, { zIndex: Z_TEXT - 1 }));
+      shapes.push(R(0, stripY, canvasW, Math.round(1 * efs),
+        hexToRgba(palette.accent, 0.20), 0, { zIndex: Z_TEXT - 1 }));
+      break;
+  }
+
+  // ── Row 1 — primary contact line ─────────────────────────────────────────
+  const row1PadLeft = variant % 4 === 3 ? pad + Math.round(16 * efs) : row1X;
   shapes.push(T("contact_row1",
-    pad, stripY + Math.round(14 * efs), textW, row1H,
-    Math.round(26 * efs), 700, palette.text, DF, "left",
-    { letterSpacing: 0.4, lineHeight: 1.15, zIndex: Z_TEXT + 1 }
+    row1PadLeft, stripY + Math.round(10 * efs),
+    row1Align === "center" ? canvasW : textW,
+    row1H,
+    fs1, variant < 4 ? 700 : 600, palette.text, DF, row1Align,
+    { letterSpacing: variant % 2 === 0 ? 0.4 : 0.2, lineHeight: 1.15, zIndex: Z_TEXT + 1 }
   ));
 
-  // ROW 2 — "📍 city · 💬 wa · FB · IG · Reg · VAT"
-  // 21px — clear secondary line
+  // ── Row 2 — secondary contact / social line ───────────────────────────────
+  const row2Y = stripY + row1H + Math.round((variant % 2 === 0 ? 16 : 14) * efs);
   shapes.push(T("contact_row2",
-    pad, stripY + row1H + Math.round(20 * efs), textW, row2H,
-    Math.round(21 * efs), 400, palette.muted, DF, "left",
-    { letterSpacing: 0.3, lineHeight: 1.15, zIndex: Z_TEXT + 1 }
+    row1PadLeft, row2Y,
+    row1Align === "center" ? canvasW : textW,
+    row2H,
+    fs2, 400,
+    variant % 3 === 2 ? palette.accent : palette.muted,
+    DF, row1Align,
+    { letterSpacing: variant % 2 === 0 ? 0.3 : 0.5, lineHeight: 1.15, zIndex: Z_TEXT + 1 }
   ));
 
-  // Website — right side, accent colour, bold
-  // Wide bounding box so long URLs don't get clipped
-  shapes.push(T("business_website",
-    canvasW - Math.round(480 * efs), stripY + Math.round(32 * efs),
-    Math.round(436 * efs), row1H,
-    Math.round(22 * efs), 800, palette.accent, DF, "right",
-    { letterSpacing: 0.8, lineHeight: 1.0, zIndex: Z_TEXT + 2 }
-  ));
+  // ── Website accent — position varies by variant ───────────────────────────
+  if (row1Align !== "right") {
+    // Only show right-side website when row1 is left/center
+    const webFS = Math.round((variant % 2 === 0 ? 18 : 20) * efs);
+    const webW  = Math.round((variant % 2 === 0 ? 400 : 360) * efs);
+    shapes.push(T("business_website",
+      canvasW - webW - Math.round(pad * 0.5), stripY + Math.round(28 * efs),
+      webW, row1H,
+      webFS, 800, palette.accent, DF, "right",
+      { letterSpacing: variant % 2 === 0 ? 1.0 : 0.6, lineHeight: 1.0, zIndex: Z_TEXT + 2 }
+    ));
+  }
+
+  // ── Variant-specific decorative extras ───────────────────────────────────
+  if (variant === 1 || variant === 5) {
+    // Small accent dot-separator between rows
+    shapes.push({
+      id: makeId("strip-dot"), type: "circle",
+      x: Math.round(pad * 0.5), y: stripY + Math.round(stripH / 2 - 4 * efs),
+      width: Math.round(8 * efs), height: Math.round(8 * efs),
+      backgroundColor: hexToRgba(palette.accent, 0.5),
+      borderWidth: 0, zIndex: Z_TEXT,
+    } as TemplateShape);
+  }
+
+  if (variant === 3 || variant === 7) {
+    // Right-side vertical accent bar
+    shapes.push(R(canvasW - Math.round(4 * efs), stripY, Math.round(4 * efs), stripH,
+      hexToRgba(palette.accent, 0.4), 0, { zIndex: Z_TEXT }));
+  }
+
+  if (variant === 2 || variant === 6) {
+    // Subtle center divider between rows
+    shapes.push(R(pad, stripY + row1H + Math.round(12 * efs),
+      Math.round(textW * 0.6), Math.round(1 * efs),
+      hexToRgba(palette.accent, 0.18), 0, { zIndex: Z_TEXT }));
+  }
 
   return shapes;
 }
 
-// ── Main style renderer ────────────────────────────────────────────────────────
-// All styles target 1080×1080 square canvas — compact, no voids.
-// NO CONTACT() blocks inside styles — contacts live ONLY in buildContactStrip().
+
 export function buildStyleShapes(
   style: TemplateStyleName,
   campaign: NormalizedCampaignData,

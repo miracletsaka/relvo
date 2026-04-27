@@ -535,6 +535,53 @@ export default function AutoGenerateImagesDialog(props: {
     throw lastError instanceof Error ? lastError : new Error("Attach failed");
   };
 
+
+  /**
+   * Paid-only AI Final Polish.
+   *
+   * This intentionally fails open: if the user is not paid, OpenAI is unavailable,
+   * or the polish route fails, we keep the current working canvas export flow and
+   * upload the original PNG. That means this premium step can never break batch
+   * generation.
+   */
+  const enhanceCanvasWithAI = async (draftId: string, file: File): Promise<File> => {
+    try {
+      setRowStage(draftId, "ai_final_polish");
+
+      const formData = new FormData();
+      formData.append("image", file, file.name);
+
+      const res = await fetch("/api/enhance-canvas-image", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+
+      // 402 / 403 means the org is not on a paid plan. Keep normal export.
+      if (res.status === 402 || res.status === 403) {
+        setRowStage(draftId, "ai_final_polish_skipped_unpaid");
+        return file;
+      }
+
+      // Do not break generation if the AI polish endpoint fails.
+      if (!res.ok) {
+        setRowStage(draftId, "ai_final_polish_skipped");
+        return file;
+      }
+
+      const blob = await res.blob();
+      if (!blob || blob.size === 0) return file;
+
+      return new File(
+        [blob],
+        file.name.replace(/\.png$/i, "-ai-polished.png"),
+        { type: blob.type || "image/png" },
+      );
+    } catch {
+      return file;
+    }
+  };
+
   useEffect(() => {
     if (!open) return;
     resetSession();
@@ -756,7 +803,9 @@ export default function AutoGenerateImagesDialog(props: {
             `${finalCampaignData.companyName || "draft"}-${draft.id}.png`,
           );
 
-          const url = await uploadWithRetry(draft.id, file);
+          const finalFile = await enhanceCanvasWithAI(draft.id, file);
+
+          const url = await uploadWithRetry(draft.id, finalFile);
           await attachWithRetry(draft.id, url);
 
           updateRow(draft.id, { status: "done", message: "complete", imageUrl: url });

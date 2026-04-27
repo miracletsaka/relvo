@@ -2,8 +2,8 @@
 /**
  * app/dashboard/billing/page.tsx
  * ─────────────────────────────────────────────────────────────────────────────
- * Billing page — fully designed, ready for future activation.
- * Current status: "Coming Soon" — all payment methods are UI-only.
+ * Billing page — production PayChangu mobile money flow.
+ * Mobile money is active; card payments stay disabled for future PayPal integration.
  *
  * Payment methods:
  *   - TNM Mpamba (mobile money)
@@ -13,7 +13,21 @@
  * Plans: Free · Starter · Pro · Agency
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+const API = (process.env.NEXT_PUBLIC_API_BASE || "http://127.0.0.1:8000").replace(/\/$/, "");
+
+type CurrentUser = {
+  id: string;
+  email: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  org_id: string | null;
+  role: string | null;
+  is_email_verified: boolean;
+};
+
+type PaymentStatus = "idle" | "pending" | "success" | "failed";
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const T = {
@@ -108,18 +122,18 @@ const PLANS: Plan[] = [
 type PayMethod = "tnm" | "airtel" | "card";
 
 const PAY_METHODS: { id: PayMethod; label: string; sub: string; icon: string; color: string }[] = [
-  {
-    id: "tnm", label: "TNM Mpamba", sub: "Dial *412# on TNM",
-    icon: "📱", color: "#e63946",
-  },
+  // {
+  //   id: "tnm", label: "TNM Mpamba", sub: "Dial *412# on TNM",
+  //   icon: "📱", color: "#e63946",
+  // },
   {
     id: "airtel", label: "Airtel Money", sub: "Dial *211# on Airtel",
     icon: "💳", color: "#ef6c00",
   },
-  {
-    id: "card", label: "Debit / Credit Card", sub: "Visa · Mastercard",
-    icon: "🏦", color: T.blue,
-  },
+  // {
+  //   id: "card", label: "Debit / Credit Card", sub: "Visa · Mastercard",
+  //   icon: "🏦", color: T.blue,
+  // },
 ];
 
 // ── Tiny helpers ──────────────────────────────────────────────────────────────
@@ -148,14 +162,14 @@ function ComingSoonBanner() {
       <div style={{ flex: 1 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
           <span style={{ fontSize: 13, fontWeight: 800, color: T.amber, fontFamily: "'Syne', sans-serif", letterSpacing: "-0.2px" }}>
-            Billing is coming soon
+            Mobile money billing is live
           </span>
           <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: "rgba(251,191,36,0.15)", border: "1px solid rgba(251,191,36,0.3)", color: T.amber, fontFamily: "DM Mono, monospace", letterSpacing: "0.08em" }}>
-            IN PREPARATION
+            ACTIVE
           </span>
         </div>
         <p style={{ fontSize: 12, color: "rgba(251,191,36,0.65)", lineHeight: 1.7, margin: 0, fontFamily: "'DM Sans', sans-serif", maxWidth: 560 }}>
-          We're actively setting up payment processing for Malawi and beyond. You can explore the plans and methods below — once billing is live, you'll be the first to know via email. Everything you see here is ready and will activate immediately.
+          TNM Mpamba and Airtel Money payments now create a phone authorisation prompt. Your plan is upgraded only after verification confirms the transaction is successful.
         </p>
       </div>
 
@@ -291,10 +305,19 @@ function PaymentMethodCard({
 }
 
 // ── Phone input for mobile money ──────────────────────────────────────────────
-function MobileMoneyForm({ method }: { method: PayMethod }) {
-  const [phone, setPhone] = useState("");
+function MobileMoneyForm({
+  method,
+  phone,
+  setPhone,
+  disabled = false,
+}: {
+  method: PayMethod;
+  phone: string;
+  setPhone: (value: string) => void;
+  disabled?: boolean;
+}) {
   const label = method === "tnm" ? "TNM Mpamba Number" : "Airtel Money Number";
-  const prefix = method === "tnm" ? "+265 88" : "+265 99";
+  const prefix = method === "tnm" ? "+265 8" : "+265 9";
 
   return (
     <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 14 }}>
@@ -305,17 +328,18 @@ function MobileMoneyForm({ method }: { method: PayMethod }) {
           <input
             type="tel"
             value={phone}
-            onChange={e => setPhone(e.target.value.replace(/\D/g, "").slice(0, 7))}
+            disabled={disabled}
+            onChange={e => setPhone(e.target.value.replace(/\D/g, "").slice(0, 8))}
             placeholder="1 234 567"
-            style={{ ...inputStyle, paddingLeft: 72 }}
+            style={{ ...inputStyle, paddingLeft: 72, opacity: disabled ? 0.55 : 1, cursor: disabled ? "not-allowed" : "text" }}
             onFocus={e => { e.target.style.borderColor = "rgba(167,139,250,0.6)"; e.target.style.boxShadow = "0 0 0 3px rgba(124,58,237,0.1)"; }}
             onBlur={e => { e.target.style.borderColor = T.border; e.target.style.boxShadow = "none"; }}
           />
         </div>
         <p style={{ fontSize: 9, color: T.dim, fontFamily: "DM Mono, monospace", margin: "6px 0 0" }}>
           {method === "tnm"
-            ? "You'll receive a push notification to authorise payment on your TNM line"
-            : "You'll receive an Airtel Money authorisation prompt on your phone"
+            ? "A TNM Mpamba PIN prompt will be sent to this line"
+            : "An Airtel Money PIN prompt will be sent to this line"
           }
         </p>
       </div>
@@ -501,6 +525,93 @@ function FAQ({ q, a }: { q: string; a: string }) {
   );
 }
 
+// ── Billing account info ─────────────────────────────────────────────────────
+function BillingAccountInfo({
+  user,
+  loading,
+  missingFields,
+}: {
+  user: CurrentUser | null;
+  loading: boolean;
+  missingFields: string[];
+}) {
+  const complete = missingFields.length === 0;
+  const displayName = user
+    ? [user.first_name, user.last_name].filter(Boolean).join(" ") || user.email || "Account user"
+    : "Account user";
+
+  return (
+    <div style={{ marginTop: 18, padding: "20px", background: T.surface, border: `1px solid ${complete ? T.border : "rgba(251,191,36,0.28)"}`, borderRadius: 16 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: T.muted, fontFamily: "DM Mono, monospace", marginBottom: 8, letterSpacing: "0.06em" }}>
+        BILLING ACCOUNT
+      </div>
+
+      {loading ? (
+        <div style={{ fontSize: 12, color: T.muted, fontFamily: "'DM Sans', sans-serif" }}>Loading account details…</div>
+      ) : complete && user ? (
+        <>
+          <div style={{ fontSize: 13, fontWeight: 800, color: T.text, fontFamily: "'Syne', sans-serif", marginBottom: 4 }}>
+            {displayName}
+          </div>
+          <div style={{ fontSize: 11, color: T.muted, fontFamily: "DM Mono, monospace" }}>
+            Receipt and billing notices will be sent to {user.email}
+          </div>
+        </>
+      ) : (
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: T.amber, fontFamily: "'Syne', sans-serif", marginBottom: 8 }}>
+            Complete your profile before payment
+          </div>
+          <div style={{ fontSize: 11, color: "rgba(251,191,36,0.75)", fontFamily: "DM Mono, monospace", marginBottom: 12 }}>
+            Missing: {missingFields.join(", ")}
+          </div>
+          <button
+            onClick={() => { window.location.href = "/dashboard/settings"; }}
+            style={{ padding: "9px 14px", background: "rgba(251,191,36,0.14)", border: "1px solid rgba(251,191,36,0.3)", borderRadius: 10, color: T.amber, fontSize: 11, fontWeight: 800, cursor: "pointer", fontFamily: "'Syne', sans-serif" }}
+          >
+            Go to Settings
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Payment status panel ──────────────────────────────────────────────────────
+function PaymentStatusPanel({
+  status,
+  message,
+  error,
+  chargeId,
+}: {
+  status: PaymentStatus;
+  message: string;
+  error: string;
+  chargeId: string | null;
+}) {
+  if (!message && !error && !chargeId) return null;
+
+  const isSuccess = status === "success";
+  const isFailed = status === "failed" || !!error;
+  const color = isSuccess ? T.green : isFailed ? T.red : T.amber;
+  const bg = isSuccess ? "rgba(52,211,153,0.1)" : isFailed ? "rgba(248,113,113,0.1)" : "rgba(251,191,36,0.09)";
+  const border = isSuccess ? "rgba(52,211,153,0.25)" : isFailed ? "rgba(248,113,113,0.25)" : "rgba(251,191,36,0.25)";
+
+  return (
+    <div style={{ marginTop: 14, padding: "14px 16px", background: bg, border: `1px solid ${border}`, borderRadius: 13 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 9, color, fontSize: 12, fontWeight: 800, fontFamily: "'Syne', sans-serif" }}>
+        {status === "pending" && <span style={{ width: 13, height: 13, border: `2px solid ${color}55`, borderTopColor: color, borderRadius: "50%", display: "inline-block", animation: "bill-spin 0.8s linear infinite" }} />}
+        <span>{error || message}</span>
+      </div>
+      {chargeId && (
+        <div style={{ marginTop: 7, fontSize: 9, color: T.dim, fontFamily: "DM Mono, monospace" }}>
+          Charge ID: {chargeId}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Shared styles ─────────────────────────────────────────────────────────────
 const labelStyle: React.CSSProperties = {
   display: "block", fontSize: 10, fontWeight: 700,
@@ -520,11 +631,168 @@ const inputStyle: React.CSSProperties = {
 // ── MAIN PAGE ─────────────────────────────────────────────────────────────────
 export default function BillingPage() {
   const [selectedPlan,   setSelectedPlan]   = useState<string>("pro");
-  const [selectedMethod, setSelectedMethod] = useState<PayMethod>("tnm");
+  const [selectedMethod, setSelectedMethod] = useState<PayMethod>("airtel");
   const [activeSection,  setActiveSection]  = useState<"plans" | "payment" | "history">("plans");
+
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [userLoading, setUserLoading] = useState(true);
+  const [mobileNumber, setMobileNumber] = useState("");
+  const [paying, setPaying] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("idle");
+  const [paymentMessage, setPaymentMessage] = useState("");
+  const [paymentError, setPaymentError] = useState("");
+  const [chargeId, setChargeId] = useState<string | null>(null);
 
   const currentPlan = PLANS.find(p => p.id === "free")!;
   const chosenPlan  = PLANS.find(p => p.id === selectedPlan)!;
+
+  const missingFields = [
+    !currentUser?.first_name ? "First name" : null,
+    !currentUser?.last_name ? "Last name" : null,
+    !currentUser?.email ? "Email" : null,
+  ].filter(Boolean) as string[];
+
+  const isProfileComplete = !userLoading && !!currentUser && missingFields.length === 0;
+  const isMobilePayment = selectedMethod === "tnm" || selectedMethod === "airtel";
+  const fullMobileNumber = isMobilePayment
+    ? `${selectedMethod === "tnm" ? "08" : "09"}${mobileNumber}`
+    : "";
+
+  function getErrorMessage(data: any, fallback: string) {
+    const detail = data?.detail;
+    if (!detail) return fallback;
+    if (typeof detail === "string") return detail;
+    if (detail?.message) return detail.message;
+    try { return JSON.stringify(detail); } catch { return fallback; }
+  }
+
+  async function startPayChanguPayment() {
+    setPaymentError("");
+    setPaymentMessage("");
+    setChargeId(null);
+    setPaymentStatus("idle");
+
+    if (!isProfileComplete) {
+      setPaymentError("Complete your profile before starting payment.");
+      return;
+    }
+
+    if (selectedMethod === "card") {
+      setPaymentError("Card payments will be added later with PayPal. Use TNM Mpamba or Airtel Money for now.");
+      return;
+    }
+
+    if (mobileNumber.length !== 8) {
+      setPaymentError(`Enter a valid ${selectedMethod === "tnm" ? "TNM Mpamba" : "Airtel Money"} number.`);
+      return;
+    }
+
+    setPaying(true);
+
+    try {
+      const res = await fetch(`${API}/billing/paychangu/initialize`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          plan_id: selectedPlan,
+          payment_method: selectedMethod,
+          mobile: fullMobileNumber,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(getErrorMessage(data, "Payment request failed"));
+      }
+
+      const nextChargeId = data?.charge_id || data?.payment?.charge_id || data?.paychangu?.data?.charge_id;
+
+      if (!nextChargeId) {
+        throw new Error("Payment request started, but no charge ID was returned.");
+      }
+
+      setChargeId(nextChargeId);
+      setPaymentStatus("pending");
+      setPaymentMessage("Payment request sent. Check your phone, enter your PIN, then keep this page open while we confirm it.");
+    } catch (err: any) {
+      setPaymentStatus("failed");
+      setPaymentError(err?.message || "Payment request failed");
+    } finally {
+      setPaying(false);
+    }
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCurrentUser() {
+      try {
+        const res = await fetch(`${API}/auth/me`, {
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+        });
+
+        if (!res.ok) throw new Error(`${res.status}`);
+
+        const data = await res.json();
+        if (!cancelled) setCurrentUser(data);
+      } catch {
+        if (!cancelled) setCurrentUser(null);
+      } finally {
+        if (!cancelled) setUserLoading(false);
+      }
+    }
+
+    loadCurrentUser();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!chargeId || paymentStatus !== "pending") return;
+
+    let cancelled = false;
+
+    async function verifyPayment() {
+      try {
+        const res = await fetch(`${API}/billing/payments/${chargeId}`, {
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          throw new Error(getErrorMessage(data, "Could not verify payment yet"));
+        }
+
+        if (cancelled) return;
+
+        if (data?.status === "success") {
+          setPaymentStatus("success");
+          setPaymentMessage("Payment successful. Your subscription has been upgraded.");
+          setPaymentError("");
+        } else if (data?.status === "failed") {
+          setPaymentStatus("failed");
+          setPaymentError("Payment failed or was cancelled. No subscription changes were made.");
+        } else {
+          setPaymentStatus("pending");
+          setPaymentMessage("Waiting for confirmation. Please approve the prompt on your phone.");
+        }
+      } catch {
+        // Keep polling. Temporary verification failures should not block the user flow.
+      }
+    }
+
+    verifyPayment();
+    const timer = window.setInterval(verifyPayment, 5000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [chargeId, paymentStatus]);
 
   const SECTIONS = [
     { id: "plans",   label: "Plans",          icon: "📦" },
@@ -622,7 +890,7 @@ export default function BillingPage() {
               <div style={{ fontSize: 16, fontWeight: 800, color: T.text, marginBottom: 4 }}>Frequently Asked Questions</div>
               <div style={{ fontSize: 11, color: T.dim, fontFamily: "DM Mono, monospace", marginBottom: 20 }}>Everything you need to know about billing</div>
               <div style={{ display: "flex", flexDirection: "column" }}>
-                <FAQ q="When will billing be available?" a="We're finalising payment integrations for TNM Mpamba, Airtel Money, and international cards. You'll receive an email notification as soon as billing goes live. All plan prices and features are confirmed." />
+                <FAQ q="When will billing be available?" a="TNM Mpamba and Airtel Money are active for testing. Card payments will be added later with PayPal." />
                 <FAQ q="Will my free tier data be preserved when I upgrade?" a="Yes — all your brands, templates, drafts, and review data carry over seamlessly when you upgrade to any paid plan." />
                 <FAQ q="Can I pay in Malawian Kwacha (MWK)?" a="Absolutely. TNM Mpamba and Airtel Money payments are processed in MWK. Card payments support MWK, USD, and GBP." />
                 <FAQ q="Is there a contract or can I cancel anytime?" a="All plans are month-to-month with no contracts. Cancel anytime from this billing page — your plan stays active until the end of the billing period." />
@@ -639,7 +907,7 @@ export default function BillingPage() {
             <div style={{ padding: "16px 18px", background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.22)", borderRadius: 12, marginBottom: 28, display: "flex", gap: 10, alignItems: "flex-start" }}>
               <span style={{ fontSize: 16, flexShrink: 0 }}>⚠️</span>
               <p style={{ fontSize: 12, color: "rgba(251,191,36,0.75)", lineHeight: 1.65, margin: 0, fontFamily: "'DM Sans', sans-serif" }}>
-                Payment processing is not yet active. Your details below will not be charged. We're collecting preferences so activation is instant when we go live.
+                A mobile money authorisation prompt will be sent to your phone. Your subscription is upgraded only after verifies the completed payment.
               </p>
             </div>
 
@@ -679,20 +947,68 @@ export default function BillingPage() {
               </div>
 
               {(selectedMethod === "tnm" || selectedMethod === "airtel") && (
-                <MobileMoneyForm method={selectedMethod} />
+                <MobileMoneyForm method={selectedMethod} phone={mobileNumber} setPhone={setMobileNumber} disabled={paymentStatus === "pending" || paying} />
               )}
               {selectedMethod === "card" && <CardForm />}
             </div>
 
+            <BillingAccountInfo
+              user={currentUser}
+              loading={userLoading}
+              missingFields={missingFields}
+            />
+
             {/* Pay button */}
             <button
-              style={{ marginTop: 18, width: "100%", padding: "15px", background: "linear-gradient(135deg, rgba(124,58,237,0.6), rgba(79,70,229,0.6))", border: "1.5px solid rgba(124,58,237,0.4)", borderRadius: 14, color: "rgba(255,255,255,0.5)", fontSize: 14, fontWeight: 800, cursor: "not-allowed", fontFamily: "'Syne', sans-serif", letterSpacing: "0.02em", display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
-              <span style={{ fontSize: 18 }}>🔒</span>
-              Confirm Subscription — Coming Soon
+              onClick={startPayChanguPayment}
+              disabled={paying || paymentStatus === "pending" || selectedMethod === "card" || !isProfileComplete}
+              style={{
+                marginTop: 18,
+                width: "100%",
+                padding: "15px",
+                background: selectedMethod === "card" || !isProfileComplete
+                  ? "rgba(255,255,255,0.06)"
+                  : "linear-gradient(135deg, #7c3aed, #4f46e5)",
+                border: "1.5px solid rgba(124,58,237,0.4)",
+                borderRadius: 14,
+                color: selectedMethod === "card" || !isProfileComplete ? "rgba(255,255,255,0.45)" : "#fff",
+                fontSize: 14,
+                fontWeight: 800,
+                cursor: paying || paymentStatus === "pending" || selectedMethod === "card" || !isProfileComplete ? "not-allowed" : "pointer",
+                fontFamily: "'Syne', sans-serif",
+                letterSpacing: "0.02em",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 10,
+                boxShadow: selectedMethod === "card" || !isProfileComplete ? "none" : "0 6px 24px rgba(124,58,237,0.35)",
+              }}
+            >
+              {paying ? (
+                <>
+                  <span style={{ width: 14, height: 14, border: "2px solid rgba(255,255,255,0.25)", borderTopColor: "#fff", borderRadius: "50%", display: "inline-block", animation: "bill-spin 0.7s linear infinite" }} />
+                  Sending payment request…
+                </>
+              ) : paymentStatus === "pending" ? (
+                <>Waiting for phone approval…</>
+              ) : selectedMethod === "card" ? (
+                <>Card payments coming later with PayPal</>
+              ) : !isProfileComplete ? (
+                <>Complete profile to continue</>
+              ) : (
+                <>Pay {fmt(chosenPlan.price)} with {selectedMethod === "tnm" ? "TNM Mpamba" : "Airtel Money"}</>
+              )}
             </button>
 
+            <PaymentStatusPanel
+              status={paymentStatus}
+              message={paymentMessage}
+              error={paymentError}
+              chargeId={chargeId}
+            />
+
             <p style={{ textAlign: "center", marginTop: 12, fontSize: 10, color: T.dim, fontFamily: "DM Mono, monospace" }}>
-              No charges will be made until billing is officially activated
+              We only activate your plan after verify confirms payment success.
             </p>
           </div>
         )}
