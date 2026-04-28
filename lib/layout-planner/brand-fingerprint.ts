@@ -7,7 +7,7 @@
 
 import type { NormalizedCampaignData, BrandFingerprint } from "./types";
 import { hashString, seededRng } from "./utils";
-import { BEBAS_NEUE, INTER, TONE_FONTS } from "./constants";
+import { BEBAS_NEUE, INTER, PLAYFAIR, SYNE, TONE_FONTS, BARLOW, OSWALD } from "./constants";
 
 export function buildBrandFingerprint(
   campaign:    NormalizedCampaignData,
