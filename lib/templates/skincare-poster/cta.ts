@@ -1,0 +1,178 @@
+import { SKINCARE_BRAND_THEME, SKINCARE_POSTER_LAYOUT } from "./layout";
+
+const jitter = (base: number, amount: number) => {
+  return Math.round(base + (Math.random() * amount * 2 - amount));
+};
+
+const pick = <T,>(items: readonly T[]): T => {
+  return items[Math.floor(Math.random() * items.length)];
+};
+
+const placements = {
+  "editorial-left": { x: 82, y: 940, width: 340, align: "left" },
+  "center-product": { x: 270, y: 1160, width: 540, align: "center" },
+  "minimal-luxury": { x: 84, y: 950, width: 330, align: "left" },
+  "stacked-vertical": { x: 270, y: 1180, width: 540, align: "center" },
+  "beauty-magazine": { x: 78, y: 950, width: 360, align: "left" },
+} as const;
+
+const p = placements[SKINCARE_POSTER_LAYOUT] || placements["editorial-left"];
+
+const ctaLayouts = [
+  () => [
+    {
+      id: "skincare-cta-bg",
+      type: "rounded-rect",
+      x: jitter(p.x, 8),
+      y: jitter(p.y, 8),
+      width: p.width,
+      height: 86,
+      backgroundColor: SKINCARE_BRAND_THEME.accent2,
+      borderWidth: 0,
+      borderRadius: 22,
+      zIndex: 22,
+    },
+    {
+      id: "skincare-cta-sheen",
+      type: "rounded-rect",
+      x: jitter(p.x + 24, 6),
+      y: jitter(p.y + 16, 4),
+      width: p.width * 0.42,
+      height: 8,
+      backgroundColor: "rgba(255,255,255,0.34)",
+      borderWidth: 0,
+      borderRadius: 999,
+      opacity: 0.75,
+      zIndex: 23,
+    },
+    {
+      id: "skincare-cta-text",
+      type: "text",
+      x: p.x,
+      y: p.y + 28,
+      width: p.width,
+      height: 34,
+      dataField: "cta_text",
+      fontSize: 30,
+      fontWeight: 900,
+      textColor: SKINCARE_BRAND_THEME.bg,
+      textAlign: "center",
+      fontFamily: "'Syne', sans-serif",
+      lineHeight: 1,
+      letterSpacing: 1.5,
+      borderWidth: 0,
+      zIndex: 24,
+    },
+  ],
+
+  () => [
+    {
+      id: "skincare-cta-outline",
+      type: "rounded-rect",
+      x: jitter(p.x, 8),
+      y: jitter(p.y, 8),
+      width: p.width,
+      height: 82,
+      backgroundColor: "transparent",
+      borderColor: SKINCARE_BRAND_THEME.accent2,
+      borderWidth: 2,
+      borderRadius: 999,
+      zIndex: 22,
+    },
+    {
+      id: "skincare-cta-soft-fill",
+      type: "rounded-rect",
+      x: jitter(p.x + 10, 5),
+      y: jitter(p.y + 10, 5),
+      width: p.width - 20,
+      height: 62,
+      backgroundColor: "rgba(255,255,255,0.045)",
+      borderWidth: 0,
+      borderRadius: 999,
+      zIndex: 21,
+    },
+    {
+      id: "skincare-cta-outline-text",
+      type: "text",
+      x: p.x,
+      y: p.y + 27,
+      width: p.width,
+      height: 32,
+      dataField: "cta_text",
+      fontSize: 26,
+      fontWeight: 900,
+      textColor: SKINCARE_BRAND_THEME.cream,
+      textAlign: "center",
+      fontFamily: "'Syne', sans-serif",
+      lineHeight: 1,
+      letterSpacing: 2,
+      borderWidth: 0,
+      zIndex: 24,
+    },
+  ],
+
+  () => [
+    {
+      id: "skincare-cta-glass",
+      type: "rounded-rect",
+      x: jitter(p.x, 8),
+      y: jitter(p.y, 8),
+      width: p.width,
+      height: 86,
+      backgroundColor: "rgba(255,255,255,0.065)",
+      borderColor: SKINCARE_BRAND_THEME.line,
+      borderWidth: 1,
+      borderRadius: 999,
+      zIndex: 22,
+    },
+    {
+      id: "skincare-cta-dot",
+      type: "circle",
+      x: p.x + 22,
+      y: p.y + 20,
+      width: 46,
+      height: 46,
+      backgroundColor: SKINCARE_BRAND_THEME.accent,
+      borderWidth: 0,
+      zIndex: 23,
+    },
+    {
+      id: "skincare-cta-arrow",
+      type: "text",
+      x: p.x + 22,
+      y: p.y + 31,
+      width: 46,
+      height: 24,
+      text: "→",
+      fontSize: 28,
+      fontWeight: 900,
+      textColor: SKINCARE_BRAND_THEME.bg,
+      textAlign: "center",
+      fontFamily: "'Syne', sans-serif",
+      lineHeight: 1,
+      letterSpacing: 0,
+      borderWidth: 0,
+      zIndex: 24,
+    },
+    {
+      id: "skincare-cta-glass-text",
+      type: "text",
+      x: p.x + 88,
+      y: p.y + 29,
+      width: p.width - 112,
+      height: 32,
+      dataField: "cta_text",
+      fontSize: 26,
+      fontWeight: 900,
+      textColor: SKINCARE_BRAND_THEME.text,
+      textAlign: "left",
+      fontFamily: "'Syne', sans-serif",
+      lineHeight: 1,
+      letterSpacing: 1.5,
+      borderWidth: 0,
+      zIndex: 24,
+    },
+  ],
+];
+
+export const skincareCtaShapes = pick(ctaLayouts)();

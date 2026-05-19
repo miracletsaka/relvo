@@ -151,12 +151,12 @@ export function getShapeText(shape: TemplateShape, campaignData: CampaignData): 
 
     // ── Registration / legal ───────────────────────────────────────────────
     case "registration_no":
+      // Return raw value only — never shown in templates unless org explicitly has it
       text = first(biz.registration_no, cd.registration_no);
-      if (text) text = `Reg: ${text}`;
       break;
     case "vat_number":
+      // Return raw value only — never shown in templates unless org explicitly has it
       text = first(biz.vat_number, cd.vat_number);
-      if (text) text = `VAT: ${text}`;
       break;
 
     // ── Composite contact rows (used in contact strip) ─────────────────────
@@ -175,25 +175,25 @@ export function getShapeText(shape: TemplateShape, campaignData: CampaignData): 
       break;
     }
 
-    // contact_row2: address + socials + legal on second line
+    // contact_row2: city/country + socials only
+    // NO registration_no or vat_number — not all businesses have these
+    // and displaying fabricated/empty legal numbers is dangerous
     case "contact_row2": {
       const parts: string[] = [];
-      const addr = [first(biz.city, cd.city), first(biz.country, cd.country)].filter(Boolean).join(", ");
+      const city    = first(biz.city, cd.city);
+      const country = first(biz.country, cd.country);
+      const addr    = [city, country].filter(Boolean).join(", ");
       const wa   = first(cd.whatsapp, biz.whatsapp);
       const fb   = first(biz.facebook_url, cd.facebook_url);
       const ig   = first(biz.instagram_url, cd.instagram_url);
       const li   = first(biz.linkedin_url, cd.linkedin_url);
       const tt   = first(biz.tiktok_url, cd.tiktok_url);
-      const reg  = first(biz.registration_no, cd.registration_no);
-      const vat  = first(biz.vat_number, cd.vat_number);
       if (addr) parts.push(`📍 ${addr}`);
       if (wa)   parts.push(`💬 ${wa}`);
       if (fb)   parts.push(`FB: ${fb.replace(/.*facebook\.com\//, "")}`);
       if (ig)   parts.push(`IG: @${ig.replace(/.*instagram\.com\//, "").replace(/\/$/, "")}`);
       if (li)   parts.push(`LI: ${li.replace(/.*linkedin\.com\/company\//, "")}`);
       if (tt)   parts.push(`TT: @${tt.replace(/.*tiktok\.com\/@/, "").replace(/\/$/, "")}`);
-      if (reg)  parts.push(`Reg: ${reg}`);
-      if (vat)  parts.push(`VAT: ${vat}`);
       text = parts.join("  ·  ");
       break;
     }

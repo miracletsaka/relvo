@@ -54,6 +54,136 @@ const FONT_OPTIONS = [
   { label: "Inconsolata", value: "Inconsolata" },
 ];
 
+const TEXT_DATA_FIELD_GROUPS = [
+  {
+    group: "Campaign Copy",
+    items: [
+      ["headline", "Headline"],
+      ["subheadline", "Subheadline"],
+      ["description", "Description"],
+      ["product_name", "Product / Service Name"],
+      ["campaign_label", "Campaign Label"],
+      ["collection_label", "Collection Label"],
+      ["footer_label", "Footer Label"],
+      ["proof", "Proof"],
+      ["cta_text", "CTA Text"],
+      ["cta", "CTA"],
+      ["ctaLink", "CTA Link"],
+      ["hashtags", "Hashtags"],
+    ],
+  },
+  {
+    group: "Offer",
+    items: [
+      ["offer_label", "Offer Label"],
+      ["offer_value", "Offer Value"],
+      ["offer_title", "Offer Title"],
+      ["offer_description", "Offer Description"],
+      ["price", "Price"],
+      ["discount_label", "Discount Label"],
+    ],
+  },
+  {
+    group: "Features",
+    items: [
+      ["feature_1", "Feature 1"],
+      ["feature_2", "Feature 2"],
+      ["feature_3", "Feature 3"],
+      ["feature_4", "Feature 4"],
+    ],
+  },
+  {
+    group: "Review",
+    items: [
+      ["review_text", "Review Text"],
+      ["review_author", "Review Author"],
+      ["review_rating", "Review Rating"],
+    ],
+  },
+  {
+    group: "Business",
+    items: [
+      ["companyName", "Company Name"],
+      ["business_tagline", "Business Tagline"],
+      ["business_description", "Business Description"],
+      ["business_type", "Business Type"],
+      ["business_size", "Business Size"],
+      ["business_founded", "Business Founded"],
+      ["business_website", "Business Website"],
+      ["website", "Website"],
+      ["phone", "Phone"],
+      ["phone_primary", "Primary Phone"],
+      ["phone_secondary", "Secondary Phone"],
+      ["email", "Email"],
+      ["email_primary", "Primary Email"],
+      ["email_support", "Support Email"],
+      ["whatsapp", "WhatsApp"],
+      ["address", "Address"],
+      ["business_address", "Business Address"],
+      ["city", "City"],
+      ["country", "Country"],
+      ["fullAddress", "Full Address"],
+      ["location", "Location"],
+    ],
+  },
+  {
+    group: "Contact Rows",
+    items: [
+      ["contact_row1", "Contact Row 1"],
+      ["contact_row2", "Contact Row 2"],
+    ],
+  },
+  {
+    group: "Social",
+    items: [
+      ["social_handle", "Social Handle"],
+      ["facebook_url", "Facebook URL"],
+      ["instagram_url", "Instagram URL"],
+      ["linkedin_url", "LinkedIn URL"],
+      ["twitter_url", "Twitter URL"],
+      ["tiktok_url", "TikTok URL"],
+      ["youtube_url", "YouTube URL"],
+      ["map_url", "Map URL"],
+    ],
+  },
+  {
+    group: "Links",
+    items: [
+      ["link_1_label", "Link 1 Label"],
+      ["link_1_url", "Link 1 URL"],
+      ["link_2_label", "Link 2 Label"],
+      ["link_2_url", "Link 2 URL"],
+    ],
+  },
+  {
+    group: "Metadata",
+    items: [
+      ["meta_1_key", "Meta 1 Key"],
+      ["meta_1_value", "Meta 1 Value"],
+      ["meta_2_key", "Meta 2 Key"],
+      ["meta_2_value", "Meta 2 Value"],
+    ],
+  },
+] as const;
+
+const IMAGE_ROLE_OPTIONS = [
+  { value: "custom", label: "Custom", slotType: "image" },
+  { value: "hero_person", label: "Hero Image", slotType: "image" },
+  { value: "heroImage", label: "Hero Image Field", slotType: "image" },
+  { value: "logo", label: "Logo", slotType: "image" },
+  { value: "dashboard_image", label: "Dashboard / Secondary Image", slotType: "image" },
+  { value: "background_image", label: "Background Image", slotType: "image" },
+  { value: "sponsor_1", label: "Sponsor Logo 1", slotType: "sponsor" },
+  { value: "sponsor_2", label: "Sponsor Logo 2", slotType: "sponsor" },
+  { value: "sponsor_3", label: "Sponsor Logo 3", slotType: "sponsor" },
+  { value: "sponsor_logo_1", label: "Sponsor Logo Field 1", slotType: "sponsor" },
+  { value: "sponsor_logo_2", label: "Sponsor Logo Field 2", slotType: "sponsor" },
+  { value: "sponsor_logo_3", label: "Sponsor Logo Field 3", slotType: "sponsor" },
+  { value: "accreditation_1", label: "Accreditation Logo 1", slotType: "accreditation" },
+  { value: "accreditation_2", label: "Accreditation Logo 2", slotType: "accreditation" },
+  { value: "review_avatar_1", label: "Review Avatar", slotType: "review" },
+] as const;
+
 interface PropertyInspectorProps {
   shape: TemplateShape;
   campaignData: CampaignData;
@@ -530,7 +660,7 @@ export default function PropertyInspector({
                 if (v === "custom") {
                   handleChange({ dataField: undefined, customText: shape.customText || "Enter your text" });
                 } else {
-                  handleChange({ dataField: "hook", customText: undefined });
+                  handleChange({ dataField: "headline", customText: undefined });
                 }
               }}
             >
@@ -545,77 +675,23 @@ export default function PropertyInspector({
                 value={shape.dataField}
                 onValueChange={(v) => handleChange({ dataField: v })}
               >
-                {/* Core */}
-                <SelectItem value="hook">Hook</SelectItem>
-                <SelectItem value="subheading">Subheading</SelectItem>
-                <SelectItem value="proof">Proof / Price</SelectItem>
-                <SelectItem value="cta">CTA</SelectItem>
-                <SelectItem value="ctaLink">CTA Link</SelectItem>
-                <SelectItem value="hashtags">Hashtags</SelectItem>
-                <SelectItem value="companyName">Company Name</SelectItem>
-                <SelectItem value="location">Location</SelectItem>
+                {TEXT_DATA_FIELD_GROUPS.map((group) => (
+                  <div key={group.group}>
+                    <SelectItem
+                      value={`__label_${group.group}`}
+                      disabled
+                      className="text-xs uppercase tracking-widest opacity-50"
+                    >
+                      {group.group}
+                    </SelectItem>
 
-                {/* Review / offer helpers */}
-                <SelectItem value="review_text">Review Text</SelectItem>
-                <SelectItem value="review_author">Review Author</SelectItem>
-                <SelectItem value="offer_title">Offer Title</SelectItem>
-                <SelectItem value="offer_cta">Offer CTA</SelectItem>
-
-                {/* Existing planner helper fields */}
-                <SelectItem value="hook_tag">Hook Tag</SelectItem>
-                <SelectItem value="hook_pre">Hook Prefix</SelectItem>
-                <SelectItem value="hook_number">Hook Number</SelectItem>
-                <SelectItem value="hook_label">Hook Label</SelectItem>
-                <SelectItem value="hook_desc">Hook Description</SelectItem>
-
-                <SelectItem value="bullet_1">Bullet 1</SelectItem>
-                <SelectItem value="bullet_2">Bullet 2</SelectItem>
-                <SelectItem value="bullet_3">Bullet 3</SelectItem>
-
-                <SelectItem value="price_label">Price Label</SelectItem>
-                <SelectItem value="fine_print">Fine Print</SelectItem>
-                <SelectItem value="enroll_note">Enroll Note</SelectItem>
-                <SelectItem value="badge_icon">Badge Icon</SelectItem>
-                <SelectItem value="deco_icon">Decorative Icon</SelectItem>
-
-                {/* Business info - nested-friendly resolved helpers */}
-                <SelectItem value="business_tagline">Business Tagline</SelectItem>
-                <SelectItem value="business_description">Business Description</SelectItem>
-                <SelectItem value="business_type">Business Type</SelectItem>
-                <SelectItem value="business_website">Business Website</SelectItem>
-
-                {/* New flattened business fields */}
-                <SelectItem value="website">Website</SelectItem>
-                <SelectItem value="address">Address</SelectItem>
-                <SelectItem value="phone">Phone</SelectItem>
-                <SelectItem value="email">Email</SelectItem>
-                <SelectItem value="whatsapp">WhatsApp</SelectItem>
-
-                <SelectItem value="city">City</SelectItem>
-                <SelectItem value="country">Country</SelectItem>
-                <SelectItem value="fullAddress">Full Address</SelectItem>
-
-                <SelectItem value="registration_no">Registration No.</SelectItem>
-                <SelectItem value="vat_number">VAT Number</SelectItem>
-
-                {/* Social / map */}
-                <SelectItem value="facebook_url">Facebook URL</SelectItem>
-                <SelectItem value="instagram_url">Instagram URL</SelectItem>
-                <SelectItem value="linkedin_url">LinkedIn URL</SelectItem>
-                <SelectItem value="twitter_url">Twitter URL</SelectItem>
-                <SelectItem value="tiktok_url">TikTok URL</SelectItem>
-                <SelectItem value="youtube_url">YouTube URL</SelectItem>
-                <SelectItem value="map_url">Map URL</SelectItem>
-
-                {/* Links / metadata */}
-                <SelectItem value="link_1_label">Link 1 Label</SelectItem>
-                <SelectItem value="link_1_url">Link 1 URL</SelectItem>
-                <SelectItem value="link_2_label">Link 2 Label</SelectItem>
-                <SelectItem value="link_2_url">Link 2 URL</SelectItem>
-                <SelectItem value="meta_1_key">Meta 1 Key</SelectItem>
-                <SelectItem value="meta_1_value">Meta 1 Value</SelectItem>
-                <SelectItem value="meta_2_key">Meta 2 Key</SelectItem>
-                <SelectItem value="meta_2_value">Meta 2 Value</SelectItem>
+                    {group.items.map(([value, label]) => (
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </div>
+                ))}
               </StyledSelect>
             </FieldRow>
           )}
@@ -706,43 +782,26 @@ export default function PropertyInspector({
                     slotKey: undefined,
                     slotLabel: undefined,
                     slotType: "image",
+                    dataField: undefined,
                   } as any);
                   return;
                 }
 
-                const labelMap: Record<string, string> = {
-                  hero_person: "Hero Image",
-                  logo: "Logo",
-                  dashboard_image: "Secondary Image",
-                  sponsor_1: "Sponsor Logo 1",
-                  sponsor_2: "Sponsor Logo 2",
-                  sponsor_3: "Sponsor Logo 3",
-                  accreditation_1: "Accreditation Logo 1",
-                  accreditation_2: "Accreditation Logo 2",
-                  review_avatar_1: "Review Avatar 1",
-                };
+                const selected = IMAGE_ROLE_OPTIONS.find((item) => item.value === v);
 
                 handleChange({
                   slotKey: v,
-                  slotLabel: labelMap[v] || v,
-                  slotType:
-                    v.startsWith("sponsor") ? "sponsor" :
-                    v.startsWith("accreditation") ? "accreditation" :
-                    v.startsWith("review_avatar") ? "review" :
-                    "image",
+                  dataField: v,
+                  slotLabel: selected?.label || v,
+                  slotType: selected?.slotType || "image",
                 } as any);
               }}
             >
-              <SelectItem value="custom">Custom</SelectItem>
-              <SelectItem value="hero_person">Hero Image</SelectItem>
-              <SelectItem value="logo">Logo</SelectItem>
-              <SelectItem value="dashboard_image">Secondary Image</SelectItem>
-              <SelectItem value="sponsor_1">Sponsor 1</SelectItem>
-              <SelectItem value="sponsor_2">Sponsor 2</SelectItem>
-              <SelectItem value="sponsor_3">Sponsor 3</SelectItem>
-              <SelectItem value="accreditation_1">Accreditation 1</SelectItem>
-              <SelectItem value="accreditation_2">Accreditation 2</SelectItem>
-              <SelectItem value="review_avatar_1">Review Avatar</SelectItem>
+              {IMAGE_ROLE_OPTIONS.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
             </StyledSelect>
           </FieldRow>
 

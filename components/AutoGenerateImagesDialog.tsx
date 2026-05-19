@@ -15,7 +15,7 @@ import {
 import { uploadFileToSpaces } from "@/lib/upload-client";
 import { attachMediaToContentItem } from "@/lib/api";
 import type { AITemplateDecision, CampaignData, TemplateShape } from "@/lib/types";
-import { getRandomTemplate } from "@/lib/template-storage";
+import { composeRandomTemplateFromDb } from "@/lib/compose-random-template";
 import {
   Check,
   X,
@@ -33,15 +33,6 @@ import {
   enrichCampaignData,
   type OrgCampaignData,
 } from "@/lib/org-campaign-enricher";
-
-// ---------------------------------------------------------------------------
-// html2canvas captures the DOM-rendered preview into a real PNG.
-// The old <canvas> ref approach only worked when TemplateCanvas painted to a
-// raw <canvas>; when it renders HTML divs the ref captures a blank bitmap.
-// Install: npm install html2canvas  (or: npm install --save-dev @types/html2canvas)
-// ---------------------------------------------------------------------------
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
 import html2canvas from "html2canvas";
 
 type StepStatus = "queued" | "running" | "done" | "failed" | "skipped";
@@ -94,11 +85,28 @@ function StatusBadge({ status }: { status: StepStatus }) {
   );
 }
 
-function inferOrientation(_draft: any): "landscape" {
-  return "landscape";
+function inferOrientation(_draft: any): "portrait" {
+  return "portrait";
 }
 
 type RunBatchMode = "queued_only" | "failed_only";
+
+const TEMPLATE_FAMILY = "mixed-poster";
+
+const DB_COMPOSE_SECTIONS = [
+  "background",
+  "scene",
+  "hero-image",
+  "header",
+  "hero-text",
+  "offer",
+  "cta",
+  "footer",
+  "features",
+  "sponsors",
+  "contact",
+  "social",
+];
 
 const TEMPLATE_FETCH_MAX_TRIES = 5;
 const RESOLUTION_MAX_TRIES = 3;
@@ -180,46 +188,8 @@ function hasValidShapeBox(shape: any) {
   return w > 0 && h > 0 && Number.isFinite(w) && Number.isFinite(h);
 }
 
-function isRealTextShape(shape: any) {
-  if (String(shape?.type || "").toLowerCase() !== "text") return false;
-  const value = String(shape?.text ?? shape?.content ?? shape?.value ?? "").trim();
-  return value.length > 0;
-}
-
-function isTextCandidateShape(shape: any) {
-  if (String(shape?.type || "").toLowerCase() !== "text") return false;
-  if (isRealTextShape(shape)) return true;
-  const slotKey = String(shape?.slotKey || "").trim();
-  const slotLabel = String(shape?.slotLabel || "").trim();
-  const dataKey = String(shape?.dataKey || shape?.bindingKey || shape?.contentKey || shape?.field || "").trim();
-  const placeholder = String(shape?.placeholder || shape?.defaultText || shape?.label || "").trim();
-  return !!(slotKey || slotLabel || dataKey || placeholder);
-}
-
 function hasBrokenDimensions(shapes: TemplateShape[]) {
   return shapes.some((shape: any) => !hasValidShapeBox(shape));
-}
-
-function templateHasMandatorySlots(template: any) {
-  const shapes = getTemplateShapes(template);
-  const slotKeys = new Set(
-    shapes.map((shape: any) => String(shape?.slotKey || "").trim()).filter(Boolean),
-  );
-  return MANDATORY_SLOT_KEYS.every((key) => slotKeys.has(key)) || shapes.length >= 6;
-}
-
-function validateTemplateQuality(
-  template: any,
-  orientation: "portrait" | "landscape",
-): { ok: boolean; reason?: string } {
-  if (!template) return { ok: false, reason: "template_missing" };
-  const shapes = getTemplateShapes(template);
-  if (!shapes.length) return { ok: false, reason: "template_has_no_shapes" };
-  if (shapes.length < MIN_TEMPLATE_SHAPES) return { ok: false, reason: "template_shape_count_too_low" };
-  if (getOrientationFromTemplate(template) !== orientation) return { ok: false, reason: "template_orientation_mismatch" };
-  if (!templateHasMandatorySlots(template)) return { ok: false, reason: "template_required_slots_missing" };
-  if (hasBrokenDimensions(shapes)) return { ok: false, reason: "template_has_broken_dimensions" };
-  return { ok: true };
 }
 
 function validateResolvedShapes(
@@ -299,21 +269,115 @@ async function resolveImageAssetPool(params: {
   return assets;
 }
 
-// ---------------------------------------------------------------------------
-// Proxy cross-origin image URLs through our Next.js route so html2canvas
-// can draw them without tainting the canvas.
-// Make sure you have /app/api/image-proxy/route.ts (or pages equivalent).
-// ---------------------------------------------------------------------------
 function proxiedImageUrl(url: string): string {
   if (!url || !url.startsWith("http")) return url;
   return `/api/image-proxy?url=${encodeURIComponent(url)}`;
 }
 
-// Warm the browser image cache for every image shape before capture.
-async function preloadShapeImages(shapes: TemplateShape[]): Promise<void> {
+function resolveCampaignImageField(
+  field: string | undefined,
+  campaignData: CampaignData | null,
+): string | null {
+  if (!field || !campaignData) return null;
+
+  const data = campaignData as any;
+  const direct = data[field];
+
+  if (typeof direct === "string" && direct.trim()) {
+    return direct;
+  }
+
+  if (field === "logo") {
+    return data.logo || data.imageSlots?.logo?.url || null;
+  }
+
+  if (field === "heroImage") {
+    return (
+      data.heroImage ||
+      data.imageSlots?.hero_person?.url ||
+      data.imageSlots?.heroImage?.url ||
+      null
+    );
+  }
+
+  if (field === "background_image") {
+    return data.background_image || data.imageSlots?.background_image?.url || null;
+  }
+
+  if (field === "dashboard_image") {
+    return data.dashboard_image || data.imageSlots?.dashboard_image?.url || null;
+  }
+
+  if (field === "sponsor_logo_1") {
+    return data.sponsor_logo_1 || data.imageSlots?.sponsor_1?.url || data.sponsors?.[0]?.logo_url || null;
+  }
+
+  if (field === "sponsor_logo_2") {
+    return data.sponsor_logo_2 || data.imageSlots?.sponsor_2?.url || data.sponsors?.[1]?.logo_url || null;
+  }
+
+  if (field === "sponsor_logo_3") {
+    return data.sponsor_logo_3 || data.imageSlots?.sponsor_3?.url || data.sponsors?.[2]?.logo_url || null;
+  }
+
+  return data.imageSlots?.[field]?.url || null;
+}
+
+async function preloadShapeImages(
+  shapes: TemplateShape[],
+  campaignData: CampaignData | null = null,
+): Promise<void> {
   const urls = shapes
-    .filter((s: any) => String(s?.type || "").toLowerCase() === "image" && s?.src)
-    .map((s: any) => proxiedImageUrl(s.src as string));
+    .filter((s: any) => String(s?.type || "").toLowerCase() === "image")
+    .map((s: any) => {
+      if (s?.src) return s.src as string;
+
+      if (s?.dataField) {
+        return resolveCampaignImageField(
+          String(s.dataField),
+          campaignData,
+        );
+      }
+
+      if (s?.slotKey === "sponsor_1") {
+        return resolveCampaignImageField(
+          "sponsor_logo_1",
+          campaignData,
+        );
+      }
+
+      if (s?.slotKey === "sponsor_2") {
+        return resolveCampaignImageField(
+          "sponsor_logo_2",
+          campaignData,
+        );
+      }
+
+      if (s?.slotKey === "sponsor_3") {
+        return resolveCampaignImageField(
+          "sponsor_logo_3",
+          campaignData,
+        );
+      }
+
+      if (s?.slotKey === "hero_person") {
+        return resolveCampaignImageField(
+          "heroImage",
+          campaignData,
+        );
+      }
+
+      if (s?.slotKey === "logo") {
+        return resolveCampaignImageField(
+          "logo",
+          campaignData,
+        );
+      }
+
+      return campaignData?.imageSlots?.[s.slotKey]?.url || null;
+    })
+    .filter(Boolean)
+    .map((src) => proxiedImageUrl(String(src)));
 
   await Promise.allSettled(
     urls.map(
@@ -322,7 +386,7 @@ async function preloadShapeImages(shapes: TemplateShape[]): Promise<void> {
           const img = new Image();
           img.crossOrigin = "anonymous";
           img.onload = () => resolve();
-          img.onerror = () => resolve(); // non-fatal – keep going
+          img.onerror = () => resolve();
           img.src = src;
         }),
     ),
@@ -341,14 +405,6 @@ export default function AutoGenerateImagesDialog(props: {
 }) {
   const { open, onOpenChange, drafts, toneId, autoStart, brandId, onFinished } = props;
 
-  // ---------------------------------------------------------------------------
-  // previewRef  →  wraps <TemplateCanvas> in the DOM for visible UI.
-  //                Scaled/clipped for preview purposes only.
-  //
-  // captureRef  →  wraps a hidden full-size <TemplateCanvas> at exact template
-  //                dimensions (no scaling). html2canvas targets this node to
-  //                capture the complete unclipped canvas at full resolution.
-  // ---------------------------------------------------------------------------
   const previewRef = useRef<HTMLDivElement>(null);
   const captureRef = useRef<HTMLDivElement>(null);
   const autoStartFiredRef = useRef(false);
@@ -409,34 +465,36 @@ export default function AutoGenerateImagesDialog(props: {
     return sourceRows.filter((r) => r.status === "queued");
   };
 
-  const fetchUsableTemplate = async (draftId: string, orientation: "portrait" | "landscape"): Promise<any> => {
-    const attempts: Array<{ toneId?: string }> = [{ toneId }, { toneId }, { toneId }, {}, {}];
-    let lastReason = "no_matching_template_found";
+  const fetchUsableTemplate = async (draftId: string, _orientation: "portrait" | "landscape"): Promise<any> => {
+    setRowStage(draftId, "composing_segments_from_db");
 
-    for (let i = 0; i < Math.min(attempts.length, TEMPLATE_FETCH_MAX_TRIES); i++) {
-      setRowStage(draftId, `retrying_template_${i + 1}`);
-      const template = await getRandomTemplate(brandId, { toneId: attempts[i].toneId, orientation });
-      const validation = validateTemplateQuality(template, orientation);
-      if (validation.ok) return template;
-      lastReason = validation.reason || lastReason;
+    const composed = await composeRandomTemplateFromDb(TEMPLATE_FAMILY, DB_COMPOSE_SECTIONS);
+    const shapes = getTemplateShapes(composed);
+
+    if (!shapes.length || shapes.length < MIN_TEMPLATE_SHAPES) {
+      throw new Error("DB segment composition returned too few shapes");
     }
 
-    throw new Error(`Template selection failed: ${lastReason}`);
+    if (hasBrokenDimensions(shapes)) {
+      throw new Error("DB segment composition returned shapes with broken dimensions");
+    }
+
+    return {
+      ...composed,
+      id: composed.instanceId || `db-composed-${TEMPLATE_FAMILY}`,
+      name: composed.name || "DB Mixed Poster",
+      description: composed.description || "Composed from saved template segments",
+      orientation: "portrait",
+      canvasWidth: PORTRAIT_W,
+      canvasHeight: PORTRAIT_H,
+      canvas_width: PORTRAIT_W,
+      canvas_height: PORTRAIT_H,
+      backgroundImage: null,
+      logoPlacement: null,
+      shapes,
+    };
   };
 
-  // ---------------------------------------------------------------------------
-  // exportCanvasFile – uses html2canvas to rasterise the hidden full-size canvas.
-  //
-  //  1. Wait for React to flush the latest shapes/template into the DOM.
-  //  2. Wait for fonts to be ready.
-  //  3. Give image slots extra settle time.
-  //  4. Capture from captureRef (hidden full-size div at exact template dimensions)
-  //     rather than previewRef (visible scaled preview).
-  //  5. Capture with html2canvas at 2× scale (crisp export).
-  //     • onclone patches all <img src> and background-image URLs to go through
-  //       /api/image-proxy so cross-origin images can be drawn without taint.
-  //  6. Return canvas.toBlob() as a File.
-  // ---------------------------------------------------------------------------
   const exportCanvasFile = async (draftId: string, fileName: string): Promise<File> => {
     let lastError: unknown;
 
@@ -535,15 +593,6 @@ export default function AutoGenerateImagesDialog(props: {
     throw lastError instanceof Error ? lastError : new Error("Attach failed");
   };
 
-
-  /**
-   * Paid-only AI Final Polish.
-   *
-   * This intentionally fails open: if the user is not paid, OpenAI is unavailable,
-   * or the polish route fails, we keep the current working canvas export flow and
-   * upload the original PNG. That means this premium step can never break batch
-   * generation.
-   */
   const enhanceCanvasWithAI = async (draftId: string, file: File): Promise<File> => {
     try {
       setRowStage(draftId, "ai_final_polish");
@@ -663,7 +712,7 @@ export default function AutoGenerateImagesDialog(props: {
             name: template?.name,
             description: template?.description,
             shapeCount: Array.isArray(template?.shapes) ? template.shapes.length : 0,
-            slotKeys: Array.isArray(template?.shapes) ? template.shapes.map((s: any) => s.slotKey).filter(Boolean) : [],
+            slotKeys: Array.isArray(template?.shapes) ? template.shapes.map((s: any) => s.slotKey || s.dataField).filter(Boolean) : [],
           },
           mediaAssets: assets.slice(0, 20).map((a) => ({
             id: a.id, filename: a.filename, tags: a.tags, price: a.price,
@@ -735,12 +784,14 @@ export default function AutoGenerateImagesDialog(props: {
             const secondaryAsset = imageAssetPool.find((a) => a.id === aiDecision.secondaryAssetId) || imageAssetPool[1];
             const sponsor1 = orgData?.sponsors[0];
             const sponsor2 = orgData?.sponsors[1];
+            const sponsor3 = orgData?.sponsors[2];
 
             const aiImageSlots: CampaignData["imageSlots"] = {
-              ...(heroAsset?.url ? { hero_person: { url: heroAsset.url } } : {}),
+              ...(heroAsset?.url ? { hero_person: { url: heroAsset.url }, heroImage: { url: heroAsset.url } } : {}),
               ...(secondaryAsset?.url ? { dashboard_image: { url: secondaryAsset.url } } : {}),
               ...(sponsor1?.logo_url ? { sponsor_1: { url: sponsor1.logo_url } } : {}),
               ...(sponsor2?.logo_url ? { sponsor_2: { url: sponsor2.logo_url } } : {}),
+              ...(sponsor3?.logo_url ? { sponsor_3: { url: sponsor3.logo_url } } : {}),
             };
 
             const formatAssetPrice = (asset?: MediaAsset | null) => {
@@ -757,10 +808,21 @@ export default function AutoGenerateImagesDialog(props: {
             setRowStage(draft.id, "building_campaign_data");
             const enrichedBase: CampaignData = {
               ...draftData,
+
+              // New segment dataField image fields
+              heroImage: heroAsset?.url || (draftData as any).heroImage || "",
+              sponsor_logo_1: sponsor1?.logo_url || (draftData as any).sponsor_logo_1 || "",
+              sponsor_logo_2: sponsor2?.logo_url || (draftData as any).sponsor_logo_2 || "",
+              sponsor_logo_3: sponsor3?.logo_url || (draftData as any).sponsor_logo_3 || "",
+
+              // Existing campaign proof/price fields still supported
               proof: aiDecision.showPrice ? aiDecision.proofText || draftData.proof || heroPriceLabel : draftData.proof,
               price_label: heroPriceLabel || (draftData as any).price_label || "",
-              imageSlots: aiImageSlots,
-            };
+              imageSlots: {
+                ...(draftData.imageSlots || {}),
+                ...aiImageSlots,
+              },
+            } as CampaignData;
             const enrichedData: CampaignData = orgData ? enrichCampaignData(enrichedBase, orgData) : enrichedBase;
 
             setRowStage(draft.id, "resolving_shapes");
@@ -792,7 +854,7 @@ export default function AutoGenerateImagesDialog(props: {
 
           // Pre-warm the browser image cache so html2canvas can paint immediately.
           setRowStage(draft.id, "preloading_images");
-          await preloadShapeImages(finalShapes);
+          await preloadShapeImages(finalShapes, finalCampaignData);
 
           // Allow TemplateCanvas to fully paint text + images before capture.
           await waitForNextPaint(4);
@@ -952,7 +1014,7 @@ export default function AutoGenerateImagesDialog(props: {
                 {orgDataLoading ? (
                   <span className="org-data-badge loading"><span className="spinner-sm" style={{ width: 8, height: 8 }} />Loading org data…</span>
                 ) : orgData ? (
-                  <span className="org-data-badge loaded">✓ Org data ready · {orgData.reviews.length} reviews · {orgData.sponsors.length} sponsors</span>
+                  <span className="org-data-badge loaded">✓ Org data ready · {(orgData.reviews || []).length} reviews · {(orgData.sponsors || []).length} sponsors</span>
                 ) : null}
                 <button className="close-btn" onClick={() => !running && onOpenChange(false)} disabled={running}>
                   <X className="w-3 h-3" /> Close
@@ -1070,10 +1132,10 @@ export default function AutoGenerateImagesDialog(props: {
               {orgData && (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                   {[
-                    { label: "Reviews", val: orgData.reviews.length },
-                    { label: "Sponsors", val: orgData.sponsors.length },
-                    { label: "Accreditations", val: orgData.accreditations.length },
-                    { label: "Offers", val: orgData.offers.length },
+                    { label: "Reviews", val: (orgData.reviews || []).length },
+                    { label: "Sponsors", val: (orgData.sponsors || []).length },
+                    { label: "Accreditations", val: (orgData.accreditations || []).length },
+                    { label: "Offers", val: (orgData.offers || []).length },
                   ].map(({ label, val }) =>
                     val > 0 ? (
                       <span key={label} style={{ fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 6, background: "rgba(52,211,153,0.1)", border: "1px solid rgba(52,211,153,0.2)", color: "#34d399", fontFamily: "DM Mono, monospace" }}>

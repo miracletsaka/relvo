@@ -51,40 +51,8 @@ import { alignShapes, distributeShapes, reorderShape } from "@/lib/alignment-uti
 import { createTemplate, updateTemplate } from "@/lib/template-storage";
 import { uploadFileToSpaces } from "@/lib/upload-client";
 import { resolveTemplateSlots } from "@/lib/resolve-template-slots";
-import { type CampaignData, type Template, type TemplateShape } from "@/lib/types";
+import { type CampaignData, type Template, type TemplateShape, Tone, BrandOption, GenerateMode, Orientation, EditorTab, AlignAction, DistributeAction, ReorderAction, LogoPlacement, SegmentTypeKey } from "@/lib/types";
 import { DEFAULT_CAMPAIGN_DATA } from "@/lib/campaign-context";
-
-type Tone = {
-  id: string;
-  name: string;
-  label: string;
-  description?: string;
-  emoji?: string;
-  is_active: boolean;
-  sort_order: number;
-};
-
-type BrandOption = {
-  id: string;
-  name?: string;
-  display_name?: string;
-};
-
-type GenerateMode = "auto" | "product" | "offer" | "trust";
-type Orientation = "portrait" | "landscape";
-type EditorTab = "design" | "content" | "templates";
-type AlignAction = "left" | "center-h" | "right" | "top" | "center-v" | "bottom";
-type DistributeAction = "horizontal" | "vertical";
-type ReorderAction = "front" | "forward" | "backward" | "back";
-
-type LogoPlacement = {
-  url: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  opacity: number;
-};
 
 const API = (process.env.NEXT_PUBLIC_API_BASE || "").replace(/\/$/, "");
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
@@ -115,6 +83,18 @@ const AI_TEMPLATES = [
   ["cdBrandVs", "Brand vs"],
   ["cdPersonHero", "Person Hero"],
   ["cdLifestyleScene", "Lifestyle Scene"],
+] as const;
+
+const AI_SEGMENTS = [
+  ["hero", "Hero"],
+  ["offer", "Offer"],
+  ["price", "Price"],
+  ["features", "Features"],
+  ["review", "Review"],
+  ["sponsor", "Sponsor"],
+  ["cta", "CTA"],
+  ["urgency", "Urgency"],
+  ["footer", "Footer"],
 ] as const;
 
 async function apiFetch<T>(path: string, opts: RequestInit = {}): Promise<T> {
@@ -431,14 +411,60 @@ function StudioSelect({
   );
 }
 
-export default function EditorPage() {
+function getNextSegmentYOffset(shapes: TemplateShape[], padding = 24) {
+  if (!shapes.length) return 0;
+
+  const lowestY = shapes.reduce((max, shape) => {
+    const y = Number(shape.y || 0);
+    const h = Number(shape.height || 0);
+    return Math.max(max, y + h);
+  }, 0);
+
+  return lowestY + padding;
+}
+
+type EditorPageProps = {
+  initialShapes?: TemplateShape[];
+  initialCampaignData?: CampaignData;
+  initialBackgroundImage?: string | null;
+  initialBrandId?: string;
+  initialToneId?: string;
+  initialCanvasWidth?: number;
+  initialCanvasHeight?: number;
+  embeddedMode?: boolean;
+  onSaveTemplateState?: (payload: {
+    shapes: TemplateShape[];
+    campaignData: CampaignData;
+    backgroundImage?: string | null;
+    canvasWidth: number;
+    canvasHeight: number;
+  }) => void;
+};
+
+export default function EditorPage({
+  initialShapes,
+  initialBrandId,
+  initialToneId,
+  initialCampaignData,
+  initialBackgroundImage,
+  embeddedMode = false,
+  onSaveTemplateState,
+}: EditorPageProps) {
   const searchParams = useSearchParams();
   const canvasRef = useRef<HTMLCanvasElement>(null);
-
+  const [insertedSegments, setInsertedSegments] = useState<SegmentTypeKey[]>([]);
   const [activeTemplate, setActiveTemplate] = useState<Template | null>(null);
-  const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
-  const [campaignData, setCampaignData] = useState<CampaignData>(DEFAULT_CAMPAIGN_DATA);
-  const [shapes, setShapes] = useState<TemplateShape[]>([]);
+  const [backgroundImage, setBackgroundImage] = useState<string | null>(
+    initialBackgroundImage || null,
+  );
+
+  const [campaignData, setCampaignData] = useState<CampaignData>(
+    initialCampaignData || DEFAULT_CAMPAIGN_DATA,
+  );
+
+  const [shapes, setShapes] = useState<TemplateShape[]>(
+    Array.isArray(initialShapes) ? initialShapes : [],
+  );
   const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
   const [selectedShapeIds, setSelectedShapeIds] = useState<string[]>([]);
   const [logoPlacement, setLogoPlacement] = useState<LogoPlacement | undefined>(undefined);
@@ -463,16 +489,16 @@ export default function EditorPage() {
   const [generatingAuto, setGeneratingAuto] = useState(false);
   const [generateMode, setGenerateMode] = useState<GenerateMode>("product");
   const [orientation, setOrientation] = useState<Orientation>("landscape");
-  const [selectedBrandId, setSelectedBrandId] = useState("");
-  const [selectedToneId, setSelectedToneId] = useState("");
+  const [selectedBrandId, setSelectedBrandId] = useState(initialBrandId || "");
+  const [selectedToneId, setSelectedToneId] = useState(initialToneId || "");
   const [brands, setBrands] = useState<BrandOption[]>([]);
   const [tones, setTones] = useState<Tone[]>([]);
-
+  const [generatingSegment, setGeneratingSegment] = useState<SegmentTypeKey | null>(null);
   const templateId = searchParams.get("templateId");
 
   const canvasSize = useMemo(() => getCanvasDimensions(orientation), [orientation]);
-  const CANVAS_WIDTH = canvasSize.width;
-  const CANVAS_HEIGHT = canvasSize.height;
+  const CANVAS_WIDTH = 1080;
+  const CANVAS_HEIGHT = 1350;
   const safeBackground = useMemo(() => ensureBgString(backgroundImage), [backgroundImage]);
   const isEditingExisting = !!activeTemplate?.id;
   const selectedShape = useMemo(
@@ -488,6 +514,24 @@ export default function EditorPage() {
     const date = new Date().toISOString().split("T")[0];
     return `${company}-${date}`;
   }, [campaignData?.companyName]);
+
+  const handleEmbeddedSave = useCallback(() => {
+    onSaveTemplateState?.({
+      shapes,
+      campaignData,
+      backgroundImage: safeBackground,
+      canvasWidth: CANVAS_WIDTH,
+      canvasHeight: CANVAS_HEIGHT,
+    });
+  }, [
+    CANVAS_HEIGHT,
+    CANVAS_WIDTH,
+    backgroundImage,
+    campaignData,
+    onSaveTemplateState,
+    safeBackground,
+    shapes,
+  ]);
 
   const fitCanvas = useCallback(() => {
     setZoom(1);
@@ -1123,6 +1167,110 @@ export default function EditorPage() {
     shapes,
   ]);
 
+  const insertAISegment = useCallback(
+  async (segmentType: SegmentTypeKey) => {
+    setErr(null);
+
+    if (!selectedBrandId) {
+      setErr("Please select a brand before generating an AI segment.");
+      setActiveTab("templates");
+      return;
+    }
+
+    if (!selectedToneId) {
+      setErr("Please select a tone before generating an AI segment.");
+      setActiveTab("templates");
+      return;
+    }
+
+    try {
+      setGeneratingSegment(segmentType);
+
+      const data = await apiFetch<{
+        success: boolean;
+        saved: boolean;
+        segment: {
+          id?: string;
+          name: string;
+          segment_type: string;
+          segment_height: number;
+          shapes: TemplateShape[];
+        };
+      }>("/segments/generate", {
+        method: "POST",
+        body: JSON.stringify({
+          segment_type: segmentType,
+          brand_id: selectedBrandId,
+          tone_id: selectedToneId,
+          canvas_width: CANVAS_WIDTH,
+          orientation,
+          save: false,
+        }),
+      });
+
+      const generatedShapes = Array.isArray(data?.segment?.shapes)
+        ? data.segment.shapes
+        : [];
+
+      if (!generatedShapes.length) {
+        throw new Error("AI generated an empty segment.");
+      }
+
+      const resolvedShapes = resolveTemplateSlots(generatedShapes, campaignData);
+
+      setShapes((prev) => {
+        const maxZ = prev.reduce((acc, shape) => Math.max(acc, shape.zIndex || 1), 1);
+
+        const minY = Math.min(...resolvedShapes.map((s) => Number(s.y || 0)));
+const maxY = Math.max(
+  ...resolvedShapes.map((s) => Number(s.y || 0) + Number(s.height || 0)),
+);
+
+const segmentHeight = Math.max(1, maxY - minY);
+
+const existingLowestY = prev.reduce((max, shape) => {
+  const y = Number(shape.y || 0);
+  const h = Number(shape.height || 0);
+  return Math.max(max, y + h);
+}, 0);
+
+const preferredY = existingLowestY + 24;
+
+const yOffset =
+  preferredY + segmentHeight > CANVAS_HEIGHT
+    ? Math.max(24, CANVAS_HEIGHT - segmentHeight - 24) - minY
+    : preferredY - minY;
+
+        return [
+          ...prev,
+          ...resolvedShapes.map((shape, index) => ({
+              ...shape,
+              id: `${shape.id || makeShapeId()}-${Date.now()}-${index}`,
+              y: Number(shape.y || 0) + yOffset,
+              zIndex: maxZ + index + 1,
+            }))
+        ];
+      });
+      setInsertedSegments((prev) => [...prev, segmentType]);
+
+      resetSelection();
+    } catch (error) {
+      console.error("AI segment generation failed:", error);
+      setErr(error instanceof Error ? error.message : "Failed to generate AI segment");
+    } finally {
+      setGeneratingSegment(null);
+    }
+  },
+  [
+    CANVAS_WIDTH,
+    campaignData,
+    orientation,
+    resetSelection,
+    selectedBrandId,
+    selectedToneId,
+  ],
+);
+
   const insertPremiumComponent = useCallback(
     (key: PremiumComponentKey) => {
       const newShapes = getPremiumComponent(key, CANVAS_WIDTH, CANVAS_HEIGHT);
@@ -1177,103 +1325,21 @@ export default function EditorPage() {
           flexShrink: 0,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: 6,
-                background: T.accentGlow,
-                border: `1px solid ${T.accent}`,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Layers size={14} color={T.accentLight} />
-            </div>
-            <div>
-              <div style={{ fontFamily: T.font, fontSize: 16, letterSpacing: "0.18em", color: T.text }}>
-                CAMPAIGN DESIGNER
-              </div>
-              <div style={{ fontSize: 9, color: T.textMuted, letterSpacing: "0.1em" }}>
-                {activeTemplate?.name ? `EDITING: ${activeTemplate.name.toUpperCase()}` : "NEW TEMPLATE"}
-              </div>
-            </div>
-          </div>
-
-          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-            <div
-              style={{
-                fontSize: 9,
-                fontFamily: T.mono,
-                color: T.textMuted,
-                border: `1px solid ${T.border}`,
-                borderRadius: 3,
-                padding: "2px 8px",
-                letterSpacing: "0.08em",
-              }}
-            >
-              {CANVAS_WIDTH}×{CANVAS_HEIGHT}
-            </div>
-            <div
-              style={{
-                fontSize: 9,
-                fontFamily: T.mono,
-                color: shapes.length > 0 ? T.accentLight : T.textMuted,
-                border: `1px solid ${shapes.length > 0 ? T.border : "rgba(255,255,255,0.06)"}`,
-                borderRadius: 3,
-                padding: "2px 8px",
-                letterSpacing: "0.08em",
-              }}
-            >
-              {shapes.length} SHAPE{shapes.length === 1 ? "" : "S"}
-            </div>
-          </div>
-        </div>
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-          <StudioButton onClick={resetToNewTemplate} variant="ghost" icon={<RefreshCcw size={12} />}>
-            New
-          </StudioButton>
-          {isEditingExisting ? (
-            <StudioButton onClick={() => void persistTemplate("update")} disabled={saving} variant="accent" icon={<Save size={12} />}>
-              {saving ? "Saving…" : "Update"}
-            </StudioButton>
-          ) : (
-            <StudioButton onClick={openSaveDialog} disabled={saving} variant="accent" icon={<Save size={12} />}>
-              Save
-            </StudioButton>
-          )}
+          <h2 className="text-green-500">{CANVAS_WIDTH}×{CANVAS_HEIGHT}</h2>
           <StudioButton onClick={handleExportPNG} icon={<Download size={12} />}>
             Export PNG
           </StudioButton>
-
-          <div style={{ width: 1, alignSelf: "stretch", background: T.border, opacity: 0.7 }} />
-
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {(["product", "offer", "trust", "auto"] as GenerateMode[]).map((mode) => (
-              <StudioButton
-                key={mode}
-                variant={generateMode === mode ? "accent" : "outline"}
-                onClick={() => setGenerateMode(mode)}
-                size="sm"
-              >
-                {mode}
-              </StudioButton>
-            ))}
-          </div>
-
-          <StudioButton
-            onClick={() => void handleAutoGenerateToCanvas()}
-            variant="accent"
-            icon={<Sparkles size={12} />}
-            size="md"
-            disabled={generatingAuto}
-          >
-            {generatingAuto ? "Generating…" : "Auto Generate to Canvas"}
-          </StudioButton>
+          {embeddedMode && (
+            <StudioButton
+              variant="accent"
+              icon={<Save size={12} />}
+              onClick={handleEmbeddedSave}
+            >
+              Save Back To Chat
+            </StudioButton>
+          )}
         </div>
       </div>
 
@@ -1328,37 +1394,6 @@ export default function EditorPage() {
                 </Panel>
 
                 <Panel>
-                  <PanelTitle icon={<Grid3x3 size={11} />}>Orientation</PanelTitle>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <StudioButton variant={orientation === "portrait" ? "accent" : "outline"} onClick={() => setOrientation("portrait")} size="sm" fullWidth>
-                      Portrait
-                    </StudioButton>
-                    <StudioButton variant={orientation === "landscape" ? "accent" : "outline"} onClick={() => setOrientation("landscape")} size="sm" fullWidth>
-                      Landscape
-                    </StudioButton>
-                  </div>
-                </Panel>
-
-                <Panel>
-                  <PanelTitle icon={<ImageIcon size={11} />}>Background</PanelTitle>
-                  <ImageUploader
-                    onImageSelect={(value: unknown) => {
-                      if (isString(value)) {
-                        setBackgroundImage(value);
-                        return;
-                      }
-                      setErr("Background must be a URL string.");
-                    }}
-                    currentImage={safeBackground}
-                  />
-                </Panel>
-
-                <Panel>
-                  <PanelTitle>Logo</PanelTitle>
-                  <LogoEditor logo={logoPlacement} onLogoChange={setLogoPlacement} />
-                </Panel>
-
-                <Panel>
                   <PanelTitle icon={<Plus size={11} />}>Add Shape</PanelTitle>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5 }}>
                     {[
@@ -1386,111 +1421,115 @@ export default function EditorPage() {
                 </Panel>
 
                 <Panel>
-                  <PanelTitle icon={<Layers size={11} />}>Assets</PanelTitle>
+                  <PanelTitle icon={<Layers size={11} />}>Segments</PanelTitle>
+
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    <Collapsible title="Brand Assets" defaultOpen>
+                    <Collapsible title="Add From DB" defaultOpen>
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5 }}>
-                        <StudioButton variant="outline" size="sm" onClick={() => createImageShape("logo", "Logo", { width: 180, height: 80, fit: "contain", radius: 0 })}>
-                          Logo
-                        </StudioButton>
-                        <StudioButton variant="outline" size="sm" onClick={() => createTextShape("companyName", { width: 280, height: 50, fontSize: 28, fontWeight: 700, textColor: "#ffffff" })}>
-                          Company Name
-                        </StudioButton>
-                        <StudioButton variant="outline" size="sm" onClick={() => createTextShape("business_tagline", { width: 360, height: 70, fontSize: 24, fontWeight: 600, textColor: "#e5e7eb" })}>
-                          Tagline
-                        </StudioButton>
-                        <StudioButton variant="outline" size="sm" onClick={() => createTextShape("location", { width: 220, height: 40, fontSize: 20, fontWeight: 500, textColor: "#d1d5db" })}>
-                          Location
-                        </StudioButton>
+                        {AI_SEGMENTS.map(([segmentType, label]) => (
+                          <StudioButton
+                            key={segmentType}
+                            variant="outline"
+                            size="sm"
+                            disabled={generatingSegment === segmentType}
+                            onClick={() => void insertAISegment(segmentType)}
+                          >
+                            {generatingSegment === segmentType ? "Adding..." : label}
+                          </StudioButton>
+                        ))}
                       </div>
                     </Collapsible>
 
-                    <Collapsible title="Visual Assets" defaultOpen>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5 }}>
-                        <StudioButton variant="outline" size="sm" onClick={() => createImageShape("hero_person", "Hero Image", { width: 320, height: 320, fit: "cover", radius: 14 })}>
-                          Hero Image
-                        </StudioButton>
-                        <StudioButton variant="outline" size="sm" onClick={() => createImageShape("dashboard_image", "Secondary Image", { width: 300, height: 220, fit: "cover", radius: 12 })}>
-                          Secondary Image
-                        </StudioButton>
-                        <StudioButton variant="outline" size="sm" onClick={() => createImageShape("sponsor_1", "Sponsor Logo 1", { width: 140, height: 60, fit: "contain", radius: 0 })}>
-                          Sponsor 1
-                        </StudioButton>
-                        <StudioButton variant="outline" size="sm" onClick={() => createImageShape("sponsor_2", "Sponsor Logo 2", { width: 140, height: 60, fit: "contain", radius: 0 })}>
-                          Sponsor 2
-                        </StudioButton>
-                        <StudioButton variant="outline" size="sm" onClick={() => createImageShape("accreditation_1", "Accreditation", { width: 140, height: 60, fit: "contain", radius: 0 })}>
-                          Accreditation
-                        </StudioButton>
-                        <StudioButton variant="outline" size="sm" onClick={() => createImageShape("review_avatar_1", "Review Avatar", { width: 90, height: 90, fit: "cover", radius: 45 })}>
-                          Review Avatar
-                        </StudioButton>
-                      </div>
-                    </Collapsible>
+                    <Collapsible title="Inserted" defaultOpen>
+                      <div style={{ display: "grid", gap: 6 }}>
+                        {insertedSegments.length === 0 ? (
+                          <div
+                            style={{
+                              fontFamily: T.mono,
+                              fontSize: 10,
+                              color: T.textMuted,
+                              lineHeight: 1.5,
+                              padding: "8px 0",
+                            }}
+                          >
+                            No segments added yet.
+                          </div>
+                        ) : (
+                          insertedSegments.map((segment, index) => (
+                            <div
+                              key={`${segment}-${index}`}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                border: `1px solid ${T.border}`,
+                                background: "rgba(255,255,255,0.03)",
+                                borderRadius: 5,
+                                padding: "6px 8px",
+                              }}
+                            >
+                              <span
+                                style={{
+                                  fontFamily: T.mono,
+                                  fontSize: 10,
+                                  color: T.text,
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.06em",
+                                }}
+                              >
+                                {segment}
+                              </span>
 
-                    <Collapsible title="Content Assets" defaultOpen>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5 }}>
-                        <StudioButton variant="outline" size="sm" onClick={() => createTextShape("review_text", { width: 380, height: 120, fontSize: 24, fontWeight: 600, textColor: "#ffffff" })}>
-                          Review Text
-                        </StudioButton>
-                        <StudioButton variant="outline" size="sm" onClick={() => createTextShape("review_author", { width: 220, height: 40, fontSize: 18, fontWeight: 700, textColor: "#d1d5db" })}>
-                          Review Author
-                        </StudioButton>
-                        <StudioButton variant="outline" size="sm" onClick={() => createTextShape("offer_title", { width: 320, height: 80, fontSize: 30, fontWeight: 800, textColor: "#ffffff" })}>
-                          Offer Title
-                        </StudioButton>
-                        <StudioButton variant="outline" size="sm" onClick={() => createTextShape("offer_cta", { width: 220, height: 50, fontSize: 22, fontWeight: 800, textColor: "#ffffff" })}>
-                          Offer CTA
-                        </StudioButton>
-                        <StudioButton variant="outline" size="sm" onClick={() => createTextShape("price_label", { width: 180, height: 30, fontSize: 18, fontWeight: 600, textColor: "#d1d5db" })}>
-                          Price Label
-                        </StudioButton>
-                        <StudioButton variant="outline" size="sm" onClick={() => createTextShape("fine_print", { width: 340, height: 40, fontSize: 14, fontWeight: 400, textColor: "#9ca3af" })}>
-                          Fine Print
-                        </StudioButton>
+                              <span
+                                style={{
+                                  fontFamily: T.mono,
+                                  fontSize: 9,
+                                  color: T.textMuted,
+                                }}
+                              >
+                                #{index + 1}
+                              </span>
+                            </div>
+                          ))
+                        )}
                       </div>
                     </Collapsible>
                   </div>
                 </Panel>
 
                 <Panel>
-                  <PanelTitle icon={<Layers size={11} />}>Components</PanelTitle>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    {PREMIUM_GROUPS.map((group) => (
-                      <Collapsible key={group.label} title={group.label}>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
-                          {group.items.map(([key, label]) => (
-                            <StudioButton key={key} size="sm" variant="outline" onClick={() => insertPremiumComponent(key as PremiumComponentKey)}>
-                              {label}
-                            </StudioButton>
-                          ))}
-                        </div>
-                      </Collapsible>
-                    ))}
+                  <PanelTitle icon={<Sparkles size={11} />}>AI Editing</PanelTitle>
 
-                    <Collapsible title="Clipdrop AI">
-                      <div
-                        style={{
-                          fontSize: 9,
-                          color: "#a78bfa",
-                          marginBottom: 6,
-                          padding: "4px 6px",
-                          borderRadius: 4,
-                          background: "rgba(167,139,250,0.08)",
-                          border: "1px solid rgba(167,139,250,0.2)",
-                          letterSpacing: "0.05em",
-                        }}
-                      >
-                        Uses AI credits
-                      </div>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
-                        {AI_TEMPLATES.map(([key, label]) => (
-                          <StudioButton key={key} size="sm" variant="outline" onClick={() => insertPremiumComponent(key as PremiumComponentKey)}>
-                            {label}
-                          </StudioButton>
-                        ))}
-                      </div>
-                    </Collapsible>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    <textarea
+                      disabled
+                      placeholder="Example: Make this design more premium and improve the CTA..."
+                      style={{
+                        width: "100%",
+                        minHeight: 90,
+                        resize: "vertical",
+                        background: "rgba(255,255,255,0.04)",
+                        border: `1px solid ${T.border}`,
+                        borderRadius: 6,
+                        color: T.textMuted,
+                        padding: "10px",
+                        outline: "none",
+                        fontSize: 11,
+                        fontFamily: T.mono,
+                        lineHeight: 1.5,
+                        opacity: 0.65,
+                      }}
+                    />
+
+                    <StudioButton
+                      variant="accent"
+                      size="md"
+                      fullWidth
+                      disabled
+                      icon={<Sparkles size={12} />}
+                    >
+                      Upgrade to AI Editing
+                    </StudioButton>
                   </div>
                 </Panel>
 

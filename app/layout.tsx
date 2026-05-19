@@ -9,7 +9,7 @@ const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-serif"
 const firaCode = Fira_Code({ subsets: ["latin"], variable: "--font-mono" })
 
 export const metadata: Metadata = {
-  title: "Relvo - Your AI Content Studio",
+  title: "Relvo - Your AI business partner for marketing and design",
   description: "AI Content creation System",
   generator: "v0.app",
   icons: ['/logo.png']

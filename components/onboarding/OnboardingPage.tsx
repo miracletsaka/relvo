@@ -17,26 +17,35 @@ const API = (process.env.NEXT_PUBLIC_API_BASE || "").replace(/\/$/, "");
 async function apiFetch<T>(path: string, opts: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API}${path}`, {
     credentials: "include",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...((opts.headers as Record<string, string> | undefined) ?? {}),
+    },
     ...opts,
   });
+
   const json = await res.json().catch(() => ({}));
+
   if (!res.ok) {
-    if (Array.isArray(json.detail)) {
+    if (Array.isArray((json as any).detail)) {
       throw new Error(
-        json.detail.map((e: any) =>
-          `${Array.isArray(e.loc) ? e.loc.join(" → ") : e.loc}: ${e.msg}`
-        ).join("; ") || `Error ${res.status}`
+        (json as any).detail
+          .map((e: any) =>
+            `${Array.isArray(e.loc) ? e.loc.join(" → ") : e.loc}: ${e.msg}`,
+          )
+          .join("; ") || `Error ${res.status}`,
       );
     }
+
     throw new Error(
-      typeof json.detail === "string"
-        ? json.detail
-        : typeof json.message === "string"
-        ? json.message
-        : `Error ${res.status}`
+      typeof (json as any).detail === "string"
+        ? (json as any).detail
+        : typeof (json as any).message === "string"
+          ? (json as any).message
+          : `Error ${res.status}`,
     );
   }
+
   return json as T;
 }
 
@@ -44,6 +53,7 @@ type Brand = {
   id: string;
   display_name: string;
   is_active: boolean;
+  logo_url?: string | null;
 };
 
 type Org = {
@@ -51,6 +61,7 @@ type Org = {
   name: string;
   slug?: string;
   role?: string;
+  logo_url?: string | null;
 };
 
 type Orientation = "portrait" | "landscape";
@@ -111,6 +122,16 @@ const EMPTY: FormData = {
 
 type Screen = "loading" | "welcome" | "step";
 
+function getCookie(name: string) {
+  if (typeof document === "undefined") return "";
+  return (
+    document.cookie
+      .split("; ")
+      .find((row) => row.startsWith(`${name}=`))
+      ?.split("=")[1] || ""
+  );
+}
+
 export default function OnboardingPage() {
   const [screen, setScreen] = useState<Screen>("loading");
   const [stepIndex, setStepIndex] = useState(0);
@@ -123,37 +144,79 @@ export default function OnboardingPage() {
   const [createdBrandLogoUrl, setCreatedBrandLogoUrl] = useState("");
   const [createdBrandOrientation, setCreatedBrandOrientation] = useState<Orientation>("landscape");
 
-  const markDone = (i: number) => setCompleted(prev => new Set([...prev, i]));
-  const goNext = () => { markDone(stepIndex); setStepIndex(i => i + 1); };
-  const goBack = () => setStepIndex(i => Math.max(0, i - 1));
-  const patch = (data: Partial<FormData>) => setFormData(d => ({ ...d, ...data }));
+  const markDone = (i: number) => setCompleted((prev) => new Set([...prev, i]));
+
+  const goNext = () => {
+    markDone(stepIndex);
+    setStepIndex((i) => i + 1);
+  };
+
+  const goBack = () => setStepIndex((i) => Math.max(0, i - 1));
+
+  const patch = (data: Partial<FormData>) =>
+    setFormData((prev) => ({
+      ...prev,
+      ...data,
+    }));
 
   const clean = (obj: Record<string, any>) =>
-    Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== "" && v !== undefined && v !== null));
+    Object.fromEntries(
+      Object.entries(obj).filter(([, v]) => v !== "" && v !== undefined && v !== null),
+    );
+
+  async function resolveCurrentOrg() {
+    const current = await apiFetch<Org>("/organisations/current").catch(() => null);
+
+    if (current?.id) {
+      return current;
+    }
+
+    const orgs = await apiFetch<Org[]>("/organisations/my-orgs").catch(() => []);
+
+    if (!orgs.length) {
+      return null;
+    }
+
+    const cookieOrgId = getCookie("nf_org");
+    const cookieOrg = orgs.find((org) => org.id === cookieOrgId);
+    const fallbackOrg = cookieOrg || orgs[0];
+
+    await apiFetch(`/organisations/switch/${fallbackOrg.id}`, {
+      method: "POST",
+    }).catch(() => {});
+
+    return fallbackOrg;
+  }
 
   useEffect(() => {
+    let cancelled = false;
+
     (async () => {
       try {
-        const orgs = await apiFetch<Org[]>("/organisations/my-orgs");
+        const currentOrg = await resolveCurrentOrg();
 
-        if (!orgs.length) {
+        if (cancelled) return;
+
+        if (!currentOrg) {
           setScreen("welcome");
           return;
         }
 
-        const org = orgs[0];
-        setFormData(prev => ({
+        setFormData((prev) => ({
           ...prev,
-          org_name: org.name || "",
+          org_name: currentOrg.name || "",
+          org_logo_url: currentOrg.logo_url || "",
         }));
-
-        await apiFetch(`/organisations/switch/${org.id}`, { method: "POST" }).catch(() => {});
 
         const brands = await apiFetch<Brand[]>("/brands?active_only=false").catch(() => []);
 
+        if (cancelled) return;
+
         if (brands.length > 0) {
           const brand = brands[0];
+
           setCreatedBrandId(brand.id);
+          setCreatedBrandLogoUrl(brand.logo_url || currentOrg.logo_url || "");
           setCompleted(new Set([0, 1, 2, 3, 4, 5]));
           setStepIndex(6);
           setScreen("step");
@@ -164,19 +227,41 @@ export default function OnboardingPage() {
         setStepIndex(5);
         setScreen("step");
       } catch {
-        setScreen("welcome");
+        if (!cancelled) {
+          setScreen("welcome");
+        }
       }
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleBeforeBranding = async () => {
     setOrgSaving(true);
     setOrgError(null);
+
     try {
-      await apiFetch<{ id: string; slug: string }>("/organisations", {
-        method: "POST",
-        body: JSON.stringify({ name: formData.org_name }),
-      });
+      const existingOrg = await apiFetch<Org>("/organisations/current").catch(() => null);
+
+      if (existingOrg?.id) {
+        if (formData.org_name.trim()) {
+          await apiFetch("/organisations/me", {
+            method: "PATCH",
+            body: JSON.stringify({
+              name: formData.org_name.trim(),
+            }),
+          }).catch(() => {});
+        }
+      } else {
+        await apiFetch<{ id: string; slug: string }>("/organisations", {
+          method: "POST",
+          body: JSON.stringify({
+            name: formData.org_name,
+          }),
+        });
+      }
 
       let finalOrgLogoUrl: string | null = formData.org_logo_url?.trim() || null;
 
@@ -187,41 +272,45 @@ export default function OnboardingPage() {
       if (finalOrgLogoUrl) {
         await apiFetch("/organisations/me", {
           method: "PATCH",
-          body: JSON.stringify({ logo_url: finalOrgLogoUrl }),
+          body: JSON.stringify({
+            logo_url: finalOrgLogoUrl,
+          }),
         }).catch(() => {});
       }
 
       await apiFetch("/org-profile/business-info", {
         method: "PUT",
-        body: JSON.stringify(clean({
-          tagline: formData.tagline,
-          description: formData.description,
-          business_type: formData.business_type,
-          company_size: formData.company_size,
-          founded_year: formData.founded_year ? parseInt(formData.founded_year) : undefined,
-          website: formData.website,
-          email_primary: formData.email_primary,
-          email_support: formData.email_support,
-          phone_primary: formData.phone_primary,
-          phone_secondary: formData.phone_secondary,
-          whatsapp: formData.whatsapp,
-          address: formData.address,
-          city: formData.city,
-          country: formData.country,
-          postal_code: formData.postal_code,
-          facebook_url: formData.facebook_url,
-          instagram_url: formData.instagram_url,
-          linkedin_url: formData.linkedin_url,
-          twitter_url: formData.twitter_url,
-          tiktok_url: formData.tiktok_url,
-          youtube_url: formData.youtube_url,
-          auto_enrich: !!formData.website,
-        })),
+        body: JSON.stringify(
+          clean({
+            tagline: formData.tagline,
+            description: formData.description,
+            business_type: formData.business_type,
+            company_size: formData.company_size,
+            founded_year: formData.founded_year ? parseInt(formData.founded_year, 10) : undefined,
+            website: formData.website,
+            email_primary: formData.email_primary,
+            email_support: formData.email_support,
+            phone_primary: formData.phone_primary,
+            phone_secondary: formData.phone_secondary,
+            whatsapp: formData.whatsapp,
+            address: formData.address,
+            city: formData.city,
+            country: formData.country,
+            postal_code: formData.postal_code,
+            facebook_url: formData.facebook_url,
+            instagram_url: formData.instagram_url,
+            linkedin_url: formData.linkedin_url,
+            twitter_url: formData.twitter_url,
+            tiktok_url: formData.tiktok_url,
+            youtube_url: formData.youtube_url,
+            auto_enrich: !!formData.website,
+          }),
+        ),
       });
 
       goNext();
     } catch (e: any) {
-      setOrgError(e.message || "Failed to save. Please try again.");
+      setOrgError(e?.message || "Failed to save. Please try again.");
     } finally {
       setOrgSaving(false);
     }
@@ -277,7 +366,6 @@ export default function OnboardingPage() {
 
         <div style={{ flex: 1, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "0 24px 80px", position: "relative", zIndex: 10 }}>
           <div style={{ width: "100%", maxWidth: 620 }}>
-
             {stepIndex === 0 && (
               <StepOrgName
                 stepIndex={0}
@@ -305,7 +393,10 @@ export default function OnboardingPage() {
                   founded_year: formData.founded_year,
                   company_size: formData.company_size,
                 }}
-                onNext={(data) => { patch(data); goNext(); }}
+                onNext={(data) => {
+                  patch(data);
+                  goNext();
+                }}
                 onBack={goBack}
               />
             )}
@@ -314,7 +405,10 @@ export default function OnboardingPage() {
               <StepWebsiteScrape
                 stepIndex={2}
                 initial={formData.website}
-                onNext={(url) => { patch({ website: url }); goNext(); }}
+                onNext={(url) => {
+                  patch({ website: url });
+                  goNext();
+                }}
                 onBack={goBack}
               />
             )}
@@ -333,7 +427,10 @@ export default function OnboardingPage() {
                   country: formData.country,
                   postal_code: formData.postal_code,
                 }}
-                onNext={(data) => { patch(data); goNext(); }}
+                onNext={(data) => {
+                  patch(data);
+                  goNext();
+                }}
                 onBack={goBack}
               />
             )}
@@ -380,8 +477,8 @@ export default function OnboardingPage() {
                 logoUrl={createdBrandLogoUrl}
                 orientation={createdBrandOrientation}
                 onBack={goBack}
-                onDone={(templateId) => {
-                  window.location.href = `/dashboard/design-studio/admin/template?templateId=${templateId}`;
+                onDone={() => {
+                  window.location.href = "/";
                 }}
               />
             )}
@@ -392,7 +489,6 @@ export default function OnboardingPage() {
                 {orgError}
               </div>
             )}
-
           </div>
         </div>
       </div>

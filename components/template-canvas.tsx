@@ -300,6 +300,52 @@ const TemplateCanvas = forwardRef<HTMLCanvasElement, TemplateCanvasProps>(functi
     return img;
   };
 
+  const getCampaignImageField = (field?: string | null): string | null => {
+    if (!field) return null;
+
+    const data = campaignData as any;
+    const direct = data[field];
+
+    if (typeof direct === "string" && direct.trim()) {
+      return direct;
+    }
+
+    if (field === "logo") {
+      return data.logo || data.imageSlots?.logo?.url || logoUrl || null;
+    }
+
+    if (field === "heroImage") {
+      return (
+        data.heroImage ||
+        data.imageSlots?.hero_person?.url ||
+        data.imageSlots?.heroImage?.url ||
+        null
+      );
+    }
+
+    if (field === "background_image") {
+      return data.background_image || data.imageSlots?.background_image?.url || null;
+    }
+
+    if (field === "dashboard_image") {
+      return data.dashboard_image || data.imageSlots?.dashboard_image?.url || null;
+    }
+
+    if (field === "sponsor_logo_1") {
+      return data.sponsor_logo_1 || data.imageSlots?.sponsor_1?.url || data.sponsors?.[0]?.logo_url || null;
+    }
+
+    if (field === "sponsor_logo_2") {
+      return data.sponsor_logo_2 || data.imageSlots?.sponsor_2?.url || data.sponsors?.[1]?.logo_url || null;
+    }
+
+    if (field === "sponsor_logo_3") {
+      return data.sponsor_logo_3 || data.imageSlots?.sponsor_3?.url || data.sponsors?.[2]?.logo_url || null;
+    }
+
+    return data.imageSlots?.[field]?.url || null;
+  };
+
   function drawPatternOverlay(ctx: CanvasRenderingContext2D, shape: any) {
     const type = shape.patternType as string;
     const color = shape.patternColor || "#ffffff";
@@ -575,7 +621,10 @@ const TemplateCanvas = forwardRef<HTMLCanvasElement, TemplateCanvasProps>(functi
         ctx.fillStyle = shape.backgroundColor || "rgba(0,0,0,0.12)";
         ctx.fill();
       } else if (shape.type === "button") {
-        const buttonText = (shape as any).buttonText || "Button";
+        const buttonText =
+          ((shape as any).dataField ? getShapeText(shape, campaignData) : "") ||
+          (shape as any).buttonText ||
+          "Button";
         const r = shape.borderRadius || 6;
         roundRectPath(ctx, shape.x, shape.y, shape.width, shape.height, r);
         ctx.fillStyle = shape.backgroundColor || "#3b82f6";
@@ -603,46 +652,60 @@ const TemplateCanvas = forwardRef<HTMLCanvasElement, TemplateCanvasProps>(functi
         ctx.stroke();
         ctx.setLineDash([]);
       } else if (shape.type === "image") {
-        function resolveSlotUrl(shape: TemplateShape, campaignData: CampaignData): string | null {
+        function resolveImageUrl(shape: TemplateShape, campaignData: CampaignData): string | null {
           // 1. Explicit src wins
           if (shape.src && shape.src !== "undefined") return shape.src;
-        
+
+          // 2. New dataField image system
+          const dataField = (shape as any).dataField as string | undefined;
+          const dataFieldUrl = getCampaignImageField(dataField);
+          if (dataFieldUrl) return dataFieldUrl;
+
           const slotKey = (shape as any).slotKey as string | undefined;
           if (!slotKey) return null;
-        
+
           const cd = campaignData;
-        
-          // 2. Named slot cases — priority order
+
+          // 3. Legacy slotKey support
           switch (slotKey) {
             case "logo":
               return (
-                (cd.logo as string)                    ||  // campaignData.logo (direct URL)
-                cd.imageSlots?.logo?.url               ||  // imageSlots.logo.url
+                (cd.logo as string) ||
+                cd.imageSlots?.logo?.url ||
+                logoUrl ||
                 null
               );
-        
+
             case "hero_person":
               return (
-                cd.imageSlots?.hero_person?.url        ||
-                (cd as any).heroImage                  ||
-                (cd as any).hero_person                ||
-                cd.logo as string                      ||  // fallback to logo if nothing else
+                cd.imageSlots?.hero_person?.url ||
+                (cd as any).heroImage ||
+                (cd as any).hero_person ||
                 null
               );
-        
+
             case "dashboard_image":
               return (
-                cd.imageSlots?.dashboard_image?.url    ||
-                (cd as any).dashboard_image            ||
+                cd.imageSlots?.dashboard_image?.url ||
+                (cd as any).dashboard_image ||
                 null
               );
-        
+
+            case "sponsor_1":
+              return getCampaignImageField("sponsor_logo_1");
+
+            case "sponsor_2":
+              return getCampaignImageField("sponsor_logo_2");
+
+            case "sponsor_3":
+              return getCampaignImageField("sponsor_logo_3");
+
             default:
-              return cd.imageSlots?.[slotKey]?.url || null;
+              return cd.imageSlots?.[slotKey]?.url || getCampaignImageField(slotKey);
           }
         }
 
-        let imageUrl: string | null = resolveSlotUrl(shape, campaignData);
+        let imageUrl: string | null = resolveImageUrl(shape, campaignData);
  
     if (imageUrl) {
       try {

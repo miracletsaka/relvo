@@ -1,0 +1,166 @@
+import { SKINCARE_BRAND_THEME, SKINCARE_POSTER_LAYOUT } from "./layout";
+
+const jitter = (base: number, amount: number) => {
+  return Math.round(base + (Math.random() * amount * 2 - amount));
+};
+
+const pick = <T,>(items: readonly T[]): T => {
+  return items[Math.floor(Math.random() * items.length)];
+};
+
+const placements = {
+  "editorial-left": { x: 82, y: 760, align: "left" },
+  "center-product": { x: 300, y: 1040, align: "center" },
+  "minimal-luxury": { x: 84, y: 780, align: "left" },
+  "stacked-vertical": { x: 300, y: 1060, align: "center" },
+  "beauty-magazine": { x: 78, y: 770, align: "left" },
+} as const;
+
+const p = placements[SKINCARE_POSTER_LAYOUT] || placements["editorial-left"];
+
+const offerLayouts = [
+  () => [
+    {
+      id: "skincare-offer-label",
+      type: "text",
+      x: jitter(p.x, 10),
+      y: jitter(p.y, 10),
+      width: 360,
+      height: 36,
+      dataField: "offer_label",
+      fontSize: 22,
+      fontWeight: 800,
+      textColor: SKINCARE_BRAND_THEME.muted,
+      textAlign: p.align,
+      fontFamily: "'Syne', sans-serif",
+      lineHeight: 1,
+      letterSpacing: 3,
+      borderWidth: 0,
+      zIndex: 20,
+    },
+    {
+      id: "skincare-offer-main",
+      type: "text",
+      x: jitter(p.x, 10),
+      y: jitter(p.y + 48, 10),
+      width: 360,
+      height: 82,
+      dataField: "offer_value",
+      fontSize: 76,
+      fontWeight: 900,
+      textColor: SKINCARE_BRAND_THEME.accent2,
+      textGradientColors: [SKINCARE_BRAND_THEME.cream, SKINCARE_BRAND_THEME.accent],
+      textAlign: p.align,
+      fontFamily: "'Bebas Neue', Impact, sans-serif",
+      lineHeight: 1,
+      letterSpacing: 1,
+      borderWidth: 0,
+      zIndex: 21,
+    },
+  ],
+
+  () => [
+    {
+      id: "skincare-offer-card",
+      type: "rounded-rect",
+      x: jitter(p.x, 10),
+      y: jitter(p.y, 10),
+      width: 300,
+      height: 160,
+      backgroundColor: "rgba(255,255,255,0.065)",
+      borderColor: SKINCARE_BRAND_THEME.line,
+      borderWidth: 1,
+      borderRadius: 28,
+      zIndex: 18,
+    },
+    {
+      id: "skincare-offer-card-small",
+      type: "text",
+      x: jitter(p.x + 26, 8),
+      y: jitter(p.y + 28, 8),
+      width: 248,
+      height: 26,
+      dataField: "offer_label",
+      fontSize: 20,
+      fontWeight: 800,
+      textColor: SKINCARE_BRAND_THEME.muted,
+      textAlign: "center",
+      fontFamily: "'Syne', sans-serif",
+      lineHeight: 1,
+      letterSpacing: 4,
+      borderWidth: 0,
+      zIndex: 20,
+    },
+    {
+      id: "skincare-offer-card-main",
+      type: "text",
+      x: jitter(p.x + 26, 8),
+      y: jitter(p.y + 58, 8),
+      width: 248,
+      height: 74,
+      dataField: "offer_value",
+      fontSize: 82,
+      fontWeight: 900,
+      textColor: SKINCARE_BRAND_THEME.accent2,
+      textAlign: "center",
+      fontFamily: "'Bebas Neue', Impact, sans-serif",
+      lineHeight: 1,
+      letterSpacing: 0,
+      borderWidth: 0,
+      zIndex: 20,
+    },
+    {
+      id: "skincare-offer-card-off",
+      type: "text",
+      x: jitter(p.x + 26, 8),
+      y: jitter(p.y + 126, 8),
+      width: 248,
+      height: 24,
+      dataField: "offer_label",
+      fontSize: 18,
+      fontWeight: 800,
+      textColor: SKINCARE_BRAND_THEME.cream,
+      textAlign: "center",
+      fontFamily: "'Syne', sans-serif",
+      lineHeight: 1,
+      letterSpacing: 2,
+      borderWidth: 0,
+      zIndex: 20,
+    },
+  ],
+
+  () => [
+    {
+      id: "skincare-offer-pill",
+      type: "rounded-rect",
+      x: jitter(p.x, 10),
+      y: jitter(p.y, 10),
+      width: 350,
+      height: 72,
+      backgroundColor: SKINCARE_BRAND_THEME.accent,
+      borderWidth: 0,
+      borderRadius: 999,
+      zIndex: 18,
+    },
+    {
+      id: "skincare-offer-pill-text",
+      type: "text",
+      x: jitter(p.x, 10),
+      y: jitter(p.y + 22, 8),
+      width: 350,
+      height: 32,
+      dataField: "offer_value",
+      fontSize: 24,
+      fontWeight: 900,
+      textColor: SKINCARE_BRAND_THEME.bg,
+      textAlign: "center",
+      fontFamily: "'Syne', sans-serif",
+      lineHeight: 1,
+      letterSpacing: 1,
+      borderWidth: 0,
+      zIndex: 20,
+    },
+  ],
+];
+
+export const skincareOfferShapes = pick(offerLayouts)();

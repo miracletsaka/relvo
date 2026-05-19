@@ -371,7 +371,7 @@ export async function listTopicChatDrafts(topicChatId: string) {
   if (!res.ok) {
     throw new Error(`Failed to load topic chat drafts (${res.status})`);
   }
-
+  
   return res.json();
 }
 

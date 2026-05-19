@@ -53,7 +53,6 @@ export async function proxy(req: NextRequest) {
 
   const session = req.cookies.get(COOKIE_NAME)?.value;
   const orgId = req.cookies.get(ORG_COOKIE_NAME)?.value;
-  const onboarding = req.cookies.get(ONBOARDING_COOKIE_NAME)?.value;
 
   const isDashboard = pathname.startsWith("/dashboard");
   const isAuthPage = AUTH_ROUTES.some((p) => pathname.startsWith(p));
@@ -66,62 +65,47 @@ export async function proxy(req: NextRequest) {
   }
 
   console.log(
-    `proxy pathname=${pathname} session=${session ? "yes" : "no"} valid=${validSession ? "yes" : "no"} org=${orgId ? "yes" : "no"} onboarding=${onboarding || "none"}`
+    `proxy pathname=${pathname} session=${session ? "yes" : "no"} valid=${
+      validSession ? "yes" : "no"
+    } org=${orgId ? "yes" : "no"}`
   );
 
-  // ── 1) Protect dashboard/internal app ─────────────────────
+  // 1) Protect dashboard.
   if (isDashboard && !validSession) {
     return redirectToLogin(req, pathname);
   }
 
-  // ── 2) Protect onboarding ─────────────────────────────────
+  // 2) Protect onboarding.
   if (isOnboarding && !validSession) {
     return redirectToLogin(req, pathname);
   }
 
-  // ── 3) Logged-in users should not stay on auth pages ───────
+  // 3) Logged-in users should not stay on auth pages.
+  // Do NOT use nf_onboarding here. It is global and breaks multi-org.
   if (isAuthPage && validSession) {
     const url = req.nextUrl.clone();
 
-    if (!orgId || onboarding !== "complete") {
-      url.pathname = "/onboarding";
-
-      if (onboarding === "branding") {
-        url.searchParams.set("resume", "branding");
-      }
-
-      return NextResponse.redirect(url);
-    }
-
-    url.pathname = "/dashboard/create";
-    return NextResponse.redirect(url);
-  }
-
-  // ── 4) Dashboard requires org + completed onboarding ───────
-  if (isDashboard && validSession) {
     if (!orgId) {
-      const url = req.nextUrl.clone();
       url.pathname = "/onboarding";
       return NextResponse.redirect(url);
     }
 
-    if (onboarding !== "complete") {
-      const url = req.nextUrl.clone();
-      url.pathname = "/onboarding";
-
-      if (onboarding === "branding") {
-        url.searchParams.set("resume", "branding");
-      }
-
-      return NextResponse.redirect(url);
-    }
+    url.pathname = "/";
+    return NextResponse.redirect(url);
   }
 
-  // ── 5) Skip onboarding if already complete ─────────────────
-  if (isOnboarding && validSession && onboarding === "complete") {
+  // 4) Dashboard requires an active org cookie.
+  // Completion is checked in app/dashboard/layout.tsx using DB current-org status.
+  if (isDashboard && validSession && !orgId) {
     const url = req.nextUrl.clone();
-    url.pathname = "/dashboard/create";
+    url.pathname = "/onboarding";
     return NextResponse.redirect(url);
+  }
+
+  // 5) Never redirect onboarding away here.
+  // Onboarding page decides whether current org is complete.
+  if (isOnboarding && validSession) {
+    return NextResponse.next();
   }
 
   return NextResponse.next();

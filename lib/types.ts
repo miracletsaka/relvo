@@ -5,6 +5,49 @@
 // ─────────────────────────────────────────────────────────────
 
 export type GradientStop = { stop: number; color: string };
+
+export type Tone = {
+  id: string;
+  name: string;
+  label: string;
+  description?: string;
+  emoji?: string;
+  is_active: boolean;
+  sort_order: number;
+};
+
+export type BrandOption = {
+  id: string;
+  name?: string;
+  display_name?: string;
+};
+
+export type GenerateMode = "auto" | "product" | "offer" | "trust";
+export type Orientation = "portrait" | "landscape";
+export type EditorTab = "design" | "content" | "templates";
+export type AlignAction = "left" | "center-h" | "right" | "top" | "center-v" | "bottom";
+export type DistributeAction = "horizontal" | "vertical";
+export type ReorderAction = "front" | "forward" | "backward" | "back";
+
+export type LogoPlacement = {
+  url: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  opacity: number;
+};
+
+export type SegmentTypeKey =
+  | "hero"
+  | "offer"
+  | "price"
+  | "features"
+  | "review"
+  | "sponsor"
+  | "cta"
+  | "urgency"
+  | "footer";
  
 export type TemplateShape = {
   id: string;
@@ -145,14 +188,46 @@ export interface ShapeEditState {
 
 // Campaign data structure - holds all user input
 export interface CampaignData {
-  hook: string;
-  subheading: string;
-  bullets: string[];
-  proof: string;
-  cta: string;
-  toneName?  : string
+  campaign_label: string;
+  campaign_description?: string;
+
+  collection_label: string;
+  collection_description?: string;
+
+  product_label?: string;
+  product_description?: string;
+
+  headline: string;
+  subheadline?: string;
+
+  product_name: string;
+  description: string;
+
+  offer_value?: string;
+  offer_label?: string;
+
+  cta_text: string;
+  footer_label?: string;
+
+  feature_1?: string;
+  feature_2?: string;
+  feature_3?: string;
+  feature_4?: string;
+
+  testimonial?: string;
+  rating?: string;
+
+  hook?: string;
+  subheading?: string;
+  bullets?: string[];
+  proof?: string;
+  cta?: string;
+
+  toneName?: string;
+
   logo?: string;
   heroImage?: string;
+  background_image?: string;
 
   imageSlots?: {
     [key: string]: {
@@ -163,6 +238,7 @@ export interface CampaignData {
   ctaLink?: string;
   hashtags: string;
   companyName: string;
+  social_handle?: string;
   location: string;
 
   links?: {
@@ -244,7 +320,6 @@ export interface CampaignData {
   offer_title?: string;
   offer_cta?: string;
 
-  // optional flattened helpers for templates
   website?: string;
   address?: string;
   phone?: string;
@@ -266,8 +341,14 @@ export interface CampaignData {
   youtube_url?: string;
   map_url?: string;
 
-  // template helper fields
   price_label?: string;
+  original_price?: string;
+  discount_price?: string;
+  currency?: string;
+  promo_code?: string;
+  stock_label?: string;
+  availability?: string;
+
   fine_print?: string;
   enroll_note?: string;
 
@@ -298,17 +379,6 @@ export interface CampaignData {
   meta_3_key?: string;
   meta_3_value?: string;
 }
-
-export type Tone = {
-  id: string;
-  name: string;
-  label: string;
-  description?: string;
-  emoji?: string;
-  is_active: boolean;
-  sort_order: number;
-};
-
 
 export type AITemplateDecision = {
   heroAssetId?: string;

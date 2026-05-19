@@ -61,6 +61,7 @@ export default function OrgSwitcher({
       ]);
 
       setOrgs(myOrgs || []);
+
       setCurrentOrg({
         id: me.id,
         name: me.name,
@@ -85,8 +86,11 @@ export default function OrgSwitcher({
         setMenuOpen(false);
       }
     }
+
     document.addEventListener("mousedown", onClickOutside);
-    return () => document.removeEventListener("mousedown", onClickOutside);
+
+    return () =>
+      document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
   async function handleSwitch(orgId: string) {
@@ -99,9 +103,13 @@ export default function OrgSwitcher({
     setErr(null);
 
     try {
-      await fetchJson(`${apiBase}/organisations/switch/${orgId}`, {
-        method: "POST",
-      });
+      await fetchJson(
+        `${apiBase}/organisations/switch/${orgId}`,
+        {
+          method: "POST",
+        }
+      );
+
       window.location.reload();
     } catch (e: any) {
       setErr(e?.message || "Failed to switch workspace");
@@ -114,304 +122,191 @@ export default function OrgSwitcher({
   const activeRole = currentOrg?.role || "member";
 
   return (
-    <>
-      <style>{`
-        .orgs-root {
-          position: relative;
-          width: 100%;
-          min-width: 0;
-          overflow: visible;
-        }
-
-        .orgs-trigger {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          width: 100%;
-          min-width: 0;
-          border-radius: 18px;
-          border: 1px solid rgba(255,255,255,0.10);
-          background: rgba(255,255,255,0.05);
-          padding: 6px 10px;
-          transition: background 0.15s, border-color 0.15s;
-          backdrop-filter: blur(8px);
-        }
-        .orgs-trigger:hover {
-          background: rgba(255,255,255,0.08);
-          border-color: rgba(255,255,255,0.14);
-        }
-
-        .orgs-trigger.collapsed {
-          width: 40px;
-          height: 40px;
-          min-width: 40px;
-          border-radius: 14px;
-          padding: 0;
-          justify-content: center;
-        }
-
-        .orgs-trigger-left {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          min-width: 0;
-          flex: 1;
-        }
-
-        .orgs-logo {
-          width: 28px;
-          height: 28px;
-          min-width: 28px;
-          border-radius: 999px;
-          background: #fff;
-          box-shadow: 0 8px 20px rgba(0,0,0,0.25);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          overflow: hidden;
-        }
-
-        .orgs-text {
-          min-width: 0;
-          text-align: left;
-          flex: 1;
-        }
-
-        .orgs-name {
-          font-size: 11px;
-          line-height: 1.1;
-          font-weight: 800;
-          color: #f5f5f5;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          text-transform: uppercase;
-          letter-spacing: 0.03em;
-        }
-
-        .orgs-role {
-          margin-top: 2px;
-          font-size: 9px;
-          line-height: 1;
-          color: rgba(255,255,255,0.48);
-          text-transform: uppercase;
-          letter-spacing: 0.08em;
-          font-family: 'DM Mono', monospace;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        .orgs-chevron {
-          width: 14px;
-          height: 14px;
-          min-width: 14px;
-          color: rgba(255,255,255,0.45);
-          flex-shrink: 0;
-          transition: transform 0.18s ease;
-        }
-
-        .orgs-chevron.open {
-          transform: rotate(180deg);
-        }
-
-        .orgs-menu {
-          position: absolute;
-          border-radius: 16px;
-          border: 1px solid rgba(255,255,255,0.10);
-          background: #101216;
-          box-shadow: 0 18px 50px rgba(0,0,0,0.48);
-          padding: 8px;
-          z-index: 9999;
-          overflow: hidden;
-          animation: orgFadeIn 0.14s ease;
-        }
-
-        .orgs-menu.expanded {
-          top: calc(100% + 8px);
-          left: 0;
-          width: 320px;
-          max-width: min(320px, calc(100vw - 24px));
-        }
-
-        .orgs-menu.collapsed {
-          top: 0;
-          left: calc(100% + 12px);
-          width: 300px;
-          max-width: min(300px, calc(100vw - 84px));
-        }
-
-        @keyframes orgFadeIn {
-          from { opacity: 0; transform: translateY(4px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-
-        .orgs-section-title {
-          padding: 6px 10px 8px;
-          font-size: 10px;
-          text-transform: uppercase;
-          letter-spacing: 0.16em;
-          color: rgba(255,255,255,0.34);
-          font-family: 'DM Mono', monospace;
-        }
-
-        .orgs-error {
-          margin: 0 4px 8px;
-          border-radius: 12px;
-          border: 1px solid rgba(239,68,68,0.2);
-          background: rgba(239,68,68,0.10);
-          color: #fca5a5;
-          padding: 10px 12px;
-          font-size: 12px;
-        }
-
-        .orgs-item {
-          width: 100%;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-          border: 0;
-          background: transparent;
-          border-radius: 12px;
-          padding: 10px 12px;
-          text-align: left;
-          transition: background 0.12s ease;
-        }
-
-        .orgs-item:hover {
-          background: rgba(255,255,255,0.05);
-        }
-
-        .orgs-item-main {
-          min-width: 0;
-          flex: 1;
-        }
-
-        .orgs-item-name {
-          font-size: 13px;
-          font-weight: 700;
-          color: #f5f5f5;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        .orgs-item-meta {
-          margin-top: 2px;
-          font-size: 11px;
-          color: rgba(255,255,255,0.45);
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        .orgs-create {
-          margin-top: 6px;
-          width: 100%;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          border: 0;
-          background: transparent;
-          border-radius: 12px;
-          padding: 11px 12px;
-          text-align: left;
-          color: rgba(255,255,255,0.88);
-          font-size: 13px;
-          font-weight: 600;
-          transition: background 0.12s ease;
-        }
-
-        .orgs-create:hover {
-          background: rgba(255,255,255,0.05);
-        }
-      `}</style>
-
-      <div ref={rootRef} className="orgs-root">
-        <button
-          type="button"
-          onClick={() => setMenuOpen((v) => !v)}
-          className={`orgs-trigger ${collapsed ? "collapsed" : ""}`}
-          title={collapsed ? activeName : undefined}
-        >
-          <div className="orgs-trigger-left">
-            <div className="">
-              <img src={currentOrg?.logo_url || "/logo.png"} alt="Relvo AI" style={{ width: 50, height: "auto" }} />
-            </div>
-
-            {!collapsed && (
-              <div className="orgs-text">
-                <div className="orgs-name">
-                  {loading ? "Loading..." : activeName}
-                </div>
-                <div className="orgs-role">
-                  {activeRole}
-                </div>
-              </div>
-            )}
+    <div
+      ref={rootRef}
+      className="relative w-full min-w-0 font-[Inter,sans-serif]"
+    >
+      <button
+        type="button"
+        onClick={() => setMenuOpen((v) => !v)}
+        title={collapsed ? activeName : undefined}
+        className={`
+          flex items-center justify-between
+          border border-black/5
+          bg-white/70
+          transition-all duration-150
+          hover:bg-white
+          hover:border-black/10
+          ${
+            collapsed
+              ? "h-10 w-10 rounded-xl p-0"
+              : "w-full rounded-2xl px-2.5 py-2"
+          }
+        `}
+      >
+        <div className="flex min-w-0 flex-1 items-center gap-2.5">
+          {/* Logo */}
+          <div
+            className="
+              flex h-7 w-7 shrink-0 items-center justify-center
+              overflow-hidden rounded-[10px]
+              border border-black/5
+              bg-white
+            "
+          >
+            <img
+              src={currentOrg?.logo_url || "/logo.png"}
+              alt={activeName}
+              className="h-[22px] w-[22px] object-contain"
+            />
           </div>
 
           {!collapsed && (
-            <ChevronDown className={`orgs-chevron ${menuOpen ? "open" : ""}`} />
-          )}
-        </button>
-
-        {menuOpen && (
-          <div className={`orgs-menu ${collapsed ? "collapsed" : "expanded"}`}>
-            <div className="orgs-section-title">Workspaces</div>
-
-            {err && <div className="orgs-error">{err}</div>}
-
-            {loading ? (
-              <div className="flex items-center gap-2 px-3 py-3 text-sm text-white/70">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Loading...
+            <div className="min-w-0 flex-1 text-left">
+              <div
+                className="
+                  truncate text-[12px]
+                  font-medium text-gray-500
+                "
+              >
+                {loading ? "Loading..." : activeName}
               </div>
-            ) : (
-              <>
-                {orgs.map((org) => {
-                  const active = org.id === currentOrg?.id;
-                  const switching = switchingId === org.id;
 
-                  return (
-                    <button
-                      key={org.id}
-                      type="button"
-                      onClick={() => handleSwitch(org.id)}
-                      className="orgs-item"
-                    >
-                      <div className="orgs-item-main">
-                        <div className="orgs-item-name">{org.name}</div>
-                        <div className="orgs-item-meta">
-                          {org.slug} • {org.role}
-                        </div>
-                      </div>
+              <div
+                className="
+                  mt-0.5 truncate
+                  text-[9px] font-medium uppercase
+                  tracking-[0.12em]
+                  text-gray-400
+                "
+              >
+                {activeRole}
+              </div>
+            </div>
+          )}
+        </div>
 
-                      <div className="shrink-0">
-                        {switching ? (
-                          <Loader2 className="h-4 w-4 animate-spin text-white/60" />
-                        ) : active ? (
-                          <Check className="h-4 w-4 text-[#4ade80]" />
-                        ) : null}
-                      </div>
-                    </button>
-                  );
-                })}
-
-                <button
-                  type="button"
-                  onClick={onCreateNew}
-                  className="orgs-create"
-                >
-                  <Plus className="h-4 w-4" />
-                  Manage Organisations
-                </button>
-              </>
-            )}
-          </div>
+        {!collapsed && (
+          <ChevronDown
+            className={`
+              h-3.5 w-3.5 shrink-0
+              text-gray-300
+              transition-transform duration-200
+              ${menuOpen ? "rotate-180" : ""}
+            `}
+          />
         )}
-      </div>
-    </>
+      </button>
+
+      {menuOpen && (
+        <div
+          className={`
+            absolute z-[9999]
+            overflow-hidden rounded-2xl
+            border border-black/5
+            bg-white/95
+            p-2
+            shadow-[0_10px_30px_rgba(0,0,0,0.08)]
+            backdrop-blur-xl
+            animate-in fade-in zoom-in-95 duration-150
+            ${
+              collapsed
+                ? "left-[calc(100%+12px)] top-0 w-[260px]"
+                : "left-0 top-[calc(100%+8px)] w-full min-w-[240px]"
+            }
+          `}
+        >
+          <div
+            className="
+              px-2.5 pb-2 pt-1
+              text-[9px] font-semibold uppercase
+              tracking-[0.14em]
+              text-gray-400
+            "
+          >
+            Workspaces
+          </div>
+
+          {err && (
+            <div
+              className="
+                mx-1 mb-2 rounded-xl
+                border border-red-200
+                bg-red-50
+                px-3 py-2
+                text-xs text-red-600
+              "
+            >
+              {err}
+            </div>
+          )}
+
+          {loading ? (
+            <div className="flex items-center gap-2 px-3 py-2 text-xs text-gray-400">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Loading...
+            </div>
+          ) : (
+            <>
+              {orgs.map((org) => {
+                const active = org.id === currentOrg?.id;
+                const switching = switchingId === org.id;
+
+                return (
+                  <button
+                    key={org.id}
+                    type="button"
+                    onClick={() => handleSwitch(org.id)}
+                    className="
+                      flex w-full items-center justify-between gap-3
+                      rounded-xl px-3 py-2.5
+                      text-left
+                      transition-all duration-150
+                      hover:bg-black/[0.03]
+                    "
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[12px] font-medium text-gray-600">
+                        {org.name}
+                      </div>
+
+                      <div className="mt-0.5 truncate text-[10px] text-gray-400">
+                        {org.slug} · {org.role}
+                      </div>
+                    </div>
+
+                    <div className="shrink-0">
+                      {switching ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-gray-300" />
+                      ) : active ? (
+                        <Check className="h-3.5 w-3.5 text-violet-500" />
+                      ) : null}
+                    </div>
+                  </button>
+                );
+              })}
+
+              <div className="mx-1 my-1 h-px bg-black/5" />
+
+              <button
+                type="button"
+                onClick={onCreateNew}
+                className="
+                  flex w-full items-center gap-2
+                  rounded-xl px-3 py-2.5
+                  text-left text-[12px]
+                  font-medium text-violet-600
+                  transition-all duration-150
+                  hover:bg-violet-500/5
+                "
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Manage Organisations
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
