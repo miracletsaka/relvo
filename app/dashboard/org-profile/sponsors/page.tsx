@@ -1,5 +1,5 @@
-import { SponsorsTab } from "@/components/org-profile/sponsors-tab";
+import { SponsorsTab } from "@/components/org-profile/SponsorsTab";
 
 export default function SponsorsPage() {
-  return <SponsorsTab />;
+  return <SponsorsTab toast={(_ok, _msg) => {}} />;
 }

@@ -1,5 +1,5 @@
-import { ReviewsTab } from "@/components/org-profile/reviews-tab";
+import {ReviewsTab }from "@/components/org-profile/ReviewsTab";
 
 export default function ReviewsPage() {
-  return <ReviewsTab />;
+  return <ReviewsTab toast={(_ok, _msg) => {}} />;
 }

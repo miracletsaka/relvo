@@ -1,11 +1,15 @@
+// frontend/lib/upload-client.ts
+// Browser upload helper: presigned PUT to S3.
+
 export type UploadResult = {
   success: boolean;
   key?: string;
-  url?: string | null; // public CDN url if configured
+  url?: string | null; // public CDN url if S3_PUBLIC_BASE_URL is configured
   error?: string;
 };
 
-export async function uploadFileToSpaces(
+// ── Core: returns a result object, never throws ──────────────────────────────
+export async function uploadFile(
   file: File | Blob,
   fileName?: string,
   onProgress?: (percent: number) => void
@@ -48,12 +52,18 @@ export async function uploadFileToSpaces(
 
 // Generated image (data URL or http URL) -> S3
 export async function uploadGeneratedBackground(imageUrl: string): Promise<UploadResult> {
-  // fetch() handles data: URLs natively, no manual atob needed
-  const blob = await (await fetch(imageUrl)).blob();
-  return uploadFile(blob, `generated-background-${Date.now()}.png`);
+  try {
+    // fetch() handles data: URLs natively, no manual atob needed
+    const res = await fetch(imageUrl);
+    if (!res.ok) throw new Error(`Failed to download image: ${res.statusText}`);
+    const blob = await res.blob();
+    return uploadFile(blob, `generated-background-${Date.now()}.png`);
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "Upload failed" };
+  }
 }
 
-// Turn a stored key into something displayable
+// Turn a stored key into something displayable (private bucket)
 export async function getViewUrl(key: string): Promise<string> {
   const res = await fetch("/api/uploads/view", {
     method: "POST",
@@ -62,4 +72,18 @@ export async function getViewUrl(key: string): Promise<string> {
   });
   if (!res.ok) throw new Error("Failed to get view URL");
   return (await res.json()).url;
+}
+
+// ── Legacy names: same signature the old pages expect (return a string, throw on error)
+// Returns the public URL when S3_PUBLIC_BASE_URL is set, otherwise the S3 key.
+export async function uploadFileToSpaces(file: File): Promise<string> {
+  const result = await uploadFile(file);
+  if (!result.success || !result.key) throw new Error(result.error || "Upload failed");
+  return result.url ?? result.key;
+}
+
+export async function uploadGeneratedBackgroundToSpaces(imageUrl: string): Promise<string> {
+  const result = await uploadGeneratedBackground(imageUrl);
+  if (!result.success || !result.key) throw new Error(result.error || "Upload failed");
+  return result.url ?? result.key;
 }
