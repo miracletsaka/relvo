@@ -1,4 +1,8 @@
-import { SKINCARE_BRAND_THEME, SKINCARE_POSTER_DIRECTION, SKINCARE_POSTER_LAYOUT } from "./layout";
+import {
+  SKINCARE_BRAND_THEME,
+  SKINCARE_POSTER_DIRECTION,
+  SKINCARE_POSTER_LAYOUT,
+} from "./layout";
 
 const jitter = (base: number, amount: number) => {
   return Math.round(base + (Math.random() * amount * 2 - amount));
@@ -38,7 +42,7 @@ const footerLayouts = [
       y: 1250,
       width: 380,
       height: 38,
-      text: "@yourbrand",
+      dataField: "social_handle",
       fontSize: 30,
       fontWeight: 700,
       textColor: SKINCARE_BRAND_THEME.text,
@@ -56,7 +60,8 @@ const footerLayouts = [
       y: 1256,
       width: 540,
       height: 28,
-      text: footerText,
+      dataField: "footer_label",
+      fallbackText: footerText,
       fontSize: 18,
       fontWeight: 800,
       textColor: SKINCARE_BRAND_THEME.muted,
@@ -90,7 +95,7 @@ const footerLayouts = [
       y: 1240,
       width: 360,
       height: 36,
-      text: "@yourbrand",
+      dataField: "social_handle",
       fontSize: 28,
       fontWeight: 700,
       textColor: SKINCARE_BRAND_THEME.text,
@@ -108,7 +113,8 @@ const footerLayouts = [
       y: 1248,
       width: 430,
       height: 26,
-      text: "BEAUTY RITUAL / 2026",
+      dataField: "footer_label",
+      fallbackText: "BEAUTY RITUAL / 2026",
       fontSize: 18,
       fontWeight: 800,
       textColor: SKINCARE_BRAND_THEME.accent2,
@@ -153,7 +159,8 @@ const footerLayouts = [
       y: 1236,
       width: 380,
       height: 34,
-      text: "LUXURY CARE",
+      dataField: "footer_label",
+      fallbackText: "LUXURY CARE",
       fontSize: 26,
       fontWeight: 900,
       textColor: SKINCARE_BRAND_THEME.text,
@@ -171,7 +178,7 @@ const footerLayouts = [
       y: 1280,
       width: 380,
       height: 24,
-      text: "@yourbrand",
+      dataField: "social_handle",
       fontSize: 18,
       fontWeight: 600,
       textColor: SKINCARE_BRAND_THEME.muted,
@@ -192,7 +199,7 @@ const footerLayouts = [
       y: 1260,
       width: 360,
       height: 34,
-      text: "@yourbrand",
+      dataField: "social_handle",
       fontSize: 26,
       fontWeight: 700,
       textColor: SKINCARE_BRAND_THEME.text,
@@ -221,7 +228,7 @@ const footerLayouts = [
       y: 1260,
       width: 438,
       height: 34,
-      text: "www.yourbrand.com",
+      dataField: "website",
       fontSize: 22,
       fontWeight: 700,
       textColor: SKINCARE_BRAND_THEME.muted,
@@ -236,7 +243,8 @@ const footerLayouts = [
 ];
 
 const filteredLayouts =
-  SKINCARE_POSTER_LAYOUT === "center-product" || SKINCARE_POSTER_LAYOUT === "stacked-vertical"
+  SKINCARE_POSTER_LAYOUT === "center-product" ||
+  SKINCARE_POSTER_LAYOUT === "stacked-vertical"
     ? [footerLayouts[1], footerLayouts[2], footerLayouts[3]]
     : footerLayouts;
 

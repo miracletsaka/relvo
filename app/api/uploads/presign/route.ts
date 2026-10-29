@@ -1,51 +1,25 @@
 import { NextResponse } from "next/server";
-import { PutObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { s3, S3_BUCKET, S3_PUBLIC_URL } from "@/lib/s3-server";
+import { createPresignedUpload, UploadValidationError } from "@/lib/s3-presign";
 
-function sanitizeFileName(fileName: string): string {
-  return fileName
-    .replace(/[^\w.\-]+/g, "_")
-    .replace(/_+/g, "_")
-    .replace(/^_+|_+$/g, "");
-}
+export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   try {
+    // TODO: authenticate here and pass userId
     const body = await req.json().catch(() => ({}));
 
-    const rawFileName = String(body.fileName || "upload.bin");
-    const contentType = String(body.contentType || "application/octet-stream");
-
-    const safeFileName = sanitizeFileName(rawFileName);
-    const key = `neuroflow/${Date.now()}-${safeFileName}`;
-
-    const command = new PutObjectCommand({
-      Bucket: S3_BUCKET,
-      Key: key,
-      ContentType: contentType,
-      ACL: "public-read",
+    const result = await createPresignedUpload({
+      fileName: String(body.fileName || "upload"),
+      contentType: String(body.contentType || ""),
+      size: Number(body.size || 0),
     });
 
-    const uploadUrl = await getSignedUrl(s3, command, {
-      expiresIn: 600,
-    });
-
-    const publicUrl = `${S3_PUBLIC_URL}/${key}`;
-
-    return NextResponse.json({
-      uploadUrl,
-      publicUrl,
-      key,
-    });
-  } catch (error: any) {
-    console.error("Presign upload error:", error);
-
-    return NextResponse.json(
-      {
-        detail: error?.message || "Failed to generate upload URL",
-      },
-      { status: 500 }
-    );
+    return NextResponse.json(result);
+  } catch (err) {
+    if (err instanceof UploadValidationError) {
+      return NextResponse.json({ error: err.message }, { status: 400 });
+    }
+    console.error("Presign upload error:", err);
+    return NextResponse.json({ error: "Failed to generate upload URL" }, { status: 500 });
   }
 }

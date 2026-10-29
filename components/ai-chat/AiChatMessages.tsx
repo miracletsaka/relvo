@@ -228,62 +228,99 @@ const systemPrompts = [
                     `}
                   >
                     <div
-                      className={`
-                        whitespace-pre-wrap font-normal text-[13.5px] leading-[1.6]
-                        ${
-                          message.role === "user"
-                            ? "text-gray-600"
-                            : "text-gray-500"
-                        }
-                      `}
-                    >
-                      {message.status === "generating" && (
-                        <Loader2
-                          size={13}
-                          className="mr-[7px] inline-block animate-spin text-violet-500"
-                        />
-                      )}
+  className={`
+    whitespace-pre-wrap
+    font-normal
+    text-[13px]
+    leading-[1.78]
+    tracking-[-0.005em]
+    antialiased
+    ${
+      message.role === "user"
+        ? "text-gray-600"
+        : "text-[#667085]"
+    }
+  `}
+>
+  {message.status === "generating" && (
+    <Loader2
+      size={13}
+      className="mr-[7px] inline-block animate-spin text-violet-500"
+    />
+  )}
 
-                      <ReactMarkdown
-                        remarkPlugins={[remarkGfm]}
-                        components={{
-                          p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                          ul: ({ children }) => (
-                            <ul className="mb-2 ml-4 list-disc space-y-1 last:mb-0">
-                              {children}
-                            </ul>
-                          ),
-                          ol: ({ children }) => (
-                            <ol className="mb-2 ml-4 list-decimal space-y-1 last:mb-0">
-                              {children}
-                            </ol>
-                          ),
-                          li: ({ children }) => <li>{children}</li>,
-                          strong: ({ children }) => (
-                            <strong className="font-semibold text-gray-700">
-                              {children}
-                            </strong>
-                          ),
-                          code: ({ children }) => (
-                            <code className="rounded bg-black/5 px-1 py-0.5 text-[12px] text-gray-700">
-                              {children}
-                            </code>
-                          ),
-                          a: ({ href, children }) => (
-                            <a
-                              href={href}
-                              target={href?.startsWith("/") ? "_self" : "_blank"}
-                              rel="noopener noreferrer"
-                              className="font-medium text-violet-700 underline underline-offset-2"
-                            >
-                              {children}
-                            </a>
-                          ),
-                        }}
-                      >
-                        {message.text || ""}
-                      </ReactMarkdown>
-                    </div>
+  <ReactMarkdown
+    remarkPlugins={[remarkGfm]}
+    components={{
+      p: ({ children }) => (
+        <p className="mb-3 text-[13px] font-normal leading-[1.78] text-[#667085] last:mb-0">
+          {children}
+        </p>
+      ),
+
+      ul: ({ children }) => (
+        <ul className="mb-4 ml-5 list-disc space-y-3 text-[#667085] last:mb-0">
+          {children}
+        </ul>
+      ),
+
+      ol: ({ children }) => (
+        <ol className="mb-4 ml-5 list-decimal space-y-3 text-[#667085] last:mb-0">
+          {children}
+        </ol>
+      ),
+
+      li: ({ children }) => (
+        <li className="pl-1 text-[13px] font-normal leading-[1.78] text-[#667085] marker:text-[#98a2b3]">
+          {children}
+        </li>
+      ),
+
+      strong: ({ children }) => (
+        <strong className="font-medium text-[#475467]">
+          {children}
+        </strong>
+      ),
+
+      h1: ({ children }) => (
+        <h1 className="mb-4 mt-1 text-[20px] font-medium tracking-[-0.025em] text-[#344054]">
+          {children}
+        </h1>
+      ),
+
+      h2: ({ children }) => (
+        <h2 className="mb-3 mt-5 text-[16px] font-medium tracking-[-0.015em] text-[#344054]">
+          {children}
+        </h2>
+      ),
+
+      h3: ({ children }) => (
+        <h3 className="mb-2 mt-4 text-[14px] font-medium tracking-[-0.01em] text-[#344054]">
+          {children}
+        </h3>
+      ),
+
+      code: ({ children }) => (
+        <code className="rounded-md bg-black/[0.045] px-[6px] py-[3px] text-[12px] font-normal text-[#475467]">
+          {children}
+        </code>
+      ),
+
+      a: ({ href, children }) => (
+        <a
+          href={href}
+          target={href?.startsWith("/") ? "_self" : "_blank"}
+          rel="noopener noreferrer"
+          className="font-medium text-violet-700 underline underline-offset-2 transition hover:text-violet-800"
+        >
+          {children}
+        </a>
+      ),
+    }}
+  >
+    {message.text || ""}
+  </ReactMarkdown>
+</div>
 
                     <BusinessAnalysisCard data={message.metadata?.business_analysis} />
 

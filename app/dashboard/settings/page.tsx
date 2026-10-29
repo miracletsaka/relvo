@@ -1,8 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import { Save, Eye, EyeOff, Copy, Check, Shield, Sliders, Key, Loader2, X } from "lucide-react"
+import { Save, Eye, EyeOff, Copy, Check, Shield, Sliders, Key, Loader2, X, Building } from "lucide-react"
 import { changePassword } from "@/lib/api"
+import OrgSettingsPage from "./organisation/page"
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -240,6 +241,7 @@ export default function SettingsPage() {
 
   const nav = [
     { id: "security",    icon: Shield,  label: "Security" },
+    { id: "organisation", icon: Building, label: "Organisation" },
     // { id: "preferences", icon: Sliders, label: "Preferences" },
     // { id: "api",         icon: Key,     label: "API Access" },
   ]
@@ -522,6 +524,10 @@ export default function SettingsPage() {
                   </p>
                 </div>
               </SectionCard>
+            )}
+
+            {activeSection === "organisation" && (
+              <OrgSettingsPage />
             )}
 
           </div>
