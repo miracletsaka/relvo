@@ -1,20 +1,3 @@
-/**
- * frontend/lib/canvas-renderer.ts
- *
- * KEY CHANGES vs previous version:
- *  - drawTextScrim() REMOVED entirely. No per-text background boxes.
- *  - Darkening overlay is a gradient-overlay shape injected by the intelligence
- *    layer — the renderer just draws it as a normal gradient-overlay. One overlay
- *    per image, positioned and z-ordered correctly.
- *  - Z-sort: explicit SEGMENT_Z_PRIORITY map. background=0, hero-image=2,
- *    overlays=3, header/text=4+. Images are always behind text.
- *  - capOffset from real TextMetrics.actualBoundingBoxAscent — no fixed 0.76.
- *  - textTransform: uppercase/lowercase/capitalize applied before word-wrap.
- *  - Dynamic canvas size from segment _meta (no hardcoded 1080×1350).
- *  - brandColor: never defaults to #7c3aed; uses shape._tokens.accent fallback.
- *  - All premium fonts loaded: Anton, Bebas Neue, Syne, Outfit, DM Sans,
- *    Barlow Condensed, Playfair Display, Cormorant Garamond, Space Grotesk.
- */
 
 export type CanvasSegment = {
   /** Optional legacy id alias — instanceId is canonical */

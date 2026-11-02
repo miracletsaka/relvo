@@ -1,653 +1,205 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Brand, listBrands, getBrandProfile, type BrandProfile } from "@/lib/api";
-import { Tone } from "@/lib/types";
-import { apiFetch } from "@/lib/tone";
-import { fetchOrgCampaignData, type OrgCampaignData } from "@/lib/org-campaign-enricher";
 import {
-  createThread,
-  listThreads,
-  getMessages,
-  replyToThread,
-  updateMessage,
-  updateThread,
+  createThread, listThreads, getMessages, replyToThread, updateMessage, updateThread,
 } from "@/lib/ai-chat-api";
 import { dbMessageToChatMessage } from "@/lib/ai-chat-mappers";
-import {
-  generateSingleImageFromAssistant,
-  generateMonthFromAssistant,
-} from "@/lib/ai-chat-generation";
+import { generateSingleImageFromAssistant, generateMonthFromAssistant } from "@/lib/ai-chat-generation";
 import AiChatFullEditorDialog from "./AiChatFullEditorDialog";
 import AiChatSidebar from "./AiChatSidebar";
 import AiChatMessages from "./AiChatMessages";
 import AiChatComposer from "./AiChatComposer";
 import AiChatEditSidebar from "./AiChatEditSidebar";
 import type { ChatMessage, ChatThread } from "./types";
-import { composeRandomTemplateFromDb } from "@/lib/compose-random-template";
-import { improveCampaignDesignShapes } from "@/lib/campaign-design-intelligence";
-
-type CurrentUser = {
-  id: string;
-  email: string;
-  first_name: string;
-  last_name: string;
-  org_id: string | null;
-  role: string | null;
-  is_email_verified: boolean;
-};
-
-const TEMPLATE_FAMILY = "mixed-poster";
-
-const DEFAULT_SECTIONS = [
-  "background",
-  "hero-image",
-  "hero-text",
-  "features",
-  "cta",
-  "footer",
-];
-
-function uid(prefix = "msg") {
-  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
+import { useChatBootstrap } from "./useChatBootstrap";
+import { uid, copyCaption, downloadCanvas, findPromptFor } from "@/lib/chat-utils";
 
 export default function AiChatShell() {
   const endRef = useRef<HTMLDivElement | null>(null);
+  const {
+    currentUser, brands, tones, orgData, brandProfile,
+    brandId, setBrandId, toneId, setToneId,
+    threads, setThreads, selectedThreadId, setSelectedThreadId,
+    messages, setMessages,
+  } = useChatBootstrap();
 
   const [prompt, setPrompt] = useState("");
-  const [threads, setThreads] = useState<ChatThread[]>([]);
-  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
-
-  const [brands, setBrands] = useState<Brand[]>([]);
-  const [brandId, setBrandId] = useState("");
-  const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
-
-  const [tones, setTones] = useState<Tone[]>([]);
-  const [toneId, setToneId] = useState("");
-
-  const [orgData, setOrgData] = useState<OrgCampaignData | null>(null);
-
   const [progressText, setProgressText] = useState("");
   const [running, setRunning] = useState(false);
-
-  const [activeEditableMessageId, setActiveEditableMessageId] = useState<string | null>(null);
+  const [activeEditId, setActiveEditId] = useState<string | null>(null);
   const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
+  const [fullEditorId, setFullEditorId] = useState<string | null>(null);
 
-  const [fullEditorMessageId, setFullEditorMessageId] = useState<string | null>(null);
-
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-
-  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
-
-  const selectedBrand = useMemo(
-    () => brands.find((b) => b.id === brandId) || null,
-    [brands, brandId],
-  );
-
-  const selectedTone = useMemo(
-    () => tones.find((t) => t.id === toneId) || null,
-    [tones, toneId],
-  );
-
-  const activeEditableMessage = useMemo(
-    () => messages.find((m) => m.id === activeEditableMessageId) || null,
-    [messages, activeEditableMessageId],
-  );
-
-  const fullEditorMessage = useMemo(
-    () => messages.find((m) => m.id === fullEditorMessageId) || null,
-    [messages, fullEditorMessageId],
-  );
+  const selectedBrand = useMemo(() => brands.find((b) => b.id === brandId) || null, [brands, brandId]);
+  const selectedTone = useMemo(() => tones.find((t) => t.id === toneId) || null, [tones, toneId]);
+  const activeEditMessage = useMemo(() => messages.find((m) => m.id === activeEditId) || null, [messages, activeEditId]);
+  const fullEditorMessage = useMemo(() => messages.find((m) => m.id === fullEditorId) || null, [messages, fullEditorId]);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "end",
-    });
+    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, progressText, running]);
 
-  useEffect(() => {
-    async function loadInitialData() {
-      try {
-        const user = await apiFetch<CurrentUser>("/auth/me");
+  // ── Message helpers ──
+  const appendMessage = (msg: ChatMessage) => setMessages((p) => [...p, msg]);
+  const patchMessage = (id: string, patch: Partial<ChatMessage>) =>
+    setMessages((p) => p.map((m) => (m.id === id ? { ...m, ...patch } : m)));
+  const systemError = (text: string) =>
+    appendMessage({ id: uid("system"), role: "system", text, status: "error" });
+  const reloadThreads = () =>
+    listThreads().then((r) => setThreads(Array.isArray(r) ? r : [])).catch(() => {});
 
-        setCurrentUser(user);
+  // Shared args for the generator
+  const genArgs = (topic: string, savedAssistant: any) => ({
+    topic, savedAssistant, brandId, toneId, brandProfile, orgData, setProgressText,
+  });
 
-        const [brandRows, toneRows, org] = await Promise.all([
-          listBrands(true),
-          apiFetch<Tone[]>("/tones?active_only=false").catch(() => []),
-          fetchOrgCampaignData().catch(() => null),
-        ]);
-
-        setBrands(Array.isArray(brandRows) ? brandRows : []);
-        setTones(Array.isArray(toneRows) ? toneRows : []);
-        setOrgData(org);
-
-        if (Array.isArray(brandRows) && brandRows.length > 0) {
-          setBrandId((prev) => prev || brandRows[0].id);
-        }
-
-        if (Array.isArray(toneRows) && toneRows.length > 0) {
-          setToneId((prev) => prev || toneRows[0].id);
-        }
-      } catch (err) {
-        console.error("[ai-chat] initial data load failed", err);
-      }
-    }
-
-    void loadInitialData();
-  }, []);
-
-  useEffect(() => {
-    async function loadOrCreateThread() {
-      try {
-        const rows = await listThreads();
-
-        setThreads(Array.isArray(rows) ? rows : []);
-
-        let threadId: string | null = null;
-
-        const first = Array.isArray(rows) ? rows[0] : null;
-
-        if (first?.id) {
-          threadId = first.id;
-
-          setSelectedThreadId(first.id);
-
-          if (first.brand_id) setBrandId(first.brand_id);
-          if (first.tone_id) setToneId(first.tone_id);
-        } else {
-          const thread = await createThread({
-            title: "New marketing chat",
-            brand_id: brandId || null,
-            tone_id: toneId || null,
-          });
-
-          threadId = thread.id;
-
-          setSelectedThreadId(thread.id);
-          setThreads([thread]);
-        }
-
-        if (threadId) {
-          const messageRows = await getMessages(threadId);
-
-          if (Array.isArray(messageRows) && messageRows.length > 0) {
-            setMessages(messageRows.map(dbMessageToChatMessage));
-          }
-        }
-      } catch (err) {
-        console.error("[ai-chat] thread load/create failed", err);
-      }
-    }
-
-    void loadOrCreateThread();
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    if (!brandId) return;
-
-    getBrandProfile(brandId)
-      .then(setBrandProfile)
-      .catch(() => setBrandProfile(null));
-  }, [brandId]);
-
-  function getCaptionFromMessage(message: any) {
-    const draft = message.draft;
-
-    return [draft?.body_text, draft?.hashtags]
-      .filter(Boolean)
-      .join("\n\n");
-  }
-
-  async function copyMessageCaption(messageId: string) {
-    const message = messages.find((m) => m.id === messageId);
-
-    if (!message) return;
-
-    const caption = getCaptionFromMessage(message);
-
-    await navigator.clipboard.writeText(caption || message.text || "");
-  }
-
-  function downloadMessageImage(messageId: string) {
-    const root = document.querySelector(
-      `[data-message-canvas="${messageId}"]`,
-    );
-
-    const canvas = root?.querySelector("canvas");
-
-    if (!canvas) return;
-
-    const link = document.createElement("a");
-
-    link.href = (canvas as HTMLCanvasElement).toDataURL("image/png", 1);
-
-    link.download = `relvo-campaign-${Date.now()}.png`;
-
-    link.click();
-  }
-
-  async function regenerateMessageImage(messageId: string) {
-    const message = messages.find((m) => m.id === messageId);
-
-    if (!message?.campaignData) return;
-
-    try {
-      const composed = await composeRandomTemplateFromDb(
-        TEMPLATE_FAMILY,
-        DEFAULT_SECTIONS,
-      );
-
-      const rawShapes =
-        composed?.shapes ||
-        composed?.template_shapes ||
-        composed?.layout?.shapes ||
-        [];
-
-      const improvedShapes = improveCampaignDesignShapes(
-        rawShapes,
-        message.campaignData,
-      );
-
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === messageId
-            ? {
-                ...m,
-                shapes: improvedShapes,
-                canvasWidth: Number(
-                  composed?.canvasWidth ||
-                    composed?.canvas_width ||
-                    m.canvasWidth,
-                ),
-                canvasHeight: Number(
-                  composed?.canvasHeight ||
-                    composed?.canvas_height ||
-                    m.canvasHeight,
-                ),
-                backgroundImage:
-                  composed?.backgroundImage ||
-                  m.backgroundImage ||
-                  null,
-              }
-            : m,
-        ),
-      );
-    } catch (err) {
-      console.error(err);
-
-      appendMessage({
-        id: uid("system"),
-        role: "system",
-        text: "Could not regenerate this image. Please try again.",
-        status: "error",
-      });
-    }
-  }
-
-  const appendMessage = (msg: ChatMessage) =>
-    setMessages((prev) => [...prev, msg]);
-
-  const patchMessage = (
-    id: string,
-    patch: Partial<ChatMessage>,
-  ) =>
-    setMessages((prev) =>
-      prev.map((msg) =>
-        msg.id === id ? { ...msg, ...patch } : msg,
-      ),
-    );
-
-  const reloadThreads = async () => {
-    const rows = await listThreads();
-
-    setThreads(Array.isArray(rows) ? rows : []);
-  };
-
+  // ── Threads ──
   const handleNewChat = async () => {
     const thread = await createThread({
-      title: "New marketing chat",
-      brand_id: brandId || null,
-      tone_id: toneId || null,
+      title: "New marketing chat", brand_id: brandId || null, tone_id: toneId || null,
     });
-
     setSelectedThreadId(thread.id);
-
-    setThreads((prev) => [thread, ...prev]);
-
+    setThreads((p) => [thread, ...p]);
     setMessages([]);
-
-    setActiveEditableMessageId(null);
+    setActiveEditId(null);
     setSelectedShapeId(null);
   };
 
   const handleOpenThread = async (thread: ChatThread) => {
     setSelectedThreadId(thread.id);
-
     if (thread.brand_id) setBrandId(thread.brand_id);
     if (thread.tone_id) setToneId(thread.tone_id);
-
     const rows = await getMessages(thread.id);
-
-    setMessages(
-      Array.isArray(rows) && rows.length > 0
-        ? rows.map(dbMessageToChatMessage)
-        : [],
-    );
+    setMessages(Array.isArray(rows) ? rows.map(dbMessageToChatMessage) : []);
   };
 
-  const handleBrandChange = async (nextBrandId: string) => {
-    setBrandId(nextBrandId);
-
-    if (selectedThreadId) {
-      const updated = await updateThread(selectedThreadId, {
-        brand_id: nextBrandId,
-        tone_id: toneId || null,
-      });
-
-      setThreads((prev) =>
-        prev.map((t) =>
-          t.id === updated.id
-            ? { ...t, ...updated }
-            : t,
-        ),
-      );
-    }
+  const handleBrandChange = async (next: string) => {
+    setBrandId(next);
+    if (!selectedThreadId) return;
+    const updated = await updateThread(selectedThreadId, { brand_id: next, tone_id: toneId || null });
+    setThreads((p) => p.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)));
   };
 
-  const patchActiveMessageShapes = (
-    messageId: string,
-    updater: (prev: any[]) => any[],
-  ) => {
-    setMessages((prev) =>
-      prev.map((msg) => {
-        if (msg.id !== messageId) return msg;
-
-        const nextShapes = updater(msg.shapes || []);
-
-        return {
-          ...msg,
-          shapes: nextShapes,
-          metadata: {
-            ...(msg.metadata || {}),
-            shapes: nextShapes,
-          },
-        };
+  // ── Shape editing ──
+  const patchMessageShapes = (messageId: string, updater: (prev: any[]) => any[]) =>
+    setMessages((p) =>
+      p.map((m) => {
+        if (m.id !== messageId) return m;
+        const shapes = updater(m.shapes || []);
+        return { ...m, shapes, metadata: { ...(m.metadata || {}), shapes } };
       }),
     );
-  };
 
   const patchSelectedShape = (patch: any) => {
-    if (!activeEditableMessageId || !selectedShapeId) return;
-
-    patchActiveMessageShapes(
-      activeEditableMessageId,
-      (prev) =>
-        prev.map((shape: any) =>
-          shape.id === selectedShapeId
-            ? { ...shape, ...patch }
-            : shape,
-        ),
+    if (!activeEditId || !selectedShapeId) return;
+    patchMessageShapes(activeEditId, (prev) =>
+      prev.map((s: any) => (s.id === selectedShapeId ? { ...s, ...patch } : s)),
     );
   };
 
+  // ── Send ──
   const sendMessage = async (overrideText?: string) => {
-    const topic =
-      typeof overrideText === "string"
-        ? overrideText.trim()
-        : String(prompt || "").trim();
-
+    const topic = String(typeof overrideText === "string" ? overrideText : prompt).trim();
     if (!topic || running) return;
-
-    if (!brandId) {
-      return appendMessage({
-        id: uid("system"),
-        role: "system",
-        text: "Please select a brand first.",
-        status: "error",
-      });
-    }
-
-    if (!selectedThreadId) {
-      return appendMessage({
-        id: uid("system"),
-        role: "system",
-        text: "Chat thread is not ready yet.",
-        status: "error",
-      });
-    }
+    if (!brandId) return systemError("Please select a brand first.");
+    if (!selectedThreadId) return systemError("Chat thread is not ready yet.");
 
     setPrompt("");
-
     setRunning(true);
     setProgressText("");
 
-    const optimisticUserId = uid("user");
-    const optimisticAssistantId = uid("assistant");
-
-    appendMessage({
-      id: optimisticUserId,
-      role: "user",
-      text: topic,
-    });
-
-    appendMessage({
-      id: optimisticAssistantId,
-      role: "assistant",
-      text: "Thinking…",
-      status: "generating",
-    });
+    const userTempId = uid("user");
+    const botTempId = uid("assistant");
+    appendMessage({ id: userTempId, role: "user", text: topic });
+    appendMessage({ id: botTempId, role: "assistant", text: "Thinking…", status: "generating" });
 
     try {
-      const replyData = await replyToThread(
-        selectedThreadId,
-        {
-          content: topic,
-          brand_id: brandId,
-          tone_id: toneId || null,
-        },
-      );
+      const reply = await replyToThread(selectedThreadId, {
+        content: topic, brand_id: brandId, tone_id: toneId || null,
+      });
+      const savedUser = reply.user_message;
+      const saved = reply.assistant_message;
 
-      const savedUser = replyData.user_message;
-      const savedAssistant = replyData.assistant_message;
-
-      patchMessage(optimisticUserId, {
-        id: savedUser.id,
-        text: savedUser.content,
-        status: "ready",
+      patchMessage(userTempId, { id: savedUser.id, text: savedUser.content, status: "ready" });
+      patchMessage(botTempId, {
+        id: saved.id, text: saved.content, status: "ready",
+        messageType: saved.message_type, metadata: saved.metadata || {},
       });
 
-      patchMessage(optimisticAssistantId, {
-        id: savedAssistant.id,
-        text: savedAssistant.content,
-        status: "ready",
-        messageType: savedAssistant.message_type,
-        metadata: savedAssistant.metadata || {},
-      });
-
-      if (
-        savedAssistant.message_type !==
-          "generate_image" &&
-        savedAssistant.message_type !==
-          "generate_month_content"
-      ) {
-        await reloadThreads().catch(() => {});
-
-        return;
-      }
-
-      if (
-        savedAssistant.message_type ===
-        "generate_month_content"
-      ) {
-        const result =
-          await generateMonthFromAssistant({
-            topic,
-            savedAssistant,
-            brandId,
-            toneId,
-            brandProfile,
-            orgData,
-            setProgressText,
-          });
-
-        const updatedAssistant =
-          await updateMessage(savedAssistant.id, {
-            content: `Generated ${result.items.length} monthly posts. Open the planner to review them.`,
-            message_type: "generated_month",
-            metadata: result.metadata,
-          });
-
-        patchMessage(savedAssistant.id, {
-          id: updatedAssistant.id,
-          text: updatedAssistant.content,
-          status: "ready",
-          messageType: "generated_month",
+      if (saved.message_type === "generate_month_content") {
+        const result = await generateMonthFromAssistant(genArgs(topic, saved));
+        const updated = await updateMessage(saved.id, {
+          content: `Generated ${result.items.length} monthly posts. Open the planner to review them.`,
+          message_type: "generated_month",
           metadata: result.metadata,
         });
-
-        await reloadThreads().catch(() => {});
-
-        return;
-      }
-
-      const result =
-        await generateSingleImageFromAssistant({
-          topic,
-          savedAssistant,
-          brandId,
-          toneId,
-          brandProfile,
-          orgData,
-          setProgressText,
+        patchMessage(saved.id, {
+          id: updated.id, text: updated.content, status: "ready",
+          messageType: "generated_month", metadata: result.metadata,
         });
-
-      const updatedAssistant =
-        await updateMessage(savedAssistant.id, {
+      } else if (saved.message_type === "generate_image") {
+        const result = await generateSingleImageFromAssistant(genArgs(topic, saved));
+        const updated = await updateMessage(saved.id, {
           content: "Generated campaign image.",
           message_type: "generated_image",
           metadata: result.metadata,
           draft_id: result.draft.id,
         });
-
-      patchMessage(savedAssistant.id, {
-        id: updatedAssistant.id,
-        text: updatedAssistant.content,
-        status: "ready",
-        messageType: "generated_image",
-        metadata: result.metadata,
-        draft: result.draft,
-        campaignData: result.campaignData,
-        shapes: result.shapes,
-        canvasWidth: result.canvasWidth,
-        canvasHeight: result.canvasHeight,
-        backgroundImage: result.backgroundImage,
-        topicChatId: result.topicChatId,
-      });
-
-      await reloadThreads().catch(() => {});
+        patchMessage(saved.id, {
+          id: updated.id, text: updated.content, status: "ready",
+          messageType: "generated_image", metadata: result.metadata,
+          draft: result.draft, campaignData: result.campaignData, shapes: result.shapes,
+          canvasWidth: result.canvasWidth, canvasHeight: result.canvasHeight,
+          backgroundImage: result.backgroundImage, topicChatId: result.topicChatId,
+        });
+      }
+      await reloadThreads();
     } catch (err: any) {
       console.error(err);
-
-      patchMessage(optimisticAssistantId, {
-        text:
-          err?.message ||
-          "Something went wrong.",
-        status: "error",
-      });
+      patchMessage(botTempId, { text: err?.message || "Something went wrong.", status: "error" });
     } finally {
       setProgressText("");
       setRunning(false);
     }
   };
 
-  const handleRegenerateMessage = async (
-    messageId: string,
-  ) => {
-    const target = messages.find(
-      (m) => m.id === messageId,
-    );
+  // ── Regenerate (one handler for both buttons) ──
+  const handleRegenerate = async (messageId: string) => {
+    const topic = findPromptFor(messages, messageId);
+    if (!topic || running) return;
 
-    if (!target) return;
-
+    setRunning(true);
+    setProgressText("Regenerating campaign…");
     try {
-      setRunning(true);
-
-      setProgressText("Regenerating campaign…");
-
-      const generationPrompt =
-        target.metadata?.generation_prompt ||
-        target.text;
-
-      const rebuilt =
-        await generateSingleImageFromAssistant({
-          topic: generationPrompt,
-          savedAssistant: {
-            metadata: {
-              generation_prompt:
-                generationPrompt,
-            },
-          } as any,
-          brandId:
-            selectedBrand?.id || "",
-          toneId:
-            selectedTone?.id || "",
-          brandProfile,
-          orgData,
-          setProgressText,
-        });
-
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === messageId
-            ? {
-                ...msg,
-                draft: rebuilt.draft,
-                campaignData:
-                  rebuilt.campaignData,
-                shapes: rebuilt.shapes,
-                canvasWidth:
-                  rebuilt.canvasWidth,
-                canvasHeight:
-                  rebuilt.canvasHeight,
-                backgroundImage:
-                  rebuilt.backgroundImage,
-                metadata:
-                  rebuilt.metadata,
-              }
-            : msg,
-        ),
+      const rebuilt = await generateSingleImageFromAssistant(
+        genArgs(topic, { metadata: { generation_prompt: topic } }),
       );
-    } catch (e) {
-      console.error(e);
+      patchMessage(messageId, {
+        draft: rebuilt.draft, campaignData: rebuilt.campaignData, shapes: rebuilt.shapes,
+        canvasWidth: rebuilt.canvasWidth, canvasHeight: rebuilt.canvasHeight,
+        backgroundImage: rebuilt.backgroundImage, metadata: rebuilt.metadata,
+      });
+      // Keep the new design after a page reload
+      updateMessage(messageId, { metadata: rebuilt.metadata, draft_id: rebuilt.draft.id }).catch(() => {});
+    } catch (err) {
+      console.error(err);
+      systemError("Could not regenerate this image. Please try again.");
     } finally {
       setRunning(false);
       setProgressText("");
     }
   };
 
+  // ── Render ──
   return (
     <main className="flex h-screen w-full overflow-hidden bg-[#f4f4f6]">
-      {/* Add this near the top of AiChatShell return OR inside layout.tsx */}
+      <style jsx global>{`
+        @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+        html, body { background: #f4f4f6; }
+        html, body, * { font-family: "Inter", sans-serif; }
+      `}</style>
 
-<style jsx global>{`
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
-  html,
-  body {
-    font-family: 'Inter', sans-serif;
-    background: #f4f4f6;
-  }
-
-  * {
-    font-family: 'Inter', sans-serif;
-  }
-`}</style>
-      {/* Sidebar */}
       <AiChatSidebar
         threads={threads}
         selectedThreadId={selectedThreadId}
@@ -663,51 +215,38 @@ export default function AiChatShell() {
         onBrandChange={handleBrandChange}
       />
 
-      {/* Main Content */}
       <section className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-[#f4f4f6]">
-        {/* Grid texture */}
         <div
           className="pointer-events-none absolute inset-0 opacity-[0.55]"
           style={{
-            backgroundImage: `
-              linear-gradient(rgba(124,85,246,0.025) 1px, transparent 1px),
-              linear-gradient(90deg, rgba(124,85,246,0.025) 1px, transparent 1px)
-            `,
+            backgroundImage:
+              "linear-gradient(rgba(124,85,246,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(124,85,246,0.025) 1px, transparent 1px)",
             backgroundSize: "28px 28px",
           }}
         />
 
-        {/* Messages */}
-        <div className="relative pt-20 lg:pt-0 z-10 flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden pt-20 lg:pt-0">
           <AiChatMessages
-            onRegenerateMessage={handleRegenerateMessage}
-            onOpenFullEditor={setFullEditorMessageId}
             messages={messages}
             running={running}
-            onDownloadMessageImage={downloadMessageImage}
-            onCopyMessageCaption={copyMessageCaption}
-            onRegenerateMessageImage={regenerateMessageImage}
             progressText={progressText}
-            onPromptClick={(prompt) => {
-              setPrompt(prompt);
-              void sendMessage(prompt);
-            }}
-            activeEditableMessageId={
-              activeEditableMessageId
-            }
+            endRef={endRef}
+            onRegenerateMessage={handleRegenerate}
+            onRegenerateMessageImage={handleRegenerate}
+            onOpenFullEditor={setFullEditorId}
+            onDownloadMessageImage={downloadCanvas}
+            onCopyMessageCaption={(id: string) => copyCaption(messages.find((m) => m.id === id))}
+            onPromptClick={(p: string) => void sendMessage(p)}
+            activeEditableMessageId={activeEditId}
             selectedShapeId={selectedShapeId}
-            onStartEditing={(id) => {
-              setActiveEditableMessageId(id);
+            onStartEditing={(id: string) => {
+              setActiveEditId(id);
               setSelectedShapeId(null);
             }}
             onSelectShape={setSelectedShapeId}
-            onPatchMessageShapes={
-              patchActiveMessageShapes
-            }
-            endRef={endRef}
+            onPatchMessageShapes={patchMessageShapes}
           />
 
-          {/* Composer */}
           <div className="relative z-20 border-t border-black/5 bg-white/60 backdrop-blur-xl">
             <AiChatComposer
               prompt={prompt}
@@ -719,75 +258,42 @@ export default function AiChatShell() {
         </div>
       </section>
 
-      {/* Right Edit Sidebar */}
-      {activeEditableMessageId && (
+      {activeEditId && (
         <aside className="hidden h-screen w-[340px] flex-shrink-0 border-l border-black/5 bg-[#f4f4f6]/95 backdrop-blur-3xl xl:flex">
           <AiChatEditSidebar
-            message={activeEditableMessage}
+            message={activeEditMessage}
             selectedShapeId={selectedShapeId}
             onSelectShape={setSelectedShapeId}
             onPatchShape={patchSelectedShape}
             onClose={() => {
-              setActiveEditableMessageId(null);
+              setActiveEditId(null);
               setSelectedShapeId(null);
             }}
           />
         </aside>
       )}
 
-      {/* Full Editor */}
-      {fullEditorMessage?.campaignData &&
-      fullEditorMessage?.shapes?.length ? (
+      {fullEditorMessage?.campaignData && fullEditorMessage?.shapes?.length ? (
         <AiChatFullEditorDialog
-          open={!!fullEditorMessageId}
-          onOpenChange={(open) => {
-            if (!open) {
-              setFullEditorMessageId(null);
-            }
-          }}
-          campaignData={
-            fullEditorMessage.campaignData
-          }
+          open={!!fullEditorId}
+          onOpenChange={(open) => !open && setFullEditorId(null)}
+          campaignData={fullEditorMessage.campaignData}
           shapes={fullEditorMessage.shapes}
-          backgroundImage={
-            fullEditorMessage.backgroundImage ||
-            null
-          }
-          canvasWidth={
-            fullEditorMessage.canvasWidth || 1080
-          }
-          canvasHeight={
-            fullEditorMessage.canvasHeight || 1350
-          }
-          onSave={(payload) => {
-            patchMessage(fullEditorMessage.id, {
-              campaignData:
-                payload.campaignData,
-              shapes: payload.shapes,
-              backgroundImage:
-                payload.backgroundImage ||
-                null,
-              canvasWidth:
-                payload.canvasWidth ||
-                fullEditorMessage.canvasWidth,
-              canvasHeight:
-                payload.canvasHeight ||
-                fullEditorMessage.canvasHeight,
+          backgroundImage={fullEditorMessage.backgroundImage || null}
+          canvasWidth={fullEditorMessage.canvasWidth || 1080}
+          canvasHeight={fullEditorMessage.canvasHeight || 1350}
+          onSave={(p) => {
+            const m = fullEditorMessage;
+            const bg = p.backgroundImage || null;
+            const w = p.canvasWidth || m.canvasWidth;
+            const h = p.canvasHeight || m.canvasHeight;
+            patchMessage(m.id, {
+              campaignData: p.campaignData, shapes: p.shapes, backgroundImage: bg,
+              canvasWidth: w, canvasHeight: h,
               metadata: {
-                ...(fullEditorMessage.metadata ||
-                  {}),
-                campaign_data:
-                  payload.campaignData,
-                shapes: payload.shapes,
-                background_image:
-                  payload.backgroundImage ||
-                  null,
-                canvas_width:
-                  payload.canvasWidth ||
-                  fullEditorMessage.canvasWidth,
-                canvas_height:
-                  payload.canvasHeight ||
-                  fullEditorMessage.canvasHeight,
+                ...(m.metadata || {}),
+                campaign_data: p.campaignData, shapes: p.shapes,
+                background_image: bg, canvas_width: w, canvas_height: h,
               },
             });
           }}
