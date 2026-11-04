@@ -2,6 +2,8 @@
 
 import { Bot, Loader2, User } from "lucide-react";
 import AiChatCanvasPreview from "./AiChatCanvasPreview";
+import OutboundCard from "./OutboundCard";
+import SchedulePanel from "./SchedulePanel";
 import type { ChatMessage, Draft } from "./types";
 import { PORTRAIT_H, PORTRAIT_W } from "@/lib/design-studio-utils";
 import ReactMarkdown from "react-markdown";
@@ -87,6 +89,7 @@ export default function AiChatMessages({
   progressText,
   activeEditableMessageId,
   selectedShapeId,
+  businessContext,
   onStartEditing,
   onCopyMessageCaption,
   onDownloadMessageImage,
@@ -105,6 +108,7 @@ export default function AiChatMessages({
   onOpenFullEditor: (messageId: string) => void;
   progressText: string;
   activeEditableMessageId: string | null;
+  businessContext?: string;
   onDownloadMessageImage: (messageId: string) => void;
   onCopyMessageCaption: (messageId: string) => void;
   onRegenerateMessageImage: (messageId: string) => void;
@@ -117,18 +121,19 @@ export default function AiChatMessages({
   const isEmpty = messages.length === 0;
 
   const quickPrompts = [
-  "Generate a branded post about our main service",
-  "Create an ad image for lead conversion",
-  "Plan this month’s content calendar",
-  "Summarise a Google Doc",
-];
+    "Generate a branded post about our main service",
+    "Create an ad image for lead conversion",
+    "Plan this month’s content calendar",
+    "Summarise a Google Doc",
+  ];
 
-const systemPrompts = [
-  { icon: "✦", label: "Explain where I manage Google Docs", prompt: "Where do I connect and read Google Docs in the platform?" },
-  { icon: "✦", label: "Review my business profile setup", prompt: "Where do I update organisation profile data and why does it matter?" },
-  { icon: "✦", label: "Create a full month of content", prompt: "Generate a full month of content for my brand" },
-  { icon: "✦", label: "Improve my brand generation setup", prompt: "How should I use brands, tones, media, and reviews to improve generated posts?" },
-];
+  const systemPrompts = [
+    { icon: "✦", label: "Explain where I manage Google Docs", prompt: "Where do I connect and read Google Docs in the platform?" },
+    { icon: "✦", label: "Review my business profile setup", prompt: "Where do I update organisation profile data and why does it matter?" },
+    { icon: "✦", label: "Create a full month of content", prompt: "Generate a full month of content for my brand" },
+    { icon: "✦", label: "Find businesses and call them", prompt: "Find 3 dental clinics in Austin and call them about our service" },
+    { icon: "✦", label: "Improve my brand generation setup", prompt: "How should I use brands, tones, media, and reviews to improve generated posts?" },
+  ];
 
   return (
     <>
@@ -170,7 +175,7 @@ const systemPrompts = [
             </div>
 
             <div className="flex w-full max-w-[560px] flex-col gap-0.5">
-             {systemPrompts.map((item, i, arr) => (
+              {systemPrompts.map((item, i, arr) => (
                 <div key={item.label}>
                   <button
                     onClick={() => onPromptClick(item.prompt)}
@@ -195,9 +200,7 @@ const systemPrompts = [
                 <div
                   key={message.id}
                   className={`flex items-start gap-3 ${
-                    message.role === "user"
-                      ? "ml-auto flex-row-reverse"
-                      : ""
+                    message.role === "user" ? "ml-auto flex-row-reverse" : ""
                   }`}
                 >
                   <div
@@ -210,11 +213,7 @@ const systemPrompts = [
                       }
                     `}
                   >
-                    {message.role === "user" ? (
-                      <User size={15} />
-                    ) : (
-                      <Bot size={15} />
-                    )}
+                    {message.role === "user" ? <User size={15} /> : <Bot size={15} />}
                   </div>
 
                   <div
@@ -228,101 +227,100 @@ const systemPrompts = [
                     `}
                   >
                     <div
-  className={`
-    whitespace-pre-wrap
-    font-normal
-    text-[13px]
-    leading-[1.78]
-    tracking-[-0.005em]
-    antialiased
-    ${
-      message.role === "user"
-        ? "text-gray-600"
-        : "text-[#667085]"
-    }
-  `}
->
-  {message.status === "generating" && (
-    <Loader2
-      size={13}
-      className="mr-[7px] inline-block animate-spin text-violet-500"
-    />
-  )}
+                      className={`
+                        whitespace-pre-wrap
+                        font-normal
+                        text-[13px]
+                        leading-[1.78]
+                        tracking-[-0.005em]
+                        antialiased
+                        ${message.role === "user" ? "text-gray-600" : "text-[#667085]"}
+                      `}
+                    >
+                      {message.status === "generating" && (
+                        <Loader2
+                          size={13}
+                          className="mr-[7px] inline-block animate-spin text-violet-500"
+                        />
+                      )}
 
-  <ReactMarkdown
-    remarkPlugins={[remarkGfm]}
-    components={{
-      p: ({ children }) => (
-        <p className="mb-3 text-[13px] font-normal leading-[1.78] text-[#667085] last:mb-0">
-          {children}
-        </p>
-      ),
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          p: ({ children }) => (
+                            <p className="mb-3 text-[13px] font-normal leading-[1.78] text-[#667085] last:mb-0">
+                              {children}
+                            </p>
+                          ),
 
-      ul: ({ children }) => (
-        <ul className="mb-4 ml-5 list-disc space-y-3 text-[#667085] last:mb-0">
-          {children}
-        </ul>
-      ),
+                          ul: ({ children }) => (
+                            <ul className="mb-4 ml-5 list-disc space-y-3 text-[#667085] last:mb-0">
+                              {children}
+                            </ul>
+                          ),
 
-      ol: ({ children }) => (
-        <ol className="mb-4 ml-5 list-decimal space-y-3 text-[#667085] last:mb-0">
-          {children}
-        </ol>
-      ),
+                          ol: ({ children }) => (
+                            <ol className="mb-4 ml-5 list-decimal space-y-3 text-[#667085] last:mb-0">
+                              {children}
+                            </ol>
+                          ),
 
-      li: ({ children }) => (
-        <li className="pl-1 text-[13px] font-normal leading-[1.78] text-[#667085] marker:text-[#98a2b3]">
-          {children}
-        </li>
-      ),
+                          li: ({ children }) => (
+                            <li className="pl-1 text-[13px] font-normal leading-[1.78] text-[#667085] marker:text-[#98a2b3]">
+                              {children}
+                            </li>
+                          ),
 
-      strong: ({ children }) => (
-        <strong className="font-medium text-[#475467]">
-          {children}
-        </strong>
-      ),
+                          strong: ({ children }) => (
+                            <strong className="font-medium text-[#475467]">{children}</strong>
+                          ),
 
-      h1: ({ children }) => (
-        <h1 className="mb-4 mt-1 text-[20px] font-medium tracking-[-0.025em] text-[#344054]">
-          {children}
-        </h1>
-      ),
+                          h1: ({ children }) => (
+                            <h1 className="mb-4 mt-1 text-[20px] font-medium tracking-[-0.025em] text-[#344054]">
+                              {children}
+                            </h1>
+                          ),
 
-      h2: ({ children }) => (
-        <h2 className="mb-3 mt-5 text-[16px] font-medium tracking-[-0.015em] text-[#344054]">
-          {children}
-        </h2>
-      ),
+                          h2: ({ children }) => (
+                            <h2 className="mb-3 mt-5 text-[16px] font-medium tracking-[-0.015em] text-[#344054]">
+                              {children}
+                            </h2>
+                          ),
 
-      h3: ({ children }) => (
-        <h3 className="mb-2 mt-4 text-[14px] font-medium tracking-[-0.01em] text-[#344054]">
-          {children}
-        </h3>
-      ),
+                          h3: ({ children }) => (
+                            <h3 className="mb-2 mt-4 text-[14px] font-medium tracking-[-0.01em] text-[#344054]">
+                              {children}
+                            </h3>
+                          ),
 
-      code: ({ children }) => (
-        <code className="rounded-md bg-black/[0.045] px-[6px] py-[3px] text-[12px] font-normal text-[#475467]">
-          {children}
-        </code>
-      ),
+                          code: ({ children }) => (
+                            <code className="rounded-md bg-black/[0.045] px-[6px] py-[3px] text-[12px] font-normal text-[#475467]">
+                              {children}
+                            </code>
+                          ),
 
-      a: ({ href, children }) => (
-        <a
-          href={href}
-          target={href?.startsWith("/") ? "_self" : "_blank"}
-          rel="noopener noreferrer"
-          className="font-medium text-violet-700 underline underline-offset-2 transition hover:text-violet-800"
-        >
-          {children}
-        </a>
-      ),
-    }}
-  >
-    {message.text || ""}
-  </ReactMarkdown>
-</div>
+                          a: ({ href, children }) => (
+                            <a
+                              href={href}
+                              target={href?.startsWith("/") ? "_self" : "_blank"}
+                              rel="noopener noreferrer"
+                              className="font-medium text-violet-700 underline underline-offset-2 transition hover:text-violet-800"
+                            >
+                              {children}
+                            </a>
+                          ),
+                        }}
+                      >
+                        {message.text || ""}
+                      </ReactMarkdown>
+                    </div>
 
                     <BusinessAnalysisCard data={message.metadata?.business_analysis} />
+
+                    {/* Outbound calls: lead list + Call button */}
+                    {message.metadata?.outbound ? (
+                      <OutboundCard {...message.metadata.outbound} />
+                    ) : null}
 
                     {message.messageType === "generated_month" && (
                       <div className="mt-[11px]">
@@ -345,26 +343,21 @@ const systemPrompts = [
 
                     {message.campaignData && message.shapes?.length ? (
                       <>
-                      <div data-message-canvas={message.id}>
-
-                        <AiChatCanvasPreview
-                          campaignData={message.campaignData}
-                          shapes={message.shapes}
-                          canvasWidth={message.canvasWidth || PORTRAIT_W}
-                          canvasHeight={message.canvasHeight || PORTRAIT_H}
-                          backgroundImage={message.backgroundImage || null}
-                          isEditable={activeEditableMessageId === message.id}
-                          selectedShapeId={
-                            activeEditableMessageId === message.id
-                              ? selectedShapeId
-                              : null
-                          }
-                          onSelectShape={onSelectShape}
-                          onPatchShapes={(updater) =>
-                            onPatchMessageShapes(message.id, updater)
-                          }
-                        />
-                          </div>
+                        <div data-message-canvas={message.id}>
+                          <AiChatCanvasPreview
+                            campaignData={message.campaignData}
+                            shapes={message.shapes}
+                            canvasWidth={message.canvasWidth || PORTRAIT_W}
+                            canvasHeight={message.canvasHeight || PORTRAIT_H}
+                            backgroundImage={message.backgroundImage || null}
+                            isEditable={activeEditableMessageId === message.id}
+                            selectedShapeId={
+                              activeEditableMessageId === message.id ? selectedShapeId : null
+                            }
+                            onSelectShape={onSelectShape}
+                            onPatchShapes={(updater) => onPatchMessageShapes(message.id, updater)}
+                          />
+                        </div>
 
                         <div className="mt-[11px] flex flex-wrap gap-[7px]">
                           <button
@@ -393,6 +386,7 @@ const systemPrompts = [
                           >
                             Regenerate
                           </button>
+
                           <button
                             className="
                               rounded-full border border-black/5
@@ -445,6 +439,13 @@ const systemPrompts = [
                             {getDraftCaption(message.draft)}
                           </div>
                         )}
+
+                        {/* Facebook scheduling */}
+                        <SchedulePanel
+                          messageId={message.id}
+                          defaultCaption={getDraftCaption(message.draft)}
+                          businessContext={businessContext || ""}
+                        />
                       </>
                     ) : null}
                   </div>

@@ -6,6 +6,7 @@ import {
 } from "@/lib/ai-chat-api";
 import { dbMessageToChatMessage } from "@/lib/ai-chat-mappers";
 import { generateSingleImageFromAssistant, generateMonthFromAssistant } from "@/lib/ai-chat-generation";
+import { looksOutbound, detectIntent, searchBusinesses } from "@/lib/outbound-api";
 import AiChatFullEditorDialog from "./AiChatFullEditorDialog";
 import AiChatSidebar from "./AiChatSidebar";
 import AiChatMessages from "./AiChatMessages";
@@ -35,6 +36,15 @@ export default function AiChatShell() {
   const selectedTone = useMemo(() => tones.find((t) => t.id === toneId) || null, [tones, toneId]);
   const activeEditMessage = useMemo(() => messages.find((m) => m.id === activeEditId) || null, [messages, activeEditId]);
   const fullEditorMessage = useMemo(() => messages.find((m) => m.id === fullEditorId) || null, [messages, fullEditorId]);
+
+  // Used by the Facebook schedule panel so the AI can pick a good posting time
+  const businessContext = useMemo(
+    () =>
+      [(selectedBrand as any)?.name, (brandProfile as any)?.description]
+        .filter(Boolean)
+        .join(". "),
+    [selectedBrand, brandProfile],
+  );
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -98,10 +108,71 @@ export default function AiChatShell() {
     );
   };
 
+  // ── Outbound calls ──
+  // Returns true when the message was handled as an outbound-call request.
+  const tryOutbound = async (topic: string): Promise<boolean> => {
+    if (!looksOutbound(topic)) return false;
+
+    setRunning(true);
+    try {
+      let intent;
+      try {
+        intent = await detectIntent(topic);
+      } catch {
+        return false; // fall back to the normal chat flow
+      }
+      if (intent.intent === "none") return false;
+
+      setPrompt("");
+      appendMessage({ id: uid("user"), role: "user", text: topic });
+      const botId = uid("assistant");
+      appendMessage({ id: botId, role: "assistant", text: "Working on it…", status: "generating" });
+      const done = (patch: any) => patchMessage(botId, { status: "ready", ...patch });
+
+      if (!intent.ready) {
+        done({ text: "Your voice agent isn't set up yet. [Open settings](/dashboard/settings/voice-agent)" });
+        return true;
+      }
+      try {
+        if (intent.intent === "call_number") {
+          const leads = (intent.phones || []).map((phone) => ({ name: "Direct call", phone }));
+          done({
+            text: "Ready to call. Confirm below.",
+            metadata: { outbound: { leads, testMode: intent.test_mode, notes: intent.notes || "" } },
+          });
+        } else {
+          const found = await searchBusinesses({
+            business_type: intent.business_type || "",
+            city: intent.city || "",
+            count: intent.count || 5,
+          });
+          done(
+            found.leads.length
+              ? {
+                  text: found.matched
+                    ? `Found ${found.leads.length} registered businesses. Choose who to call:`
+                    : `No exact match, so here are ${found.leads.length} registered businesses. Choose who to call:`,
+                  metadata: {
+                    outbound: { leads: found.leads, testMode: found.test_mode, notes: intent.notes || "" },
+                  },
+                }
+              : { text: "No registered businesses with a phone number were found yet." },
+          );
+        }
+      } catch (e: any) {
+        done({ text: e?.message || "Search failed.", status: "error" });
+      }
+      return true;
+    } finally {
+      setRunning(false);
+    }
+  };
+
   // ── Send ──
   const sendMessage = async (overrideText?: string) => {
     const topic = String(typeof overrideText === "string" ? overrideText : prompt).trim();
     if (!topic || running) return;
+    if (await tryOutbound(topic)) return;
     if (!brandId) return systemError("Please select a brand first.");
     if (!selectedThreadId) return systemError("Chat thread is not ready yet.");
 
@@ -231,6 +302,7 @@ export default function AiChatShell() {
             running={running}
             progressText={progressText}
             endRef={endRef}
+            businessContext={businessContext}
             onRegenerateMessage={handleRegenerate}
             onRegenerateMessageImage={handleRegenerate}
             onOpenFullEditor={setFullEditorId}
