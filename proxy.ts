@@ -12,7 +12,18 @@ const AUTH_ROUTES = [
   "/auth/reset-password",
 ];
 
-const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || "").replace(/\/$/, "");
+// Server-side code needs an ABSOLUTE backend URL.
+// In production NEXT_PUBLIC_API_BASE is the relative proxy path "/backend",
+// which cannot be fetched from the server, so we fall back to BACKEND_URL / the Render URL.
+// Locally NEXT_PUBLIC_API_BASE is usually http://localhost:8000 and is used as is.
+const PUBLIC_BASE = process.env.NEXT_PUBLIC_API_BASE || "";
+const API_BASE = (
+  process.env.BACKEND_URL ||
+  (PUBLIC_BASE.startsWith("http") ? PUBLIC_BASE : "") ||
+  "https://relvo-backend-iker.onrender.com"
+).replace(/\/$/, "");
+
+type SessionState = "valid" | "invalid" | "unreachable";
 
 function clearAuthCookies(res: NextResponse) {
   res.cookies.delete(COOKIE_NAME);
@@ -21,8 +32,12 @@ function clearAuthCookies(res: NextResponse) {
   return res;
 }
 
-async function isSessionValid(req: NextRequest): Promise<boolean> {
-  if (!API_BASE) return false;
+// valid       -> backend confirmed the session
+// invalid     -> backend said 401/403: really logged out
+// unreachable -> backend asleep / slow / error: we cannot tell, so do NOT log the user out
+async function checkSession(req: NextRequest): Promise<SessionState> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
 
   try {
     const res = await fetch(`${API_BASE}/auth/validate-session`, {
@@ -31,11 +46,16 @@ async function isSessionValid(req: NextRequest): Promise<boolean> {
         cookie: req.headers.get("cookie") || "",
       },
       cache: "no-store",
+      signal: controller.signal,
     });
 
-    return res.ok;
+    if (res.ok) return "valid";
+    if (res.status === 401 || res.status === 403) return "invalid";
+    return "unreachable";
   } catch {
-    return false;
+    return "unreachable";
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -58,16 +78,23 @@ export async function proxy(req: NextRequest) {
   const isAuthPage = AUTH_ROUTES.some((p) => pathname.startsWith(p));
   const isOnboarding = pathname.startsWith("/onboarding");
 
-  let validSession = false;
+  let state: SessionState = "invalid";
 
   if (session) {
-    validSession = await isSessionValid(req);
+    state = await checkSession(req);
   }
 
+  // Page access: if the backend is unreachable, keep the user in (the cookie exists).
+  // The page shell holds no data, and every API call is still protected by the backend.
+  const validSession = state === "valid" || state === "unreachable";
+
+  // Only redirect away from login pages when the backend actually confirmed the session.
+  const confirmedSession = state === "valid";
+
   console.log(
-    `proxy pathname=${pathname} session=${session ? "yes" : "no"} valid=${
-      validSession ? "yes" : "no"
-    } org=${orgId ? "yes" : "no"}`
+    `proxy pathname=${pathname} session=${session ? "yes" : "no"} state=${state} org=${
+      orgId ? "yes" : "no"
+    } api=${API_BASE}`
   );
 
   // 1) Protect dashboard.
@@ -82,7 +109,7 @@ export async function proxy(req: NextRequest) {
 
   // 3) Logged-in users should not stay on auth pages.
   // Do NOT use nf_onboarding here. It is global and breaks multi-org.
-  if (isAuthPage && validSession) {
+  if (isAuthPage && confirmedSession) {
     const url = req.nextUrl.clone();
 
     if (!orgId) {
@@ -104,10 +131,6 @@ export async function proxy(req: NextRequest) {
 
   // 5) Never redirect onboarding away here.
   // Onboarding page decides whether current org is complete.
-  if (isOnboarding && validSession) {
-    return NextResponse.next();
-  }
-
   return NextResponse.next();
 }
 
