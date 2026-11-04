@@ -110,16 +110,23 @@ export default function AiChatShell() {
 
   // ── Outbound calls ──
   // Returns true when the message was handled as an outbound-call request.
-  const tryOutbound = async (topic: string): Promise<boolean> => {
-    if (!looksOutbound(topic)) return false;
+    const tryOutbound = async (topic: string): Promise<boolean> => {
+    const gate = looksOutbound(topic);
+    console.log("[outbound] gate:", gate, "|", topic);
+    if (!gate) return false;
 
     setRunning(true);
     try {
       let intent;
       try {
         intent = await detectIntent(topic);
-      } catch {
-        return false; // fall back to the normal chat flow
+        console.log("[outbound] intent:", intent);
+      } catch (e: any) {
+        console.error("[outbound] intent failed:", e);
+        appendMessage({ id: uid("user"), role: "user", text: topic });
+        systemError(`Call feature error: ${e?.message || "intent check failed"}`);
+        setPrompt("");
+        return true;
       }
       if (intent.intent === "none") return false;
 
