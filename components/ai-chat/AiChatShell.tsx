@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Loader2, Mic, Square } from "lucide-react";
 import {
   createThread, listThreads, getMessages, replyToThread, updateMessage, updateThread,
 } from "@/lib/ai-chat-api";
 import { dbMessageToChatMessage } from "@/lib/ai-chat-mappers";
-import { generateSingleImageFromAssistant, generateMonthFromAssistant } from "@/lib/ai-chat-generation";
+import { generateMonthFromAssistant } from "@/lib/ai-chat-generation";
+import { runCampaign } from "@/lib/campaign-flow";
 import { looksOutbound, detectIntent, searchBusinesses } from "@/lib/outbound-api";
 import AiChatFullEditorDialog from "./AiChatFullEditorDialog";
 import AiChatSidebar from "./AiChatSidebar";
@@ -14,7 +16,23 @@ import AiChatComposer from "./AiChatComposer";
 import AiChatEditSidebar from "./AiChatEditSidebar";
 import type { ChatMessage, ChatThread } from "./types";
 import { useChatBootstrap } from "./useChatBootstrap";
+import { useVoiceInput } from "./useVoiceInput";
 import { uid, copyCaption, downloadCanvas, findPromptFor } from "@/lib/chat-utils";
+
+// Questions go to chat. Only "make me an ad"-style requests go to the campaign flow.
+const isCampaignRequest = (t: string) =>
+  !/^\s*(how|what|why|explain|can|does)\b/i.test(t) &&
+  /\b(generate|create|design|make|write)\b[^?]*\b(ads?|posters?|flyers?|campaigns?|posts?|images?)\b/i.test(t);
+
+// Saves a runCampaign result in the metadata shape the full editor already uses.
+const campaignMetadata = (c: any, topic: string) => ({
+  generation_prompt: topic,
+  campaign_data: c.campaignData,
+  shapes: c.shapes,
+  background_image: c.backgroundImage ?? null,
+  canvas_width: c.canvasWidth,
+  canvas_height: c.canvasHeight,
+});
 
 export default function AiChatShell() {
   const endRef = useRef<HTMLDivElement | null>(null);
@@ -37,7 +55,7 @@ export default function AiChatShell() {
   const activeEditMessage = useMemo(() => messages.find((m) => m.id === activeEditId) || null, [messages, activeEditId]);
   const fullEditorMessage = useMemo(() => messages.find((m) => m.id === fullEditorId) || null, [messages, fullEditorId]);
 
-  // Used by the Facebook schedule panel so the AI can pick a good posting time
+  // Used by the Facebook schedule panel and as brand context for campaign prompts
   const businessContext = useMemo(
     () =>
       [(selectedBrand as any)?.name, (brandProfile as any)?.description]
@@ -45,6 +63,22 @@ export default function AiChatShell() {
         .join(". "),
     [selectedBrand, brandProfile],
   );
+
+  const campaignPrompt = (topic: string) =>
+    businessContext ? `${topic}\n\nBusiness: ${businessContext}` : topic;
+
+  // ── Voice input ──
+  // Transcripts are cumulative, so each update replaces the text after what was already typed.
+  const voiceBase = useRef("");
+  const voice = useVoiceInput((text) => {
+    const base = voiceBase.current.replace(/\s+$/, "");
+    setPrompt(base ? `${base} ${text}` : text);
+  });
+  const toggleMic = () => {
+    if (voice.listening) return voice.stop();
+    voiceBase.current = prompt;
+    void voice.start();
+  };
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -59,7 +93,7 @@ export default function AiChatShell() {
   const reloadThreads = () =>
     listThreads().then((r) => setThreads(Array.isArray(r) ? r : [])).catch(() => {});
 
-  // Shared args for the generator
+  // Shared args for the month generator
   const genArgs = (topic: string, savedAssistant: any) => ({
     topic, savedAssistant, brandId, toneId, brandProfile, orgData, setProgressText,
   });
@@ -110,17 +144,14 @@ export default function AiChatShell() {
 
   // ── Outbound calls ──
   // Returns true when the message was handled as an outbound-call request.
-    const tryOutbound = async (topic: string): Promise<boolean> => {
-    const gate = looksOutbound(topic);
-    console.log("[outbound] gate:", gate, "|", topic);
-    if (!gate) return false;
+  const tryOutbound = async (topic: string): Promise<boolean> => {
+    if (!looksOutbound(topic)) return false;
 
     setRunning(true);
     try {
       let intent;
       try {
         intent = await detectIntent(topic);
-        console.log("[outbound] intent:", intent);
       } catch (e: any) {
         console.error("[outbound] intent failed:", e);
         appendMessage({ id: uid("user"), role: "user", text: topic });
@@ -179,6 +210,7 @@ export default function AiChatShell() {
   const sendMessage = async (overrideText?: string) => {
     const topic = String(typeof overrideText === "string" ? overrideText : prompt).trim();
     if (!topic || running) return;
+    voice.cancel(); // stop the mic so a late transcript can't refill the input
     if (await tryOutbound(topic)) return;
     if (!brandId) return systemError("Please select a brand first.");
     if (!selectedThreadId) return systemError("Chat thread is not ready yet.");
@@ -216,20 +248,22 @@ export default function AiChatShell() {
           id: updated.id, text: updated.content, status: "ready",
           messageType: "generated_month", metadata: result.metadata,
         });
-      } else if (saved.message_type === "generate_image") {
-        const result = await generateSingleImageFromAssistant(genArgs(topic, saved));
+      } else if (saved.message_type === "generate_image" || isCampaignRequest(topic)) {
+        setProgressText("Designing your campaign…");
+        const c: any = await runCampaign(campaignPrompt(topic), "");
+        const metadata = campaignMetadata(c, topic);
         const updated = await updateMessage(saved.id, {
-          content: "Generated campaign image.",
+          content: c.message || "Generated campaign image.",
           message_type: "generated_image",
-          metadata: result.metadata,
-          draft_id: result.draft.id,
+          metadata,
+          ...(c.draft?.id ? { draft_id: c.draft.id } : {}),
         });
         patchMessage(saved.id, {
           id: updated.id, text: updated.content, status: "ready",
-          messageType: "generated_image", metadata: result.metadata,
-          draft: result.draft, campaignData: result.campaignData, shapes: result.shapes,
-          canvasWidth: result.canvasWidth, canvasHeight: result.canvasHeight,
-          backgroundImage: result.backgroundImage, topicChatId: result.topicChatId,
+          messageType: "generated_image", metadata,
+          draft: c.draft, campaignData: c.campaignData, shapes: c.shapes,
+          canvasWidth: c.canvasWidth, canvasHeight: c.canvasHeight,
+          backgroundImage: c.backgroundImage ?? null,
         });
       }
       await reloadThreads();
@@ -250,16 +284,17 @@ export default function AiChatShell() {
     setRunning(true);
     setProgressText("Regenerating campaign…");
     try {
-      const rebuilt = await generateSingleImageFromAssistant(
-        genArgs(topic, { metadata: { generation_prompt: topic } }),
-      );
+      const c: any = await runCampaign(campaignPrompt(topic), "");
+      const metadata = campaignMetadata(c, topic);
       patchMessage(messageId, {
-        draft: rebuilt.draft, campaignData: rebuilt.campaignData, shapes: rebuilt.shapes,
-        canvasWidth: rebuilt.canvasWidth, canvasHeight: rebuilt.canvasHeight,
-        backgroundImage: rebuilt.backgroundImage, metadata: rebuilt.metadata,
+        draft: c.draft, campaignData: c.campaignData, shapes: c.shapes,
+        canvasWidth: c.canvasWidth, canvasHeight: c.canvasHeight,
+        backgroundImage: c.backgroundImage ?? null, metadata,
       });
       // Keep the new design after a page reload
-      updateMessage(messageId, { metadata: rebuilt.metadata, draft_id: rebuilt.draft.id }).catch(() => {});
+      updateMessage(messageId, {
+        metadata, ...(c.draft?.id ? { draft_id: c.draft.id } : {}),
+      }).catch(() => {});
     } catch (err) {
       console.error(err);
       systemError("Could not regenerate this image. Please try again.");
@@ -327,12 +362,46 @@ export default function AiChatShell() {
           />
 
           <div className="relative z-20 border-t border-black/5 bg-white/60 backdrop-blur-xl">
-            <AiChatComposer
-              prompt={prompt}
-              running={running}
-              onPromptChange={setPrompt}
-              onSend={sendMessage}
-            />
+            {voice.error && (
+              <div className="px-4 pt-2 text-xs text-red-500">{voice.error}</div>
+            )}
+            {(voice.listening || voice.finishing) && (
+              <div className="px-4 pt-2 text-xs text-violet-600">
+                {voice.listening ? "Listening… tap the square to finish." : "Finishing transcript…"}
+              </div>
+            )}
+            <div className="flex items-center gap-2 pr-4">
+              <div className="min-w-0 flex-1">
+                <AiChatComposer
+                  prompt={prompt}
+                  running={running}
+                  onPromptChange={setPrompt}
+                  onSend={sendMessage}
+                />
+              </div>
+              {voice.supported && (
+                <button
+                  type="button"
+                  onClick={toggleMic}
+                  disabled={running || voice.connecting || voice.finishing}
+                  title={voice.listening ? "Stop and transcribe" : "Speak instead of typing"}
+                  aria-label={voice.listening ? "Stop recording" : "Start voice input"}
+                  className={`grid h-11 w-11 shrink-0 place-items-center rounded-full border transition disabled:opacity-50 ${
+                    voice.listening
+                      ? "animate-pulse border-red-200 bg-red-500 text-white"
+                      : "border-black/5 bg-white text-gray-500 hover:text-violet-700"
+                  }`}
+                >
+                  {voice.connecting || voice.finishing ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : voice.listening ? (
+                    <Square size={14} fill="currentColor" />
+                  ) : (
+                    <Mic size={16} />
+                  )}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </section>
