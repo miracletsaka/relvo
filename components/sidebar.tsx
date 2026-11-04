@@ -61,7 +61,7 @@ const CORE_NAV: NavItem[] = [
   // { name: "Design Studio",   href: "/dashboard/design-studio/admin/template", icon: Edit },
   { name: "Chats",           href: "/",                  icon: MessageCircle },
   { name: "Media Assets",    href: "/dashboard/media-assets",                 icon: ImageIcon },
-  { name: "Integrations", href: "/dashboard/integrations/google",             icon: Google },
+  { name: "Integrations", href: "/dashboard/integrations/",             icon: Google },
   // { name: "Platforms",       href: "/dashboard/platforms",                    icon: Linkedin },
   { name: "Brand",           href: "/dashboard/brands",                       icon: Plus },
   { name: "Profile",         href: "/dashboard/org-profile",                  icon: Building },
